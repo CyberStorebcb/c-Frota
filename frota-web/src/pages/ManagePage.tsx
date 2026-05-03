@@ -1,0 +1,609 @@
+import { useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  ClipboardList,
+  History,
+  Inbox,
+  TrendingUp,
+  RotateCcw,
+  Upload,
+  Search,
+  Settings2,
+  Truck,
+  X,
+} from 'lucide-react'
+import type { Apontamento } from '../apontamentos/ApontamentosContext'
+import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { Select, type SelectOption } from '../components/ui/Select'
+import { Portal } from '../components/ui/Portal'
+
+function formatDateBR(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return iso
+  return new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function isDefeitoEntrante(r: Apontamento, nowMs: number) {
+  if (r.resolvido) return false
+  const ap = new Date(r.dataApontamento + 'T12:00:00').getTime()
+  const ageDays = (nowMs - ap) / 86_400_000
+  return ageDays >= 0 && ageDays <= 7
+}
+
+function uniqSorted(values: string[]): SelectOption[] {
+  const u = [...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  return u.map((v) => ({ value: v, label: v }))
+}
+
+const DATA_OPTS: SelectOption[] = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'hoje', label: 'Hoje' },
+  { value: '7d', label: 'Últimos 7 dias' },
+  { value: '30d', label: 'Últimos 30 dias' },
+  { value: 'ano', label: 'Ano atual' },
+]
+
+function StatPill({
+  label,
+  value,
+  icon,
+  tone,
+  selected = false,
+  onClick,
+}: {
+  label: string
+  value: string
+  icon: React.ReactNode
+  tone: 'slate' | 'emerald' | 'rose' | 'sky'
+  selected?: boolean
+  onClick?: () => void
+}) {
+  const toneClass =
+    tone === 'emerald'
+      ? 'border-emerald-200/80 bg-emerald-50 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-100'
+      : tone === 'rose'
+        ? 'border-rose-200/80 bg-rose-50 text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100'
+        : tone === 'sky'
+          ? 'border-sky-200/80 bg-sky-50 text-sky-950 dark:border-sky-900/45 dark:bg-sky-950/35 dark:text-sky-100'
+          : 'border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
+
+  const Tag = onClick ? 'button' : 'div'
+
+  return (
+    <Tag
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={[
+        'flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-soft text-left',
+        onClick ? 'transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0' : '',
+        selected ? 'ring-2 ring-brand-500/60' : 'ring-0',
+        toneClass,
+      ].join(' ')}
+    >
+      <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/80 text-current shadow-sm dark:bg-slate-950/50">
+        {icon}
+      </span>
+      <div>
+        <div className="text-xs font-extrabold uppercase tracking-wide opacity-80">{label}</div>
+        <div className="text-lg font-black tracking-tight">{value}</div>
+      </div>
+    </Tag>
+  )
+}
+
+export function ManagePage() {
+  const { rows, marcarResolvido } = useApontamentos()
+  const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')
+  const [vehicleId, setVehicleId] = useState<string>('todos')
+  const [query, setQuery] = useState('')
+  const [processo, setProcesso] = useState('todos')
+  const [base, setBase] = useState('todos')
+  const [coordenador, setCoordenador] = useState('todos')
+  const [responsavel, setResponsavel] = useState('todos')
+  const [prefixo, setPrefixo] = useState('todos')
+  const [data, setData] = useState('todos')
+
+  const vehicleOptions = useMemo<SelectOption[]>(() => {
+    const map = new Map<string, string>()
+    for (const r of rows) {
+      if (!map.has(r.veiculoId)) map.set(r.veiculoId, r.veiculoLabel)
+    }
+    const opts = Array.from(map.entries()).map(([value, label]) => ({ value, label }))
+    opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+    return [{ value: 'todos', label: 'Todos os veículos' }, ...opts]
+  }, [rows])
+
+  const processoOptions = useMemo<SelectOption[]>(() => {
+    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.processo))]
+  }, [rows])
+
+  const baseOptions = useMemo<SelectOption[]>(() => {
+    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.base))]
+  }, [rows])
+
+  const coordOptions = useMemo<SelectOption[]>(() => {
+    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.coordenador))]
+  }, [rows])
+
+  const respOptions = useMemo<SelectOption[]>(() => {
+    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.responsavel))]
+  }, [rows])
+
+  const prefixoOptions = useMemo<SelectOption[]>(() => {
+    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.prefixo))]
+  }, [rows])
+
+  const stats = useMemo(() => {
+    const now = Date.now()
+    const pendentes = rows.filter((r) => !r.resolvido).length
+    const resolvidos = rows.filter((r) => r.resolvido).length
+    const entrantes = rows.filter((r) => isDefeitoEntrante(r, now)).length
+    return { total: rows.length, pendentes, resolvidos, entrantes }
+  }, [rows])
+
+  const sortedFiltered = useMemo(() => {
+    let list = rows
+    if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
+    if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
+    if (vehicleId !== 'todos') list = list.filter((r) => r.veiculoId === vehicleId)
+    if (processo !== 'todos') list = list.filter((r) => r.processo === processo)
+    if (base !== 'todos') list = list.filter((r) => r.base === base)
+    if (coordenador !== 'todos') list = list.filter((r) => r.coordenador === coordenador)
+    if (responsavel !== 'todos') list = list.filter((r) => r.responsavel === responsavel)
+    if (prefixo !== 'todos') list = list.filter((r) => r.prefixo === prefixo)
+
+    if (data !== 'todos') {
+      const now = new Date()
+      now.setHours(23, 59, 59, 999)
+      const nowMs = now.getTime()
+      const ano = now.getFullYear()
+
+      if (data === 'ano') {
+        list = list.filter((r) => Number(r.dataApontamento.slice(0, 4)) === ano)
+      } else {
+        const dias = data === 'hoje' ? 0 : data === '7d' ? 7 : 30
+        const min = nowMs - dias * 86_400_000
+        list = list.filter((r) => new Date(r.dataApontamento + 'T00:00:00').getTime() >= min)
+      }
+    }
+    const q = query.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (r) =>
+          r.defeito.toLowerCase().includes(q) ||
+          r.veiculoLabel.toLowerCase().includes(q),
+      )
+    }
+    return [...list].sort(
+      (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),
+    )
+  }, [rows, visao, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query])
+
+  const filtrosAtivos =
+    vehicleId !== 'todos' ||
+    processo !== 'todos' ||
+    base !== 'todos' ||
+    coordenador !== 'todos' ||
+    responsavel !== 'todos' ||
+    prefixo !== 'todos' ||
+    data !== 'todos'
+
+  const limparFiltros = () => {
+    setVehicleId('todos')
+    setProcesso('todos')
+    setBase('todos')
+    setCoordenador('todos')
+    setResponsavel('todos')
+    setPrefixo('todos')
+    setData('todos')
+  }
+
+  const prazoPassou = (prazoIso: string, resolvido: boolean) => {
+    if (resolvido) return false
+    const t = new Date(prazoIso + 'T23:59:59').getTime()
+    return Date.now() > t
+  }
+
+  const [resolveOpen, setResolveOpen] = useState(false)
+  const [resolveId, setResolveId] = useState<string | null>(null)
+  const [resolveValor, setResolveValor] = useState<string>('')
+  const [resolveImgs, setResolveImgs] = useState<string[]>([])
+  const fileRef = useRef<HTMLInputElement | null>(null)
+
+  const currentResolve = useMemo(
+    () => (resolveId ? rows.find((r) => r.id === resolveId) ?? null : null),
+    [rows, resolveId],
+  )
+
+  const openResolveModal = (r: Apontamento) => {
+    setResolveId(r.id)
+    setResolveValor(r.reparoValor != null ? String(r.reparoValor) : '')
+    setResolveImgs(r.reparoImagens ?? [])
+    setResolveOpen(true)
+  }
+
+  const closeResolveModal = () => {
+    setResolveOpen(false)
+    setResolveId(null)
+    setResolveValor('')
+    setResolveImgs([])
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  const addImages = async (files: FileList | null) => {
+    if (!files) return
+    const remaining = Math.max(0, 3 - resolveImgs.length)
+    const picked = Array.from(files).slice(0, remaining)
+    const toDataUrl = (f: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result ?? ''))
+        reader.onerror = () => reject(new Error('Falha ao ler imagem'))
+        reader.readAsDataURL(f)
+      })
+    try {
+      const urls = (await Promise.all(picked.map(toDataUrl))).filter(Boolean)
+      setResolveImgs((prev) => [...prev, ...urls].slice(0, 3))
+    } finally {
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const confirmResolve = () => {
+    if (!resolveId) return
+    const v = resolveValor.trim()
+    const valor = v ? Number(v.replace(',', '.')) : null
+    marcarResolvido(resolveId, { valor: Number.isFinite(valor ?? NaN) ? valor : null, imagens: resolveImgs })
+    closeResolveModal()
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-900 text-white shadow-soft dark:bg-slate-100 dark:text-slate-900">
+            <Settings2 size={18} />
+          </div>
+          <div>
+            <div className="text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+              Gerenciar
+            </div>
+            <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              Apontamentos de defeitos — ordenados por data (mais antigos no topo)
+            </div>
+          </div>
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <Link
+            to="/gerenciar/evolucao"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
+          >
+            <TrendingUp size={18} />
+            Evolução
+          </Link>
+          <Link
+            to="/gerenciar/historico"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
+          >
+            <History size={18} />
+            Histórico
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatPill
+          label="Apontamentos"
+          value={String(stats.total)}
+          icon={<ClipboardList size={18} />}
+          tone="slate"
+          selected={visao === 'apontamentos'}
+          onClick={() => setVisao('apontamentos')}
+        />
+        <StatPill
+          label="Pendentes"
+          value={String(stats.pendentes)}
+          icon={<AlertTriangle size={18} />}
+          tone="rose"
+          selected={visao === 'pendentes'}
+          onClick={() => setVisao('pendentes')}
+        />
+        <StatPill
+          label="Resolvidos"
+          value={String(stats.resolvidos)}
+          icon={<CheckCircle2 size={18} />}
+          tone="emerald"
+          selected={visao === 'resolvidos'}
+          onClick={() => setVisao('resolvidos')}
+        />
+        <StatPill
+          label="Defeitos entrantes"
+          value={String(stats.entrantes)}
+          icon={<Inbox size={18} />}
+          tone="sky"
+        />
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            <Select
+              label="Filtrar por veículo"
+              value={vehicleId}
+              options={vehicleOptions}
+              onChange={setVehicleId}
+            />
+            <Select label="Processo" value={processo} options={processoOptions} onChange={setProcesso} />
+            <Select label="Base" value={base} options={baseOptions} onChange={setBase} />
+            <Select label="Coordenador" value={coordenador} options={coordOptions} onChange={setCoordenador} />
+            <Select label="Responsável" value={responsavel} options={respOptions} onChange={setResponsavel} />
+            <Select label="Prefixo" value={prefixo} options={prefixoOptions} onChange={setPrefixo} />
+            <Select label="Data" value={data} options={DATA_OPTS} onChange={setData} />
+            <div>
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Buscar defeito ou veículo
+              </div>
+              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Texto do defeito, prefixo ou placa..."
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={limparFiltros}
+            disabled={!filtrosAtivos}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            title="Limpar filtros"
+          >
+            <RotateCcw size={18} aria-hidden />
+            Limpar
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                <th className="px-4 py-3">Veículo</th>
+                <th className="px-4 py-3">Processo</th>
+                <th className="px-4 py-3">Base</th>
+                <th className="px-4 py-3">Coordenador</th>
+                <th className="px-4 py-3">Defeito</th>
+                <th className="px-4 py-3">Data de apontamento</th>
+                <th className="px-4 py-3">Prazo</th>
+                <th className="px-4 py-3 text-center">Resolvido ou não</th>
+              </tr>
+            </thead>
+            <tbody className="font-semibold text-slate-800 dark:text-slate-200">
+              {sortedFiltered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-500 dark:text-slate-400">
+                    Nenhum registro para os filtros atuais.
+                  </td>
+                </tr>
+              ) : (
+                sortedFiltered.map((r) => {
+                  const atrasado = prazoPassou(r.prazo, r.resolvido)
+                  return (
+                    <tr
+                      key={r.id}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40"
+                    >
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+                            <Truck size={14} />
+                          </span>
+                          <span className="font-mono text-xs tracking-tight">{r.veiculoLabel}</span>
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                        {r.processo}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                        {r.base}
+                      </td>
+                      <td className="max-w-[140px] truncate px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                        {r.coordenador}
+                      </td>
+                      <td className="max-w-[220px] px-4 py-3 text-xs leading-snug sm:text-sm">
+                        {r.defeito}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
+                        {formatDateBR(r.dataApontamento)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
+                        <span className={atrasado ? 'font-black text-rose-600 dark:text-rose-400' : ''}>
+                          {formatDateBR(r.prazo)}
+                        </span>
+                        {atrasado ? (
+                          <span className="ml-2 text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400">
+                            Atrasado
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-2">
+                          {r.resolvido ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                              title="Resolvido"
+                            >
+                              <Check size={16} strokeWidth={3} className="text-emerald-600" aria-hidden />
+                              Sim
+                            </span>
+                          ) : (
+                            <>
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1.5 text-xs font-extrabold text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+                                title="Não resolvido"
+                              >
+                                <X size={14} strokeWidth={2.5} className="text-rose-600" aria-hidden />
+                                Não
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => openResolveModal(r)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
+                                title="Marcar como resolvido"
+                                aria-label={`Marcar defeito ${r.defeito.slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
+                              >
+                                <Check size={18} strokeWidth={3} aria-hidden />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {sortedFiltered.length} registro(s) — mais antigos primeiro na coluna &quot;Data de apontamento&quot;.
+        </div>
+      </div>
+
+      {resolveOpen ? (
+        <Portal>
+          <button
+            type="button"
+            className="fixed inset-0 z-[9998] bg-black/50"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              closeResolveModal()
+            }}
+            aria-label="Fechar"
+          />
+          <div className="fixed inset-0 z-[9999] grid place-items-center p-4">
+            <div
+              className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950"
+              onPointerDown={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Finalizar reparo"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
+                    Marcar como resolvido
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                    {currentResolve ? (
+                      <>
+                        <span className="font-extrabold">{currentResolve.prefixo}</span> — {currentResolve.defeito}
+                      </>
+                    ) : (
+                      'Informe o valor e anexe evidências.'
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeResolveModal}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                  aria-label="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Valor gasto no reparo (R$)
+                  </div>
+                  <input
+                    value={resolveValor}
+                    onChange={(e) => setResolveValor(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="Ex.: 250,00"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-brand-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Opcional. Use vírgula ou ponto.
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Imagens (máx. 3)
+                  </div>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => void addImages(e.target.files)}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={resolveImgs.length >= 3}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-extrabold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                    >
+                      <Upload size={16} />
+                      Anexar
+                    </button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {resolveImgs.map((src, idx) => (
+                      <div key={src} className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+                        <img src={src} alt={`Anexo ${idx + 1}`} className="h-20 w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setResolveImgs((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/75"
+                          aria-label="Remover imagem"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeResolveModal}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmResolve}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-soft hover:bg-emerald-700"
+                >
+                  <Check size={18} strokeWidth={3} />
+                  Confirmar resolvido
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      ) : null}
+    </div>
+  )
+}
