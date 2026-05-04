@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import type { Apontamento } from '../apontamentos/ApontamentosContext'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { useAuth } from '../auth/AuthContext'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { Portal } from '../components/ui/Portal'
 
@@ -100,6 +101,10 @@ function StatPill({
 
 export function ManagePage() {
   const { rows, marcarResolvido } = useApontamentos()
+  const { user } = useAuth()
+  const canMarkResolved =
+    user?.role === 'admin' || (user?.role === 'user' && user.userKind === 'special')
+
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')
   const [vehicleId, setVehicleId] = useState<string>('todos')
   const [query, setQuery] = useState('')
@@ -223,6 +228,7 @@ export function ManagePage() {
   )
 
   const openResolveModal = (r: Apontamento) => {
+    if (!canMarkResolved) return
     setResolveId(r.id)
     setResolveValor(r.reparoValor != null ? String(r.reparoValor) : '')
     setResolveImgs(r.reparoImagens ?? [])
@@ -257,12 +263,22 @@ export function ManagePage() {
   }
 
   const confirmResolve = () => {
-    if (!resolveId) return
+    if (!canMarkResolved || !resolveId) return
     const v = resolveValor.trim()
     const valor = v ? Number(v.replace(',', '.')) : null
     marcarResolvido(resolveId, { valor: Number.isFinite(valor ?? NaN) ? valor : null, imagens: resolveImgs })
     closeResolveModal()
   }
+
+  useEffect(() => {
+    if (!canMarkResolved && resolveOpen) {
+      setResolveOpen(false)
+      setResolveId(null)
+      setResolveValor('')
+      setResolveImgs([])
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }, [canMarkResolved, resolveOpen])
 
   return (
     <div className="space-y-5">
@@ -454,15 +470,17 @@ export function ManagePage() {
                                 <X size={14} strokeWidth={2.5} className="text-rose-600" aria-hidden />
                                 Não
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => openResolveModal(r)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
-                                title="Marcar como resolvido"
-                                aria-label={`Marcar defeito ${r.defeito.slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
-                              >
-                                <Check size={18} strokeWidth={3} aria-hidden />
-                              </button>
+                              {canMarkResolved ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openResolveModal(r)}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
+                                  title="Marcar como resolvido"
+                                  aria-label={`Marcar defeito ${r.defeito.slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
+                                >
+                                  <Check size={18} strokeWidth={3} aria-hidden />
+                                </button>
+                              ) : null}
                             </>
                           )}
                         </div>
@@ -480,7 +498,7 @@ export function ManagePage() {
         </div>
       </div>
 
-      {resolveOpen ? (
+      {resolveOpen && canMarkResolved ? (
         <Portal>
           <button
             type="button"

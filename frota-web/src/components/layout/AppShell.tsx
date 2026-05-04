@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 
-export function AppShell() {
+export function AppShellLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -23,17 +23,25 @@ export function AppShell() {
         <div className="min-w-0 flex-1">
           <Topbar onMenuClick={toggleSidebar} onToggleSidebar={toggleCollapsed} />
           <main
-            className="h-[calc(100%-56px)] overflow-auto px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
+            className="flex h-[calc(100%-56px)] min-h-0 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
             onClick={() => {
               if (sidebarOpen) closeSidebar()
               if (!sidebarCollapsed) collapseSidebar()
             }}
           >
-            <Outlet />
+            {children}
           </main>
         </div>
       </div>
     </div>
+  )
+}
+
+export function AppShell() {
+  return (
+    <AppShellLayout>
+      <Outlet />
+    </AppShellLayout>
   )
 }
 

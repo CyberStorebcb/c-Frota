@@ -238,8 +238,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const res = saveApontamentosToStorage(rows)
-    if (!res.ok) setPersistError(res.message)
-    else setPersistError(null)
+    setPersistError(res.ok === false ? res.message : null)
   }, [rows])
 
   const clearPersistError = useCallback(() => setPersistError(null), [])
