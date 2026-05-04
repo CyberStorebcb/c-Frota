@@ -1,15 +1,15 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './components/auth/RequireAuth'
+import { RequireAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
 import { ApontamentosLayout } from './layouts/ApontamentosLayout'
+import { AdministradorPage } from './pages/AdministradorPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { EvolucaoPage } from './pages/EvolucaoPage'
 import { HistoricoPage } from './pages/HistoricoPage'
 import { LoginPage } from './pages/LoginPage'
-import { RegistroEspecialPage } from './pages/RegistroEspecialPage'
-import { RequireAdmin } from './components/auth/RequireAdmin'
-import { AdministradorPage } from './pages/AdministradorPage'
 import { ManagePage } from './pages/ManagePage'
+import { RegistroEspecialPage } from './pages/RegistroEspecialPage'
 import { RegistroRoute } from './routes/RegistroRoute'
 
 export default function App() {
