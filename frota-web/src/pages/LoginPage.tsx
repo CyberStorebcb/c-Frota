@@ -4,44 +4,14 @@ import { Loader2, Lock, LogIn, Mail, MessageSquare, Moon, Sparkles, Sun, Zap } f
 import { useAuth } from '../auth/AuthContext'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import { useTheme } from '../theme/ThemeProvider'
+import { renderFormattedText } from '../utils/renderFormattedAiText'
 
 const FLUX_VB_H = 800
 const FLUX_VB_W = 60
 const FLUX_PERIOD = 80
 
-/** Converte `**negrito**` da IA em texto realmente a negrito; quebras de linha viram blocos. */
 function renderAiResponseRich(text: string): ReactNode {
-  const boldRe = /\*\*(.+?)\*\*/g
-
-  function lineToNodes(line: string, lineKey: string): ReactNode {
-    const out: ReactNode[] = []
-    let last = 0
-    let m: RegExpExecArray | null
-    const r = new RegExp(boldRe.source, boldRe.flags)
-    let i = 0
-    while ((m = r.exec(line)) !== null) {
-      if (m.index > last) {
-        out.push(line.slice(last, m.index))
-      }
-      out.push(
-        <strong key={`${lineKey}-b${i++}`} className="font-bold text-white">
-          {m[1]}
-        </strong>,
-      )
-      last = m.index + m[0].length
-    }
-    if (last < line.length) {
-      out.push(line.slice(last))
-    }
-    return out.length > 0 ? out : line
-  }
-
-  const lines = text.split('\n')
-  return lines.map((line, idx) => (
-    <span key={`L${idx}`} className="block min-h-[1em]">
-      {lineToNodes(line, `L${idx}`)}
-    </span>
-  ))
+  return renderFormattedText(text)
 }
 
 function buildFluxRailPath(totalH: number): string {
