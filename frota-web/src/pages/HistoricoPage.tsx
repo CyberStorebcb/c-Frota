@@ -70,10 +70,23 @@ async function urlToPngData(url: string): Promise<{ data: string; w: number; h: 
 export function HistoricoPage() {
   const { rows } = useApontamentos()
   const [query, setQuery] = useState('')
+  const [valorMin, setValorMin] = useState('')
+  const [valorMax, setValorMax] = useState('')
+  const [dataInicio, setDataInicio] = useState('')
+  const [dataFim, setDataFim] = useState('')
   const [imgOpen, setImgOpen] = useState<string | null>(null)
 
   const historico = useMemo(() => {
     const q = query.trim().toLowerCase()
+    const parseMoney = (s: string) => {
+      const t = s.trim()
+      if (!t) return null
+      const n = Number(t.replace(/\./g, '').replace(',', '.'))
+      return Number.isFinite(n) ? n : null
+    }
+    const min = parseMoney(valorMin)
+    const max = parseMoney(valorMax)
+
     let list = rows.filter((r) => r.resolvido && r.dataResolvido)
     if (q) {
       list = list.filter(
@@ -82,11 +95,26 @@ export function HistoricoPage() {
           r.veiculoLabel.toLowerCase().includes(q),
       )
     }
+    if (min != null || max != null) {
+      list = list.filter((r) => {
+        const v = r.reparoValor
+        if (v == null || !Number.isFinite(v)) return false
+        if (min != null && v < min) return false
+        if (max != null && v > max) return false
+        return true
+      })
+    }
+    if (dataInicio) {
+      list = list.filter((r) => !!r.dataResolvido && r.dataResolvido >= dataInicio)
+    }
+    if (dataFim) {
+      list = list.filter((r) => !!r.dataResolvido && r.dataResolvido <= dataFim)
+    }
     return [...list].sort(
       (a, b) =>
         new Date(b.dataResolvido!).getTime() - new Date(a.dataResolvido!).getTime(),
     )
-  }, [rows, query])
+  }, [rows, query, valorMin, valorMax, dataInicio, dataFim])
 
   const gerarPdf = async (r: (typeof historico)[number]) => {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -207,6 +235,7 @@ export function HistoricoPage() {
     const entregaIso = r.dataResolvido || r.dataApontamento
     const duracao = daysBetweenIso(inicioIso, entregaIso)
     const custo = formatMoneyBRL(r.reparoValor)
+    const servico = (r.reparoDescricao ?? '').trim()
 
     // Header: logo (esquerda), "Gerado em" (direita) e título central (como exemplo)
     const headerTop = y
@@ -424,6 +453,32 @@ export function HistoricoPage() {
     doc.setTextColor(0)
     y += secH + 34
 
+    // Serviço executado (opcional)
+    if (servico) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(30)
+      doc.text('Serviço executado', margin, y)
+      doc.setTextColor(0)
+      y += 12
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      doc.setTextColor(40)
+      const usedH = drawWrapped({
+        text: servico,
+        x: margin,
+        y: y + 10,
+        maxW: pageW - margin * 2,
+        fontSize: 11,
+        lineH: 14,
+        align: 'left',
+        maxLines: 6,
+      })
+      doc.setTextColor(0)
+      y += usedH + 18
+    }
+
     // Evidências
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(14)
@@ -523,14 +578,43 @@ export function HistoricoPage() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-            <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por defeito ou veículo..."
-              className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-            />
+          <div className="flex w-full flex-col gap-2 sm:max-w-3xl sm:flex-row sm:items-center">
+            <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+              <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por defeito ou veículo..."
+                className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+              />
+            </div>
+
+            <div className="flex w-full max-w-md items-center gap-2">
+              <div className="flex w-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Valor mín.
+                </span>
+                <input
+                  value={valorMin}
+                  onChange={(e) => setValorMin(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0"
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                />
+              </div>
+              <div className="flex w-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Valor máx.
+                </span>
+                <input
+                  value={valorMax}
+                  onChange={(e) => setValorMax(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="9999"
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                />
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
             <CalendarCheck2 size={14} />
@@ -538,12 +622,48 @@ export function HistoricoPage() {
           </div>
         </div>
 
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              De
+            </span>
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+            />
+          </div>
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Até
+            </span>
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+            />
+          </div>
+          {(dataInicio || dataFim) && (
+            <button
+              type="button"
+              onClick={() => { setDataInicio(''); setDataFim('') }}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-900"
+            >
+              <X size={12} aria-hidden />
+              Limpar datas
+            </button>
+          )}
+        </div>
+
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="min-w-[980px] w-full border-collapse text-left text-sm">
+          <table className="min-w-[1080px] w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
                 <th className="px-4 py-3">Veículo</th>
                 <th className="px-4 py-3">Defeito</th>
+                <th className="px-4 py-3">Serviço</th>
                 <th className="px-4 py-3">Apontado em</th>
                 <th className="px-4 py-3">Resolvido em</th>
                 <th className="px-4 py-3">Valor</th>
@@ -553,7 +673,7 @@ export function HistoricoPage() {
             <tbody className="font-semibold text-slate-800 dark:text-slate-200">
               {historico.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
                     Nenhum defeito resolvido no histórico. Marque itens como resolvidos em{' '}
                     <Link to="/gerenciar" className="font-extrabold text-brand-600 underline dark:text-brand-400">
                       Gerenciar
@@ -576,6 +696,13 @@ export function HistoricoPage() {
                       </span>
                     </td>
                     <td className="max-w-[300px] px-4 py-3 text-xs leading-snug sm:text-sm">{r.defeito}</td>
+                    <td className="max-w-[340px] px-4 py-3 text-xs leading-snug text-slate-700 dark:text-slate-300 sm:text-sm">
+                      {r.reparoDescricao?.trim() ? (
+                        r.reparoDescricao
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
                       {formatDateBR(r.dataApontamento)}
                     </td>

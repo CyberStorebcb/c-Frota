@@ -1,21 +1,17 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   type LucideIcon,
-  AlertTriangle,
   BarChart3,
-  BrainCircuit,
   Calendar,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   ChevronUp,
   ClipboardCheck,
   ClipboardX,
   Filter,
-  Loader2,
-  Sparkles,
-  TrendingUp,
+  Gauge,
+  Truck,
 } from 'lucide-react'
 import {
   Area,
@@ -31,66 +27,49 @@ import {
 } from 'recharts'
 
 import { Select } from '../components/ui/Select'
+import {
+  FLEET_STATUS_BY_PLACA_STORAGE_KEY,
+  getDisplayedFleetVehicles,
+} from '../frota/vehicleRegistry'
 import { useTheme } from '../theme/ThemeProvider'
-import { renderFormattedText } from '../utils/renderFormattedAiText'
 
-type GeminiGenerateResponse = {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-  error?: { message?: string }
+type ChartRow = { name: string; realizados: number; naoRealizados: number }
+
+const CHART_DATA_BY_PERIOD: Record<string, ChartRow[]> = {
+  '7d': [
+    { name: 'Seg', realizados: 110, naoRealizados: 15 },
+    { name: 'Ter', realizados: 125, naoRealizados: 10 },
+    { name: 'Qua', realizados: 95,  naoRealizados: 30 },
+    { name: 'Qui', realizados: 140, naoRealizados: 5  },
+    { name: 'Sex', realizados: 130, naoRealizados: 12 },
+    { name: 'Sab', realizados: 45,  naoRealizados: 8  },
+  ],
+  '30d': [
+    { name: 'Sem 1', realizados: 520, naoRealizados: 60 },
+    { name: 'Sem 2', realizados: 490, naoRealizados: 85 },
+    { name: 'Sem 3', realizados: 610, naoRealizados: 42 },
+    { name: 'Sem 4', realizados: 580, naoRealizados: 55 },
+  ],
+  'hoje': [
+    { name: 'Manhã', realizados: 52, naoRealizados: 6 },
+    { name: 'Tarde', realizados: 68, naoRealizados: 4 },
+    { name: 'Noite', realizados: 32, naoRealizados: 2 },
+  ],
 }
 
-async function callGemini(prompt: string, systemInstruction: string): Promise<string> {
-  const key = (import.meta.env.VITE_GEMINI_API_KEY ?? '').trim()
-  if (!key) throw new Error('API_KEY_MISSING')
-
-  let model = (import.meta.env.VITE_GEMINI_MODEL ?? 'gemini-2.5-flash').trim()
-  model = model.replace(/^models\//, '')
-
-  const payload = {
-    contents: [{ parts: [{ text: prompt }] }],
-    systemInstruction: { parts: [{ text: systemInstruction }] },
-  }
-
-  let retries = 5
-  let delay = 1000
-
-  while (retries > 0) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = (await response.json()) as GeminiGenerateResponse
-
-      if (!response.ok) {
-        const msg = data.error?.message ?? response.statusText
-        throw new Error(msg || 'GEMINI_HTTP_ERROR')
-      }
-
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-      if (typeof text === 'string' && text.trim()) return text
-      throw new Error('GEMINI_EMPTY_RESPONSE')
-    } catch (e) {
-      retries -= 1
-      if (retries === 0) throw e
-      await new Promise((r) => setTimeout(r, delay))
-      delay *= 2
-    }
-  }
-  throw new Error('GEMINI_UNAVAILABLE')
+const BASE_SCALE: Record<string, number> = {
+  todos: 1,
+  pdt:   0.38,
+  bcb:   0.35,
+  sti:   0.27,
 }
 
-/** Dados ilustrativos — adesão aos checklists por dia da semana */
-const checklistData = [
-  { name: 'Seg', realizados: 110, naoRealizados: 15 },
-  { name: 'Ter', realizados: 125, naoRealizados: 10 },
-  { name: 'Qua', realizados: 95, naoRealizados: 30 },
-  { name: 'Qui', realizados: 140, naoRealizados: 5 },
-  { name: 'Sex', realizados: 130, naoRealizados: 12 },
-  { name: 'Sab', realizados: 45, naoRealizados: 8 },
-]
+const KPIS_BY_PERIOD: Record<string, { checklistsBase: number; conformidade: string }> = {
+  '7d':   { checklistsBase: 152, conformidade: '94%' },
+  '30d':  { checklistsBase: 621, conformidade: '91%' },
+  'hoje': { checklistsBase: 28,  conformidade: '96%' },
+}
+
 
 const CHART_COLORS = {
   realizados: '#1E40AF',
@@ -233,7 +212,6 @@ function GomanLogo({
 }: {
   mode?: 'full' | 'icon'
   className?: string
-  /** `dark`: texto claro sobre barra escura. */
   variant?: 'light' | 'dark'
 }) {
   const uid = useId().replace(/:/g, '')
@@ -292,11 +270,14 @@ function QuickSelect({
 }) {
   return (
     <div className="relative min-w-0">
-      <Icon className="pointer-events-none absolute left-2.5 top-1/2 z-10 size-3.5 -translate-y-1/2 text-slate-500 dark:text-slate-400" aria-hidden />
+      <Icon
+        className="pointer-events-none absolute left-3 top-1/2 z-10 size-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+        aria-hidden
+      />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full min-w-[132px] appearance-none rounded-lg border border-slate-200/80 bg-transparent py-2 pl-8 pr-9 text-[11px] font-bold text-slate-800 outline-none transition hover:border-slate-300 hover:bg-slate-50/50 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:bg-transparent dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-white/5 sm:min-w-[158px]"
+        className="w-full min-w-[132px] appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-bold text-slate-900 shadow-sm outline-none transition-colors hover:bg-slate-50 focus:ring-2 focus:ring-blue-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900/60 sm:min-w-[158px]"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -304,9 +285,20 @@ function QuickSelect({
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" aria-hidden />
+      <ChevronDown
+        className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+        aria-hidden
+      />
     </div>
   )
+}
+
+type Stat = {
+  label: string
+  value: string
+  Icon: LucideIcon
+  iconWrap: string
+  cardHover: string
 }
 
 export function DashboardPage() {
@@ -314,8 +306,17 @@ export function DashboardPage() {
   const isDark = theme === 'dark'
   const areaGradId = useId().replace(/:/g, '')
   const [viewMode, setViewMode] = useState<'bar' | 'area'>('bar')
-  const [isAiLoading, setIsAiLoading] = useState(false)
-  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
+  const [vehicles, setVehicles] = useState(() => getDisplayedFleetVehicles())
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'frota.vehicles.registry' || e.key === FLEET_STATUS_BY_PLACA_STORAGE_KEY || e.key === null) {
+        setVehicles(getDisplayedFleetVehicles())
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   const [periodo, setPeriodo] = useState<string>('7d')
   const [filtroBaseRapido, setFiltroBaseRapido] = useState<string>('todos')
@@ -325,8 +326,6 @@ export function DashboardPage() {
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>('todos')
   const [filtroPrefixo, setFiltroPrefixo] = useState<string>('todos')
   const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(true)
-
-  const geminiConfigured = Boolean((import.meta.env.VITE_GEMINI_API_KEY ?? '').trim())
 
   const baseEfetiva =
     filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
@@ -340,46 +339,73 @@ export function DashboardPage() {
       if (filtroPrefixo !== 'todos' && row.prefixo !== filtroPrefixo) return false
       return true
     })
-  }, [
-    filtroProcesso,
-    baseEfetiva,
-    filtroCoordenador,
-    filtroResponsavel,
-    filtroPrefixo,
-  ])
+  }, [filtroProcesso, baseEfetiva, filtroCoordenador, filtroResponsavel, filtroPrefixo])
 
   const pendentesCount = pendenciasFiltradas.length
 
-  const stats = useMemo(
-    () =>
-      [
-        {
-          label: 'Checklists hoje',
-          value: '152',
-          Icon: ClipboardCheck,
-          iconWrap:
-            'bg-blue-50 text-blue-600 group-hover:scale-110 dark:bg-blue-950/50 dark:text-blue-400',
-          cardHover: 'hover:border-blue-400 dark:hover:border-blue-500',
-        },
-        {
-          label: 'Conformidade',
-          value: '94%',
-          Icon: CheckCircle2,
-          iconWrap:
-            'bg-emerald-50 text-emerald-600 group-hover:scale-110 dark:bg-emerald-950/50 dark:text-emerald-400',
-          cardHover: 'hover:border-emerald-400 dark:hover:border-emerald-500',
-        },
-        {
-          label: 'Pendentes',
-          value: String(pendentesCount),
-          Icon: ClipboardX,
-          iconWrap:
-            'bg-orange-50 text-orange-600 group-hover:scale-110 dark:bg-orange-950/50 dark:text-orange-400',
-          cardHover: 'hover:border-orange-400 dark:hover:border-orange-500',
-        },
-      ] as const,
-    [pendentesCount],
-  )
+  const chartData = useMemo<ChartRow[]>(() => {
+    const base = CHART_DATA_BY_PERIOD[periodo] ?? CHART_DATA_BY_PERIOD['7d']!
+    const scale = BASE_SCALE[baseEfetiva] ?? 1
+    if (scale === 1) return base
+    return base.map((r) => ({
+      ...r,
+      realizados: Math.round(r.realizados * scale),
+      naoRealizados: Math.max(1, Math.round(r.naoRealizados * scale)),
+    }))
+  }, [periodo, baseEfetiva])
+
+  const stats = useMemo<Stat[]>(() => {
+    const kpi = KPIS_BY_PERIOD[periodo] ?? KPIS_BY_PERIOD['7d']!
+    const scale = BASE_SCALE[baseEfetiva] ?? 1
+    const checklistsTotal = Math.round(kpi.checklistsBase * scale)
+    const checklistsValue = String(checklistsTotal)
+    const veiculosTotal =
+      baseEfetiva === 'todos'
+        ? vehicles.length
+        : vehicles.filter((v) => v.base.toLowerCase().includes(baseEfetiva)).length
+    const pctAdesao = veiculosTotal > 0
+      ? Math.min(100, Math.round((checklistsTotal / veiculosTotal) * 100))
+      : 0
+    const mediaPorVeiculo = `${pctAdesao}%`
+
+    return [
+      {
+        label: 'Total de Veículos',
+        value: String(veiculosTotal),
+        Icon: Truck,
+        iconWrap: 'bg-purple-50 text-purple-600 group-hover:scale-110 dark:bg-purple-950/50 dark:text-purple-400',
+        cardHover: 'hover:border-purple-400 dark:hover:border-purple-500',
+      },
+      {
+        label: 'Checklists hoje',
+        value: checklistsValue,
+        Icon: ClipboardCheck,
+        iconWrap: 'bg-blue-50 text-blue-600 group-hover:scale-110 dark:bg-blue-950/50 dark:text-blue-400',
+        cardHover: 'hover:border-blue-400 dark:hover:border-blue-500',
+      },
+      {
+        label: 'Conformidade',
+        value: kpi.conformidade,
+        Icon: CheckCircle2,
+        iconWrap: 'bg-emerald-50 text-emerald-600 group-hover:scale-110 dark:bg-emerald-950/50 dark:text-emerald-400',
+        cardHover: 'hover:border-emerald-400 dark:hover:border-emerald-500',
+      },
+      {
+        label: 'Pendentes',
+        value: String(pendentesCount),
+        Icon: ClipboardX,
+        iconWrap: 'bg-orange-50 text-orange-600 group-hover:scale-110 dark:bg-orange-950/50 dark:text-orange-400',
+        cardHover: 'hover:border-orange-400 dark:hover:border-orange-500',
+      },
+      {
+        label: 'Adesão da Frota',
+        value: mediaPorVeiculo,
+        Icon: Gauge,
+        iconWrap: 'bg-sky-50 text-sky-600 group-hover:scale-110 dark:bg-sky-950/50 dark:text-sky-400',
+        cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
+      },
+    ]
+  }, [pendentesCount, periodo, baseEfetiva, vehicles])
 
   const chartUi = useMemo(
     () => ({
@@ -389,21 +415,6 @@ export function DashboardPage() {
     [isDark],
   )
 
-  const handleGenerateAnalysis = async () => {
-    if (!geminiConfigured) return
-    setIsAiLoading(true)
-    try {
-      const res = await callGemini(
-        `Dados semanais de checklists (realizados vs não realizados por dia): ${JSON.stringify(checklistData)}`,
-        'És o analista de segurança da GOMAN. Analisa a taxa de realização de checklists e dá um insight curto sobre a adesão dos condutores, em Português de Portugal.',
-      )
-      setAiAnalysis(res)
-    } catch {
-      setAiAnalysis('Não foi possível gerar a análise. Verifique VITE_GEMINI_API_KEY no .env.')
-    } finally {
-      setIsAiLoading(false)
-    }
-  }
 
   return (
     <div className="-mx-3 -my-3 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent text-slate-900 dark:text-slate-100 sm:-mx-4 sm:-my-4 lg:-mx-8 lg:-my-6 lg:overflow-hidden">
@@ -458,54 +469,56 @@ export function DashboardPage() {
           </div>
         </header>
 
-        {filtrosAvancadosVisiveis ? (
-          <div
-            id="dashboard-filtros-avancados"
-            className="border-t border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8"
-          >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
-              <Select
-                label="Processo"
-                value={filtroProcesso}
-                onChange={setFiltroProcesso}
-                options={[...PROCESSO_FILTER_OPTIONS]}
-              />
-              <Select
-                label="Base"
-                value={filtroBase}
-                onChange={(v) => {
-                  setFiltroBase(v)
-                  if (v === 'todos') setFiltroBaseRapido('todos')
-                  else setFiltroBaseRapido(v)
-                }}
-                options={[...BASE_FILTER_OPTIONS]}
-              />
-              <Select
-                label="Coordenador"
-                value={filtroCoordenador}
-                onChange={setFiltroCoordenador}
-                options={[...COORDENADOR_OPTIONS]}
-              />
-              <Select
-                label="Responsável"
-                value={filtroResponsavel}
-                onChange={setFiltroResponsavel}
-                options={[...RESPONSAVEL_OPTIONS]}
-              />
-              <Select
-                label="Prefixo"
-                value={filtroPrefixo}
-                onChange={setFiltroPrefixo}
-                options={[...PREFIXO_OPTIONS]}
-              />
+        <div
+          id="dashboard-filtros-avancados"
+          className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosAvancadosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+        >
+          <div className="overflow-hidden">
+            <div className="border-t border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+                <Select
+                  label="Processo"
+                  value={filtroProcesso}
+                  onChange={setFiltroProcesso}
+                  options={[...PROCESSO_FILTER_OPTIONS]}
+                />
+                <Select
+                  label="Base"
+                  value={filtroBase}
+                  onChange={(v) => {
+                    setFiltroBase(v)
+                    if (v === 'todos') setFiltroBaseRapido('todos')
+                    else setFiltroBaseRapido(v)
+                  }}
+                  options={[...BASE_FILTER_OPTIONS]}
+                />
+                <Select
+                  label="Coordenador"
+                  value={filtroCoordenador}
+                  onChange={setFiltroCoordenador}
+                  options={[...COORDENADOR_OPTIONS]}
+                />
+                <Select
+                  label="Responsável"
+                  value={filtroResponsavel}
+                  onChange={setFiltroResponsavel}
+                  options={[...RESPONSAVEL_OPTIONS]}
+                />
+                <Select
+                  label="Prefixo"
+                  value={filtroPrefixo}
+                  onChange={setFiltroPrefixo}
+                  options={[...PREFIXO_OPTIONS]}
+                />
+              </div>
             </div>
           </div>
-        ) : null}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:flex-row lg:gap-5 lg:p-5">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
-          <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
             {stats.map((s) => (
               <div
                 key={s.label}
@@ -578,7 +591,7 @@ export function DashboardPage() {
               >
                 {viewMode === 'bar' ? (
                   <BarChart
-                    data={checklistData}
+                    data={chartData}
                     margin={{ top: 12, right: 10, left: 4, bottom: 8 }}
                     barCategoryGap="18%"
                   >
@@ -650,7 +663,7 @@ export function DashboardPage() {
                     />
                   </BarChart>
                 ) : (
-                  <AreaChart data={checklistData} margin={{ top: 12, right: 10, left: 4, bottom: 8 }}>
+                  <AreaChart data={chartData} margin={{ top: 12, right: 10, left: 4, bottom: 8 }}>
                     <defs>
                       <linearGradient id={`colorReal-${areaGradId}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#1E40AF" stopOpacity={0.35} />
@@ -730,98 +743,6 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex min-h-0 w-full shrink-0 flex-col gap-3 overflow-hidden sm:gap-4 lg:h-full lg:max-w-[400px] lg:shrink-0 xl:max-w-[420px]">
-          <div className="group relative flex shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-transparent p-5 text-white dark:border-slate-600/40 sm:rounded-[2.5rem] sm:p-6">
-            <div className="relative z-10">
-              <div className="mb-4 flex items-center justify-between sm:mb-5">
-                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                  <div className="rounded-xl bg-blue-600 p-2 shadow-md shadow-blue-600/30 sm:rounded-2xl sm:p-2.5">
-                    <Sparkles size={17} aria-hidden />
-                  </div>
-                  <span className="truncate text-[10px] font-black uppercase tracking-[0.25em] text-blue-100 sm:text-xs sm:tracking-[0.35em]">
-                    GOMAN Safety
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleGenerateAnalysis()}
-                  disabled={isAiLoading || !geminiConfigured}
-                  title={geminiConfigured ? 'Gerar análise' : 'Configure VITE_GEMINI_API_KEY'}
-                  className="shrink-0 rounded-xl bg-white/10 p-2.5 transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50 sm:rounded-2xl sm:p-3"
-                >
-                  {isAiLoading ? (
-                    <Loader2 size={19} className="animate-spin text-blue-400" aria-hidden />
-                  ) : (
-                    <TrendingUp size={19} aria-hidden />
-                  )}
-                </button>
-              </div>
-              <div className="min-h-[72px] max-h-48 overflow-y-auto rounded-2xl border border-white/10 bg-transparent p-4 sm:min-h-[88px] sm:max-h-56 sm:rounded-3xl sm:p-5">
-                {aiAnalysis ? (
-                  <div className="text-xs font-bold italic leading-relaxed text-blue-50 sm:text-sm [&_li]:font-semibold [&_li]:not-italic [&_p]:italic [&_strong]:not-italic">
-                    {renderFormattedText(aiAnalysis)}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-2 text-center opacity-40 sm:py-3">
-                    <BrainCircuit size={28} className="mb-2 sm:mb-3" aria-hidden />
-                    <p className="text-[9px] font-black uppercase tracking-widest sm:text-[10px]">
-                      Analisar conformidade de hoje
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-transparent dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2.5rem] lg:min-h-[200px]">
-            <div className="shrink-0 border-b border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-5 sm:py-4">
-              <h3 className="text-[11px] font-black uppercase tracking-tight text-slate-800 dark:text-white sm:text-xs">
-                Veículos sem checklist
-              </h3>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 sm:text-[10px]">
-                Ação necessária imediata
-              </p>
-            </div>
-            <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3 sm:space-y-3 sm:px-5 sm:py-4">
-              {pendenciasFiltradas.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-200/70 bg-transparent px-4 py-8 text-center text-[11px] font-bold text-slate-400 dark:border-slate-600/50 dark:bg-transparent dark:text-slate-500">
-                  Nenhum veículo com estes filtros.
-                </p>
-              ) : (
-                pendenciasFiltradas.map((v) => (
-                  <div
-                    key={v.plate}
-                    className="flex items-center justify-between rounded-xl border border-slate-100/70 bg-transparent p-3 dark:border-slate-700/45 dark:bg-transparent sm:rounded-2xl sm:p-3.5"
-                  >
-                    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                      <div className="shrink-0 rounded-lg bg-orange-100 p-1.5 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400 sm:p-2">
-                        <AlertTriangle size={15} aria-hidden />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-[11px] font-black text-slate-700 dark:text-slate-200 sm:text-xs">
-                          {v.plate}
-                        </p>
-                        <p className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500">{v.unit}</p>
-                      </div>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-slate-200/70 bg-transparent px-2 py-0.5 text-[8px] font-black uppercase text-slate-500 dark:border-slate-600/50 dark:bg-transparent dark:text-slate-400 sm:px-3 sm:text-[9px]">
-                      {v.status}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="shrink-0 px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
-              <Link
-                to="/gerenciar"
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/60 bg-transparent py-3 text-[9px] font-black uppercase text-slate-600 transition-all hover:bg-slate-100/50 dark:border-slate-600/45 dark:bg-transparent dark:text-slate-300 dark:hover:bg-white/5 sm:rounded-2xl sm:py-3.5 sm:text-[10px]"
-              >
-                Ver todos os alertas
-                <ChevronRight size={14} aria-hidden />
-              </Link>
-            </div>
-          </div>
-        </div>
       </div>
 
       <style>{`

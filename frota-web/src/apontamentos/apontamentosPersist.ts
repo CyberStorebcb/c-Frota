@@ -51,6 +51,12 @@ export function normalizeApontamento(raw: unknown, fallback?: Apontamento): Apon
         : typeof o.reparoValor === 'string' && o.reparoValor.trim()
           ? Number(o.reparoValor)
           : (fallback?.reparoValor ?? null),
+    reparoDescricao:
+      o.reparoDescricao === null || o.reparoDescricao === undefined
+        ? (fallback?.reparoDescricao ?? null)
+        : typeof o.reparoDescricao === 'string'
+          ? o.reparoDescricao
+          : (fallback?.reparoDescricao ?? null),
     reparoImagens: Array.isArray(o.reparoImagens)
       ? (o.reparoImagens.filter((x) => typeof x === 'string') as string[]).slice(0, 3)
       : (fallback?.reparoImagens ?? []),

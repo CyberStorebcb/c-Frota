@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { askGemini, isGeminiConfigured } from '../services/aiService'
 import {
   addFleetVehicle,
   FLEET_STATUS_BY_PLACA_STORAGE_KEY,
@@ -49,55 +50,6 @@ function isEmbeddedCatalogSource(
     source === 'picapeleve' ||
     source === 'veiculosleves'
   )
-}
-
-type GeminiGenerateResponse = {
-  candidates?: { content?: { parts?: { text?: string }[] } }[]
-  error?: { message?: string }
-}
-
-/** Chamada à API Gemini (chave e modelo via `import.meta.env`). */
-async function callGemini(prompt: string, systemInstruction: string): Promise<string> {
-  const key = (import.meta.env.VITE_GEMINI_API_KEY ?? '').trim()
-  if (!key) throw new Error('API_KEY_MISSING')
-
-  let model = (import.meta.env.VITE_GEMINI_MODEL ?? 'gemini-2.5-flash').trim()
-  model = model.replace(/^models\//, '')
-
-  const payload = {
-    contents: [{ parts: [{ text: prompt }] }],
-    systemInstruction: { parts: [{ text: systemInstruction }] },
-  }
-
-  let retries = 5
-  let delay = 1000
-
-  while (retries > 0) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = (await response.json()) as GeminiGenerateResponse
-
-      if (!response.ok) {
-        const msg = data.error?.message ?? response.statusText
-        throw new Error(msg || 'GEMINI_HTTP_ERROR')
-      }
-
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-      if (typeof text === 'string' && text.trim()) return text
-      throw new Error('GEMINI_EMPTY_RESPONSE')
-    } catch (e) {
-      retries -= 1
-      if (retries === 0) throw e
-      await new Promise((r) => setTimeout(r, delay))
-      delay *= 2
-    }
-  }
-  throw new Error('GEMINI_UNAVAILABLE')
 }
 
 const TYPE_FILTER_IDLE =
@@ -463,7 +415,7 @@ export function RegistroVeiculosPage() {
     return '[]'
   }, [vehicles])
 
-  const geminiConfigured = Boolean((import.meta.env.VITE_GEMINI_API_KEY ?? '').trim())
+  const geminiConfigured = isGeminiConfigured()
 
   const inputFilterClass =
     'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-900 outline-none placeholder:font-semibold placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500'
@@ -492,11 +444,11 @@ export function RegistroVeiculosPage() {
     setIsAiLoading(true)
     try {
       const prompt = `Resumo factual (fonte de verdade para totais e contagens por tipo; não contradigas estes números): ${fleetAiSummaryJson}\n\nAmostra detalhada da frota em JSON (pode estar truncada, só para contexto qualitativo): ${fleetContextJson}\n\nTarefa: analisa a frota GOMAN e dá 3 sugestões estratégicas curtas.`
-      const result = await callGemini(
+      const result = await askGemini(
         prompt,
         'És um analista de dados de logística. Para números, usa apenas o bloco JSON inicial com totalFrota, porTipo e porStatus. Sê conciso e profissional em Português de Portugal.',
       )
-      setAiAnalysis(result)
+      setAiAnalysis(result.ok ? result.text : 'Erro ao conectar com o serviço de inteligência. Tente novamente.')
     } catch {
       setAiAnalysis('Erro ao conectar com o serviço de inteligência. Tente novamente.')
       showNotification('Falha na análise IA.', 'error')
@@ -517,11 +469,14 @@ export function RegistroVeiculosPage() {
     setIsChatSending(true)
     try {
       const prompt = `Resumo factual (fonte de verdade para totais e contagens; o JSON seguinte pode estar truncado): ${fleetAiSummaryJson}\n\nDetalhe parcial da frota (JSON): ${fleetContextJson}\n\nPergunta do utilizador: ${trimmed}`
-      const response = await callGemini(
+      const response = await askGemini(
         prompt,
         'És o assistente FROTA AI. Responde de forma útil e educada em Português de Portugal. Para totais ou contagens por tipo ou estado, baseia-te exclusivamente em totalFrota, porTipo e porStatus do resumo factual; não contes veículos só pelo array detalhado.',
       )
-      setChatHistory((prev) => [...prev, { role: 'assistant', content: response }])
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'assistant', content: response.ok ? response.text : 'Desculpe, tive um problema técnico. Pode repetir?' },
+      ])
     } catch {
       setChatHistory((prev) => [
         ...prev,

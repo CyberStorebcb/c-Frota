@@ -25,8 +25,12 @@ export type Apontamento = {
   horaResolvido: string | null
   /** Valor gasto no reparo (R$) */
   reparoValor: number | null
+  /** Descrição do serviço executado (opcional) */
+  reparoDescricao: string | null
   /** Imagens anexadas (data URLs) */
   reparoImagens: string[]
+  /** Arquivo da OS anexado (data URL — PDF ou imagem) */
+  osArquivo: string | null
   processo: string
   base: string
   coordenador: string
@@ -46,7 +50,9 @@ const SEED: Apontamento[] = [
     dataResolvido: null,
     horaResolvido: null,
     reparoValor: null,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Checklist',
     base: 'Base 01',
     coordenador: 'Carlos Mendes',
@@ -64,7 +70,9 @@ const SEED: Apontamento[] = [
     dataResolvido: null,
     horaResolvido: null,
     reparoValor: null,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Corretiva',
     base: 'Base 02',
     coordenador: 'Ana Costa',
@@ -82,7 +90,9 @@ const SEED: Apontamento[] = [
     dataResolvido: '2026-03-12',
     horaResolvido: '14:20',
     reparoValor: 350,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Checklist',
     base: 'Base 01',
     coordenador: 'Carlos Mendes',
@@ -100,7 +110,9 @@ const SEED: Apontamento[] = [
     dataResolvido: null,
     horaResolvido: null,
     reparoValor: null,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Checklist',
     base: 'Base 03',
     coordenador: 'Ana Costa',
@@ -118,7 +130,9 @@ const SEED: Apontamento[] = [
     dataResolvido: null,
     horaResolvido: null,
     reparoValor: null,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Corretiva',
     base: 'Base 01',
     coordenador: 'Carlos Mendes',
@@ -136,7 +150,9 @@ const SEED: Apontamento[] = [
     dataResolvido: null,
     horaResolvido: null,
     reparoValor: null,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Checklist',
     base: 'Base 02',
     coordenador: 'Ana Costa',
@@ -154,7 +170,9 @@ const SEED: Apontamento[] = [
     dataResolvido: '2026-01-17',
     horaResolvido: '09:10',
     reparoValor: 120,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Corretiva',
     base: 'Base 02',
     coordenador: 'Ana Costa',
@@ -172,7 +190,9 @@ const SEED: Apontamento[] = [
     dataResolvido: '2026-02-10',
     horaResolvido: '16:05',
     reparoValor: 60,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Checklist',
     base: 'Base 03',
     coordenador: 'Ana Costa',
@@ -190,7 +210,9 @@ const SEED: Apontamento[] = [
     dataResolvido: '2026-04-11',
     horaResolvido: '11:42',
     reparoValor: 220,
+    reparoDescricao: null,
     reparoImagens: [],
+    osArquivo: null,
     processo: 'Corretiva',
     base: 'Base 01',
     coordenador: 'Carlos Mendes',
@@ -225,7 +247,10 @@ function initialRows(): Apontamento[] {
 
 type Ctx = {
   rows: Apontamento[]
-  marcarResolvido: (id: string, payload?: { valor: number | null; imagens: string[] }) => void
+  marcarResolvido: (
+    id: string,
+    payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
+  ) => void
   persistError: string | null
   clearPersistError: () => void
 }
@@ -243,7 +268,8 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
   const clearPersistError = useCallback(() => setPersistError(null), [])
 
-  const marcarResolvido = useCallback((id: string, payload?: { valor: number | null; imagens: string[] }) => {
+  const marcarResolvido = useCallback(
+    (id: string, payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null }) => {
     // Importante: usar data local (Brasília etc), não UTC do toISOString().
     const now = new Date()
     const hoje = localIsoDate(now)
@@ -257,12 +283,17 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
               dataResolvido: hoje,
               horaResolvido: hora,
               reparoValor: payload?.valor ?? r.reparoValor ?? null,
+              reparoDescricao:
+                typeof payload?.descricao === 'string' ? payload.descricao : r.reparoDescricao ?? null,
               reparoImagens: payload?.imagens?.slice(0, 3) ?? r.reparoImagens ?? [],
+              osArquivo: payload?.osArquivo !== undefined ? payload.osArquivo : r.osArquivo ?? null,
             }
           : r,
       ),
     )
-  }, [])
+    },
+    [],
+  )
 
   const value = useMemo(
     () => ({ rows, marcarResolvido, persistError, clearPersistError }),

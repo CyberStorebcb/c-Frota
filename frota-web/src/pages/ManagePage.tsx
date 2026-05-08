@@ -219,8 +219,11 @@ export function ManagePage() {
   const [resolveOpen, setResolveOpen] = useState(false)
   const [resolveId, setResolveId] = useState<string | null>(null)
   const [resolveValor, setResolveValor] = useState<string>('')
+  const [resolveDescricao, setResolveDescricao] = useState<string>('')
   const [resolveImgs, setResolveImgs] = useState<string[]>([])
+  const [resolveOsFile, setResolveOsFile] = useState<{ name: string; data: string } | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const osFileRef = useRef<HTMLInputElement | null>(null)
 
   const currentResolve = useMemo(
     () => (resolveId ? rows.find((r) => r.id === resolveId) ?? null : null),
@@ -231,7 +234,9 @@ export function ManagePage() {
     if (!canMarkResolved) return
     setResolveId(r.id)
     setResolveValor(r.reparoValor != null ? String(r.reparoValor) : '')
+    setResolveDescricao(r.reparoDescricao ?? '')
     setResolveImgs(r.reparoImagens ?? [])
+    setResolveOsFile(r.osArquivo ? { name: 'OS Anexada', data: r.osArquivo } : null)
     setResolveOpen(true)
   }
 
@@ -239,8 +244,24 @@ export function ManagePage() {
     setResolveOpen(false)
     setResolveId(null)
     setResolveValor('')
+    setResolveDescricao('')
     setResolveImgs([])
+    setResolveOsFile(null)
     if (fileRef.current) fileRef.current.value = ''
+    if (osFileRef.current) osFileRef.current.value = ''
+  }
+
+  const addOsFile = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const file = files[0]
+    const reader = new FileReader()
+    const data = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(String(reader.result ?? ''))
+      reader.onerror = () => reject(new Error('Falha ao ler arquivo'))
+      reader.readAsDataURL(file)
+    })
+    setResolveOsFile({ name: file.name, data })
+    if (osFileRef.current) osFileRef.current.value = ''
   }
 
   const addImages = async (files: FileList | null) => {
@@ -266,7 +287,13 @@ export function ManagePage() {
     if (!canMarkResolved || !resolveId) return
     const v = resolveValor.trim()
     const valor = v ? Number(v.replace(',', '.')) : null
-    marcarResolvido(resolveId, { valor: Number.isFinite(valor ?? NaN) ? valor : null, imagens: resolveImgs })
+    const desc = resolveDescricao.trim()
+    marcarResolvido(resolveId, {
+      valor: Number.isFinite(valor ?? NaN) ? valor : null,
+      descricao: desc ? desc : null,
+      imagens: resolveImgs,
+      osArquivo: resolveOsFile?.data ?? null,
+    })
     closeResolveModal()
   }
 
@@ -275,8 +302,11 @@ export function ManagePage() {
       setResolveOpen(false)
       setResolveId(null)
       setResolveValor('')
+      setResolveDescricao('')
       setResolveImgs([])
+      setResolveOsFile(null)
       if (fileRef.current) fileRef.current.value = ''
+      if (osFileRef.current) osFileRef.current.value = ''
     }
   }, [canMarkResolved, resolveOpen])
 
@@ -552,11 +582,9 @@ export function ManagePage() {
                     value={resolveValor}
                     onChange={(e) => setResolveValor(e.target.value)}
                     inputMode="decimal"
-                    placeholder="Ex.: 250,00"
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-brand-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                   />
                   <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    Opcional. Use vírgula ou ponto.
                   </div>
                 </div>
 
@@ -597,6 +625,69 @@ export function ManagePage() {
                         </button>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-baseline gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Anexar
+                    <span className="text-sky-600 dark:text-sky-400">OS</span>
+                    <span className="text-[10px] font-semibold normal-case tracking-normal text-slate-400 dark:text-slate-500">
+                      (Ordem de Serviço)
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      ref={osFileRef}
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => void addOsFile(e.target.files)}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => osFileRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-extrabold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                    >
+                      <Upload size={16} />
+                      {resolveOsFile ? 'Substituir' : 'Anexar'}
+                    </button>
+                    {resolveOsFile ? (
+                      <div className="flex flex-1 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                        <span className="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          {resolveOsFile.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResolveOsFile(null)
+                            if (osFileRef.current) osFileRef.current.value = ''
+                          }}
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
+                          aria-label="Remover OS"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        Arquivo ou imagem
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Descrição do serviço
+                  </div>
+                  <textarea
+                    value={resolveDescricao}
+                    onChange={(e) => setResolveDescricao(e.target.value)}
+                    rows={3}
+                    className="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-brand-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                   </div>
                 </div>
               </div>

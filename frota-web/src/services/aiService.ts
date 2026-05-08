@@ -3,10 +3,74 @@
  * Retentativas com backoff exponencial em falhas de rede e em 5xx / 429.
  */
 
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
+const GEMINI_MODELS_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 const DEFAULT_MODEL = 'gemini-2.5-flash'
 const MAX_RETRIES = 5
+
+type GeminiModel = {
+  name?: string
+  supportedGenerationMethods?: string[]
+}
+
+let cachedResolvedModel: { model: string; at: number } | null = null
+let resolveModelInFlight: Promise<string> | null = null
+
+function normalizeModelName(raw: string): string {
+  const t = raw.trim()
+  return t.replace(/^models\//, '')
+}
+
+async function resolveGenerateContentModel(apiKey: string): Promise<string> {
+  const now = Date.now()
+  if (cachedResolvedModel && now - cachedResolvedModel.at < 10 * 60 * 1000) return cachedResolvedModel.model
+  if (resolveModelInFlight) return resolveModelInFlight
+
+  const wanted = normalizeModelName(import.meta.env.VITE_GEMINI_MODEL?.trim() || DEFAULT_MODEL)
+
+  resolveModelInFlight = (async () => {
+    try {
+      const url = `${GEMINI_MODELS_BASE}?key=${encodeURIComponent(apiKey)}`
+      const response = await fetch(url)
+      const data = (await response.json()) as { models?: GeminiModel[]; error?: { message?: string } }
+
+      const models = Array.isArray(data.models) ? data.models : []
+      const generateCapable = models.filter((m) =>
+        Array.isArray(m.supportedGenerationMethods) ? m.supportedGenerationMethods.includes('generateContent') : false,
+      )
+
+      const names = generateCapable
+        .map((m) => (m.name ? normalizeModelName(m.name) : ''))
+        .filter((n) => Boolean(n))
+
+      const wantedMatch = names.find((n) => n === wanted || n.endsWith(`/${wanted}`))
+      const preferredFastest =
+        // Prioriza "2.5 flash" quando existir (é o que está habilitado no free tier).
+        names.find((n) => /gemini/i.test(n) && /2\.5/i.test(n) && /flash/i.test(n)) ??
+        // Depois "2.0 flash".
+        names.find((n) => /gemini/i.test(n) && /2\.0/i.test(n) && /flash/i.test(n)) ??
+        // Depois qualquer "flash" gemini.
+        names.find((n) => /gemini/i.test(n) && /flash/i.test(n)) ??
+        // Depois qualquer gemini.
+        names.find((n) => /gemini/i.test(n)) ??
+        // E por fim o primeiro da lista.
+        names[0]
+
+      const chosen = wantedMatch ?? preferredFastest ?? wanted
+      cachedResolvedModel = { model: chosen, at: Date.now() }
+      return chosen
+    } catch {
+      // Se não conseguir listar modelos, volta para o valor do .env (ou default) e deixa a API responder.
+      const fallback = normalizeModelName(import.meta.env.VITE_GEMINI_MODEL?.trim() || DEFAULT_MODEL)
+      cachedResolvedModel = { model: fallback, at: Date.now() }
+      return fallback
+    } finally {
+      resolveModelInFlight = null
+    }
+  })()
+
+  return resolveModelInFlight
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -29,8 +93,8 @@ export async function askGemini(prompt: string, systemInstruction: string): Prom
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim()
   if (!apiKey) return { ok: false, kind: 'not_configured' }
 
-  const model = import.meta.env.VITE_GEMINI_MODEL?.trim() || DEFAULT_MODEL
-  const url = `${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const model = await resolveGenerateContentModel(apiKey)
+  const url = `${GEMINI_MODELS_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
 
   let lastErrorMessage = 'Não foi possível conectar. Tente de novo em instantes.'
 
