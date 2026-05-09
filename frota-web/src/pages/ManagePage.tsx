@@ -38,6 +38,21 @@ function isDefeitoEntrante(r: Apontamento, nowMs: number) {
   return ageDays >= 0 && ageDays <= 7
 }
 
+function formatCurrency(digits: string): string {
+  const cents = parseInt(digits, 10)
+  if (!Number.isFinite(cents)) return ''
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100)
+}
+
+function parseCurrency(masked: string): number | null {
+  const raw = masked.replace(/\./g, '').replace(',', '.')
+  const n = parseFloat(raw)
+  return Number.isFinite(n) ? n : null
+}
+
 function uniqSorted(values: string[]): SelectOption[] {
   const u = [...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   return u.map((v) => ({ value: v, label: v }))
@@ -233,7 +248,8 @@ export function ManagePage() {
   const openResolveModal = (r: Apontamento) => {
     if (!canMarkResolved) return
     setResolveId(r.id)
-    setResolveValor(r.reparoValor != null ? String(r.reparoValor) : '')
+    const digits = r.reparoValor != null ? String(Math.round(r.reparoValor * 100)) : ''
+    setResolveValor(digits ? formatCurrency(digits) : '')
     setResolveDescricao(r.reparoDescricao ?? '')
     setResolveImgs(r.reparoImagens ?? [])
     setResolveOsFile(r.osArquivo ? { name: 'OS Anexada', data: r.osArquivo } : null)
@@ -286,7 +302,7 @@ export function ManagePage() {
   const confirmResolve = () => {
     if (!canMarkResolved || !resolveId) return
     const v = resolveValor.trim()
-    const valor = v ? Number(v.replace(',', '.')) : null
+    const valor = v ? parseCurrency(v) : null
     const desc = resolveDescricao.trim()
     marcarResolvido(resolveId, {
       valor: Number.isFinite(valor ?? NaN) ? valor : null,
@@ -580,8 +596,12 @@ export function ManagePage() {
                   </div>
                   <input
                     value={resolveValor}
-                    onChange={(e) => setResolveValor(e.target.value)}
-                    inputMode="decimal"
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '')
+                      setResolveValor(digits ? formatCurrency(digits) : '')
+                    }}
+                    inputMode="numeric"
+                    placeholder="0,00"
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-brand-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                   />
                   <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -653,8 +673,8 @@ export function ManagePage() {
                       {resolveOsFile ? 'Substituir' : 'Anexar'}
                     </button>
                     {resolveOsFile ? (
-                      <div className="flex flex-1 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                        <span className="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                        <span className="min-w-0 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
                           {resolveOsFile.name}
                         </span>
                         <button

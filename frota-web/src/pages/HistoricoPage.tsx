@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, CalendarCheck2, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
 import { jsPDF } from 'jspdf'
+import { PDFDocument } from 'pdf-lib'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { Portal } from '../components/ui/Portal'
 
@@ -65,6 +66,60 @@ async function urlToPngData(url: string): Promise<{ data: string; w: number; h: 
   ctx.drawImage(img, 0, 0)
   const png = canvas.toDataURL('image/png')
   return { data: png, w: img.width, h: img.height }
+}
+
+function dataUrlMime(dataUrl: string): string {
+  const m = dataUrl.match(/^data:([^;,]+)/)
+  return m?.[1] ?? ''
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const comma = dataUrl.indexOf(',')
+  const b64 = dataUrl.slice(comma + 1)
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+async function ensurePngOrJpegDataUrl(dataUrl: string): Promise<{ bytes: Uint8Array; mime: 'png' | 'jpeg' }> {
+  const mime = dataUrlMime(dataUrl)
+  if (mime === 'image/png') return { bytes: dataUrlToBytes(dataUrl), mime: 'png' }
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return { bytes: dataUrlToBytes(dataUrl), mime: 'jpeg' }
+  // Outros formatos (webp, gif…): converter para JPEG via canvas
+  const { data } = await dataUrlToJpeg(dataUrl)
+  return { bytes: dataUrlToBytes(data), mime: 'jpeg' }
+}
+
+async function mergeOsIntoReport(reportBytes: ArrayBuffer, osDataUrl: string): Promise<Uint8Array> {
+  const merged = await PDFDocument.load(reportBytes)
+  const mime = dataUrlMime(osDataUrl)
+
+  if (mime === 'application/pdf') {
+    const osPdf = await PDFDocument.load(dataUrlToBytes(osDataUrl))
+    const copied = await merged.copyPages(osPdf, osPdf.getPageIndices())
+    copied.forEach((p) => merged.addPage(p))
+  } else {
+    // Imagem → nova página A4 centralizada
+    const pageW = 595.28
+    const pageH = 841.89
+    const margin = 28
+    const { bytes, mime: imgMime } = await ensurePngOrJpegDataUrl(osDataUrl)
+    const img = imgMime === 'png' ? await merged.embedPng(bytes) : await merged.embedJpg(bytes)
+    const { width, height } = img
+    const scale = Math.min((pageW - margin * 2) / width, (pageH - margin * 2) / height, 1)
+    const drawW = width * scale
+    const drawH = height * scale
+    const page = merged.addPage([pageW, pageH])
+    page.drawImage(img, {
+      x: (pageW - drawW) / 2,
+      y: (pageH - drawH) / 2,
+      width: drawW,
+      height: drawH,
+    })
+  }
+
+  return merged.save()
 }
 
 export function HistoricoPage() {
@@ -536,8 +591,23 @@ export function HistoricoPage() {
       doc.setTextColor(0)
     }
 
-    const name = fileSafeName(`${r.prefixo}-${r.defeito}-${r.dataResolvido ?? ''}`)
-    doc.save(`relatorio-${name || r.id}.pdf`)
+    const fileName = `relatorio-${fileSafeName(`${r.prefixo}-${r.defeito}-${r.dataResolvido ?? ''}`) || r.id}.pdf`
+
+    if (r.osArquivo) {
+      const reportBytes = doc.output('arraybuffer') as ArrayBuffer
+      const mergedBytes = await mergeOsIntoReport(reportBytes, r.osArquivo)
+      const blob = new Blob([mergedBytes.buffer as ArrayBuffer], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } else {
+      doc.save(fileName)
+    }
   }
 
   return (

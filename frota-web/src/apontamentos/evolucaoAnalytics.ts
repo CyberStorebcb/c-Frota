@@ -86,9 +86,10 @@ function formatWeekLabel(mondayIso: string): string {
   return `${start.toLocaleDateString('pt-BR', opt)} – ${end.toLocaleDateString('pt-BR', opt)}`
 }
 
-export function buildWeeklyChartPoints(resolvidos: Apontamento[]): PontoEvolucao[] {
-  if (resolvidos.length === 0) return []
-
+export function buildWeeklyChartPoints(
+  resolvidos: Apontamento[],
+  boundary?: { from: string; to: string },
+): PontoEvolucao[] {
   const map = new Map<string, Apontamento[]>()
   for (const r of resolvidos) {
     const key = mondayKeyFromDateIso(r.dataResolvido!)
@@ -96,12 +97,24 @@ export function buildWeeklyChartPoints(resolvidos: Apontamento[]): PontoEvolucao
     map.get(key)!.push(r)
   }
 
-  const keysComDados = [...map.keys()].sort((a, b) => a.localeCompare(b))
-  const from = keysComDados[0]
-  const to = keysComDados[keysComDados.length - 1]
+  let fromKey: string | undefined
+  let toKey: string | undefined
+  if (map.size > 0) {
+    const sorted = [...map.keys()].sort()
+    fromKey = sorted[0]
+    toKey = sorted[sorted.length - 1]
+  }
+  if (boundary) {
+    const bFrom = mondayKeyFromDateIso(boundary.from)
+    const bTo = mondayKeyFromDateIso(boundary.to)
+    fromKey = fromKey ? (fromKey < bFrom ? fromKey : bFrom) : bFrom
+    toKey = toKey ? (toKey > bTo ? toKey : bTo) : bTo
+  }
+  if (!fromKey || !toKey) return []
+
   const weeks: string[] = []
-  let cur = from
-  while (cur <= to) {
+  let cur = fromKey
+  while (cur <= toKey) {
     weeks.push(cur)
     cur = addDaysIso(cur, 7)
   }
@@ -113,14 +126,8 @@ export function buildWeeklyChartPoints(resolvidos: Apontamento[]): PontoEvolucao
       itens.length > 0
         ? Math.round((dias.reduce((s, x) => s + x, 0) / dias.length) * 10) / 10
         : null
-    const exemplos = itens.slice(0, 4).map((r) => `${r.prefixo} — ${r.defeito}`)
-    return {
-      periodo: formatWeekLabel(chave),
-      chave,
-      resolvidos: itens.length,
-      diasMedios,
-      exemplos,
-    }
+    const exemplos = itens.map((r) => `${r.prefixo} — ${r.defeito}`)
+    return { periodo: formatWeekLabel(chave), chave, resolvidos: itens.length, diasMedios, exemplos }
   })
 }
 
@@ -140,9 +147,10 @@ function formatMonthLabel(ym: string): string {
   return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
 }
 
-export function buildMonthlyChartPoints(resolvidos: Apontamento[]): PontoEvolucao[] {
-  if (resolvidos.length === 0) return []
-
+export function buildMonthlyChartPoints(
+  resolvidos: Apontamento[],
+  boundary?: { from: string; to: string },
+): PontoEvolucao[] {
   const map = new Map<string, Apontamento[]>()
   for (const r of resolvidos) {
     const key = monthKeyFromIso(r.dataResolvido!)
@@ -150,13 +158,24 @@ export function buildMonthlyChartPoints(resolvidos: Apontamento[]): PontoEvoluca
     map.get(key)!.push(r)
   }
 
-  const keysComDados = [...map.keys()].sort((a, b) => a.localeCompare(b))
-  const from = keysComDados[0]
-  const to = keysComDados[keysComDados.length - 1]
+  let fromKey: string | undefined
+  let toKey: string | undefined
+  if (map.size > 0) {
+    const sorted = [...map.keys()].sort()
+    fromKey = sorted[0]
+    toKey = sorted[sorted.length - 1]
+  }
+  if (boundary) {
+    const bFrom = monthKeyFromIso(boundary.from)
+    const bTo = monthKeyFromIso(boundary.to)
+    fromKey = fromKey ? (fromKey < bFrom ? fromKey : bFrom) : bFrom
+    toKey = toKey ? (toKey > bTo ? toKey : bTo) : bTo
+  }
+  if (!fromKey || !toKey) return []
 
   const months: string[] = []
-  let cur = from
-  while (cur <= to) {
+  let cur = fromKey
+  while (cur <= toKey) {
     months.push(cur)
     cur = nextMonthYm(cur)
   }
@@ -168,14 +187,8 @@ export function buildMonthlyChartPoints(resolvidos: Apontamento[]): PontoEvoluca
       itens.length > 0
         ? Math.round((dias.reduce((s, x) => s + x, 0) / dias.length) * 10) / 10
         : null
-    const exemplos = itens.slice(0, 4).map((r) => `${r.prefixo} — ${r.defeito}`)
-    return {
-      periodo: formatMonthLabel(chave),
-      chave,
-      resolvidos: itens.length,
-      diasMedios,
-      exemplos,
-    }
+    const exemplos = itens.map((r) => `${r.prefixo} — ${r.defeito}`)
+    return { periodo: formatMonthLabel(chave), chave, resolvidos: itens.length, diasMedios, exemplos }
   })
 }
 
