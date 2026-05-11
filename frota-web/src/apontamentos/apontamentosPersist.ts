@@ -66,6 +66,12 @@ export function normalizeApontamento(raw: unknown, fallback?: Apontamento): Apon
       typeof o.coordenador === 'string' ? o.coordenador : (fallback?.coordenador ?? ''),
     responsavel:
       typeof o.responsavel === 'string' ? o.responsavel : (fallback?.responsavel ?? ''),
+    osArquivo:
+      o.osArquivo === null || o.osArquivo === undefined
+        ? (fallback?.osArquivo ?? null)
+        : typeof o.osArquivo === 'string'
+          ? o.osArquivo
+          : (fallback?.osArquivo ?? null),
   }
 }
 
