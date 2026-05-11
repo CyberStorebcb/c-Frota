@@ -1,3 +1,6 @@
+import { matchesBaseFilter } from '../data/baseFilterOptions'
+import { matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
+import { matchesProcessoFilter } from '../data/processoFilterOptions'
 import type { Apontamento } from './ApontamentosContext'
 
 export type EvolucaoFiltros = {
@@ -32,9 +35,9 @@ export function diasEntreApontamentoEResolucao(r: Apontamento): number {
 
 export function filterResolvidosParaEvolucao(rows: Apontamento[], f: EvolucaoFiltros): Apontamento[] {
   let list = rows.filter((r) => r.resolvido && r.dataResolvido)
-  if (f.processo !== 'todos') list = list.filter((r) => r.processo === f.processo)
-  if (f.base !== 'todos') list = list.filter((r) => r.base === f.base)
-  if (f.coordenador !== 'todos') list = list.filter((r) => r.coordenador === f.coordenador)
+  if (f.processo !== 'todos') list = list.filter((r) => matchesProcessoFilter(r.processo, f.processo))
+  if (f.base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, f.base))
+  if (f.coordenador !== 'todos') list = list.filter((r) => matchesCoordenadorFilter(r.coordenador, f.coordenador))
   if (f.responsavel !== 'todos') list = list.filter((r) => r.responsavel === f.responsavel)
   if (f.prefixo !== 'todos') list = list.filter((r) => r.prefixo === f.prefixo)
 

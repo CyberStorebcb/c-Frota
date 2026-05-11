@@ -26,6 +26,13 @@ import {
   YAxis,
 } from 'recharts'
 
+import {
+  BASE_DASHBOARD_QUICK_SELECT_OPTIONS,
+  BASE_FILTER_SELECT_OPTIONS,
+  matchesBaseFilter,
+} from '../data/baseFilterOptions'
+import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
+import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select } from '../components/ui/Select'
 import {
   FLEET_STATUS_BY_PLACA_STORAGE_KEY,
@@ -62,6 +69,10 @@ const BASE_SCALE: Record<string, number> = {
   pdt:   0.38,
   bcb:   0.35,
   sti:   0.27,
+  bdc:   1,
+  desmob: 1,
+  itm:   1,
+  pds:   1,
 }
 
 const KPIS_BY_PERIOD: Record<string, { checklistsBase: number; conformidade: string }> = {
@@ -123,7 +134,7 @@ const pendenciasMock = [
     plate: 'ROU6H57',
     unit: 'PDT',
     status: 'Atrasado',
-    processo: 'diario',
+    processo: 'frota',
     base: 'pdt',
     coordenador: 'ana',
     responsavel: 'a',
@@ -133,7 +144,7 @@ const pendenciasMock = [
     plate: 'SNQ1J22',
     unit: 'BCB',
     status: 'Pendente',
-    processo: 'semanal',
+    processo: 'transporte',
     base: 'bcb',
     coordenador: 'bruno',
     responsavel: 'b',
@@ -143,7 +154,7 @@ const pendenciasMock = [
     plate: 'RZR1F70',
     unit: 'STI',
     status: 'Atrasado',
-    processo: 'diario',
+    processo: 'goman',
     base: 'sti',
     coordenador: 'ana',
     responsavel: 'a',
@@ -153,7 +164,7 @@ const pendenciasMock = [
     plate: 'ROU7A90',
     unit: 'BCB',
     status: 'Atrasado',
-    processo: 'semanal',
+    processo: 'gstc',
     base: 'bcb',
     coordenador: 'bruno',
     responsavel: 'a',
@@ -165,32 +176,6 @@ const PERIODO_OPTIONS = [
   { label: 'Últimos 7 dias', value: '7d' },
   { label: 'Últimos 30 dias', value: '30d' },
   { label: 'Hoje', value: 'hoje' },
-] as const
-
-const BASE_QUICK_OPTIONS = [
-  { label: 'Todas as bases', value: 'todos' },
-  { label: 'PDT', value: 'pdt' },
-  { label: 'BCB', value: 'bcb' },
-  { label: 'STI', value: 'sti' },
-] as const
-
-const PROCESSO_FILTER_OPTIONS = [
-  { label: 'Todos', value: 'todos' },
-  { label: 'Diário', value: 'diario' },
-  { label: 'Semanal', value: 'semanal' },
-] as const
-
-const BASE_FILTER_OPTIONS = [
-  { label: 'Todos', value: 'todos' },
-  { label: 'PDT', value: 'pdt' },
-  { label: 'BCB', value: 'bcb' },
-  { label: 'STI', value: 'sti' },
-] as const
-
-const COORDENADOR_OPTIONS = [
-  { label: 'Todos', value: 'todos' },
-  { label: 'Ana', value: 'ana' },
-  { label: 'Bruno', value: 'bruno' },
 ] as const
 
 const RESPONSAVEL_OPTIONS = [
@@ -332,9 +317,9 @@ export function DashboardPage() {
 
   const pendenciasFiltradas = useMemo(() => {
     return pendenciasMock.filter((row) => {
-      if (filtroProcesso !== 'todos' && row.processo !== filtroProcesso) return false
-      if (baseEfetiva !== 'todos' && row.base !== baseEfetiva) return false
-      if (filtroCoordenador !== 'todos' && row.coordenador !== filtroCoordenador) return false
+      if (filtroProcesso !== 'todos' && !matchesProcessoFilter(row.processo, filtroProcesso)) return false
+      if (baseEfetiva !== 'todos' && !matchesBaseFilter(row.base, baseEfetiva)) return false
+      if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(row.coordenador, filtroCoordenador)) return false
       if (filtroResponsavel !== 'todos' && row.responsavel !== filtroResponsavel) return false
       if (filtroPrefixo !== 'todos' && row.prefixo !== filtroPrefixo) return false
       return true
@@ -437,7 +422,7 @@ export function DashboardPage() {
                   setFiltroBaseRapido(v)
                   setFiltroBase(v === 'todos' ? 'todos' : v)
                 }}
-                options={BASE_QUICK_OPTIONS}
+                options={BASE_DASHBOARD_QUICK_SELECT_OPTIONS}
               />
             </div>
           </div>
@@ -480,7 +465,7 @@ export function DashboardPage() {
                   label="Processo"
                   value={filtroProcesso}
                   onChange={setFiltroProcesso}
-                  options={[...PROCESSO_FILTER_OPTIONS]}
+                  options={PROCESSO_FILTER_SELECT_OPTIONS}
                 />
                 <Select
                   label="Base"
@@ -490,13 +475,13 @@ export function DashboardPage() {
                     if (v === 'todos') setFiltroBaseRapido('todos')
                     else setFiltroBaseRapido(v)
                   }}
-                  options={[...BASE_FILTER_OPTIONS]}
+                  options={BASE_FILTER_SELECT_OPTIONS}
                 />
                 <Select
                   label="Coordenador"
                   value={filtroCoordenador}
                   onChange={setFiltroCoordenador}
-                  options={[...COORDENADOR_OPTIONS]}
+                  options={COORDENADOR_FILTER_SELECT_OPTIONS}
                 />
                 <Select
                   label="Responsável"

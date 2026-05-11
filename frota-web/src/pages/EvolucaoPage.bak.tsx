@@ -26,6 +26,9 @@ import {
   mediaDiasApontamentoResolucao,
   mediaDiasNosPontosDoGrafico,
 } from '../apontamentos/evolucaoAnalytics'
+import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
+import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
+import { PROCESSO_FILTER_SELECT_OPTIONS } from '../data/processoFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 
 const DATA_OPTS: SelectOption[] = [
@@ -107,21 +110,6 @@ export function EvolucaoPage() {
     if (el.clientWidth > 0) setReady(true)
     return () => ro.disconnect()
   }, [])
-
-  const optProcesso = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.processo))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
-
-  const optBase = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.base))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
-
-  const optCoord = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.coordenador))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
 
   const optResp = useMemo(() => {
     const opts = uniqSorted(rows.map((r) => r.responsavel))
@@ -268,9 +256,9 @@ export function EvolucaoPage() {
           </button>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <Select label="Processo" value={filtroProcesso} options={optProcesso} onChange={setFiltroProcesso} />
-          <Select label="Base" value={filtroBase} options={optBase} onChange={setFiltroBase} />
-          <Select label="Coordenador" value={filtroCoord} options={optCoord} onChange={setFiltroCoord} />
+          <Select label="Processo" value={filtroProcesso} options={PROCESSO_FILTER_SELECT_OPTIONS} onChange={setFiltroProcesso} />
+          <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} />
+          <Select label="Coordenador" value={filtroCoord} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setFiltroCoord} />
           <Select label="Responsável" value={filtroResp} options={optResp} onChange={setFiltroResp} />
           <Select label="Prefixo" value={filtroPrefixo} options={optPrefixo} onChange={setFiltroPrefixo} />
           <Select label="Data" value={filtroData} options={DATA_OPTS} onChange={(v) => setFiltroData(v as EvolucaoFiltros['data'])} />

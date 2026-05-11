@@ -14,6 +14,9 @@ import {
   mondayKeyFromDateIso,
   parseIsoDate,
 } from '../apontamentos/evolucaoAnalytics'
+import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
+import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
+import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { EVOLUCAO_MOCK_APONTAMENTOS } from '../apontamentos/evolucaoMockApontamentos'
 
@@ -122,21 +125,6 @@ export function EvolucaoPage() {
     return () => ro.disconnect()
   }, [])
 
-  const optProcesso = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.processo))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
-
-  const optBase = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.base))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
-
-  const optCoord = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.coordenador))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
-
   const optResp = useMemo(() => {
     const opts = uniqSorted(rows.map((r) => r.responsavel))
     return [{ value: 'todos', label: 'Todos' }, ...opts]
@@ -229,9 +217,9 @@ export function EvolucaoPage() {
       agregacao === 'semana' ? mondayKeyFromDateIso(iso) : iso.slice(0, 7)
 
     const filtered = rows.filter((r) => {
-      if (filtroProcesso !== 'todos' && r.processo !== filtroProcesso) return false
-      if (filtroBase !== 'todos' && r.base !== filtroBase) return false
-      if (filtroCoord !== 'todos' && r.coordenador !== filtroCoord) return false
+      if (filtroProcesso !== 'todos' && !matchesProcessoFilter(r.processo, filtroProcesso)) return false
+      if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
+      if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
       if (filtroResp !== 'todos' && r.responsavel !== filtroResp) return false
       if (filtroPrefixo !== 'todos' && r.prefixo !== filtroPrefixo) return false
       if (boundaryRange) {
@@ -367,9 +355,9 @@ export function EvolucaoPage() {
           </button>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <Select label="Processo" value={filtroProcesso} options={optProcesso} onChange={setFiltroProcesso} />
-          <Select label="Base" value={filtroBase} options={optBase} onChange={setFiltroBase} />
-          <Select label="Coordenador" value={filtroCoord} options={optCoord} onChange={setFiltroCoord} />
+          <Select label="Processo" value={filtroProcesso} options={PROCESSO_FILTER_SELECT_OPTIONS} onChange={setFiltroProcesso} />
+          <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} />
+          <Select label="Coordenador" value={filtroCoord} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setFiltroCoord} />
           <Select label="Responsável" value={filtroResp} options={optResp} onChange={setFiltroResp} />
           <Select label="Prefixo" value={filtroPrefixo} options={optPrefixo} onChange={setFiltroPrefixo} />
           <Select label="Data" value={filtroData} options={DATA_OPTS} onChange={(v) => setFiltroData(v as EvolucaoFiltros['data'])} />

@@ -145,6 +145,8 @@ function localTimeHHmm(d: Date) {
 // ---------------------------------------------------------------------------
 type Ctx = {
   rows: Apontamento[]
+  /** Total de registros na tabela `checklists` com inspeção concluída (`progresso` = 100). */
+  checklistsRealizadosTotal: number
   carregando: boolean
   marcarResolvido: (
     id: string,
@@ -160,6 +162,7 @@ const ApontamentosContext = createContext<Ctx | null>(null)
 
 export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const [rows, setRows]               = useState<Apontamento[]>([])
+  const [checklistsRealizadosTotal, setChecklistsRealizadosTotal] = useState(0)
   const [carregando, setCarregando]   = useState(true)
   const [persistError, setPersistError] = useState<string | null>(null)
   const clearPersistError = useCallback(() => setPersistError(null), [])
@@ -169,7 +172,14 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     setCarregando(true)
     localStorage.removeItem('frota-apontamentos-v1')
 
-    // 1. Busca checklists com NC (apenas campos necessários)
+    // 1. Total de checklists concluídos (mesmo critério do formulário: progresso 100)
+    const { count: totalRealizados, error: countError } = await supabase
+      .from('checklists')
+      .select('id', { count: 'exact', head: true })
+      .eq('progresso', 100)
+    setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
+
+    // 2. Checklists com NC (apenas campos necessários) → linhas da tabela Gerenciar
     const { data: clData, error: clError } = await supabase
       .from('checklists')
       .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, dados_veiculo, respostas, observacoes')
@@ -182,7 +192,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // 2. Busca resoluções da tabela apontamentos
+    // 3. Busca resoluções da tabela apontamentos
     const { data: resData } = await supabase
       .from('apontamentos')
       .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo')
@@ -194,7 +204,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       })
     )
 
-    // 3. Expande cada checklist em um apontamento por item NC
+    // 4. Expande cada checklist em um apontamento por item NC
     const apontamentos: Apontamento[] = []
     for (const cl of (clData ?? []) as unknown[]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,7 +230,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, () => {
         void recarregar()
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checklists' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklists' }, () => {
         void recarregar()
       })
       .subscribe()
@@ -294,8 +304,17 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   }, [rows])
 
   const value = useMemo(
-    () => ({ rows, carregando, marcarResolvido, hasByChecklist, persistError, clearPersistError, recarregar }),
-    [rows, carregando, marcarResolvido, hasByChecklist, persistError, clearPersistError, recarregar],
+    () => ({
+      rows,
+      checklistsRealizadosTotal,
+      carregando,
+      marcarResolvido,
+      hasByChecklist,
+      persistError,
+      clearPersistError,
+      recarregar,
+    }),
+    [rows, checklistsRealizadosTotal, carregando, marcarResolvido, hasByChecklist, persistError, clearPersistError, recarregar],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>

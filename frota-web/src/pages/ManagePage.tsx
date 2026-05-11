@@ -4,6 +4,8 @@ import {
   AlertTriangle,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   History,
   Inbox,
@@ -20,6 +22,9 @@ import {
 import type { Apontamento } from '../apontamentos/ApontamentosContext'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { useAuth } from '../auth/AuthContext'
+import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
+import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
+import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { Portal } from '../components/ui/Portal'
 
@@ -66,6 +71,12 @@ const DATA_OPTS: SelectOption[] = [
   { value: '7d', label: 'Últimos 7 dias' },
   { value: '30d', label: 'Últimos 30 dias' },
   { value: 'ano', label: 'Ano atual' },
+]
+
+const PAGE_SIZE_OPTIONS: SelectOption[] = [
+  { value: '25', label: '25 por página' },
+  { value: '50', label: '50 por página' },
+  { value: '100', label: '100 por página' },
 ]
 
 function StatPill({
@@ -117,7 +128,7 @@ function StatPill({
 }
 
 export function ManagePage() {
-  const { rows, carregando, marcarResolvido } = useApontamentos()
+  const { rows, carregando, marcarResolvido, checklistsRealizadosTotal } = useApontamentos()
   const { user } = useAuth()
   const canMarkResolved =
     user?.role === 'admin' || (user?.role === 'user' && user.userKind === 'special')
@@ -131,6 +142,10 @@ export function ManagePage() {
   const [responsavel, setResponsavel] = useState('todos')
   const [prefixo, setPrefixo] = useState('todos')
   const [data, setData] = useState('todos')
+  const [pagina, setPagina] = useState(1)
+  const [pageSizeStr, setPageSizeStr] = useState('25')
+  const pageSize = Number(pageSizeStr) || 25
+  const tabelaRef = useRef<HTMLDivElement | null>(null)
 
   const vehicleOptions = useMemo<SelectOption[]>(() => {
     const map = new Map<string, string>()
@@ -140,18 +155,6 @@ export function ManagePage() {
     const opts = Array.from(map.entries()).map(([value, label]) => ({ value, label }))
     opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
     return [{ value: 'todos', label: 'Todos os veículos' }, ...opts]
-  }, [rows])
-
-  const processoOptions = useMemo<SelectOption[]>(() => {
-    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.processo))]
-  }, [rows])
-
-  const baseOptions = useMemo<SelectOption[]>(() => {
-    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.base))]
-  }, [rows])
-
-  const coordOptions = useMemo<SelectOption[]>(() => {
-    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.coordenador))]
   }, [rows])
 
   const respOptions = useMemo<SelectOption[]>(() => {
@@ -175,9 +178,9 @@ export function ManagePage() {
     if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
     if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
     if (vehicleId !== 'todos') list = list.filter((r) => r.veiculoId === vehicleId)
-    if (processo !== 'todos') list = list.filter((r) => r.processo === processo)
-    if (base !== 'todos') list = list.filter((r) => r.base === base)
-    if (coordenador !== 'todos') list = list.filter((r) => r.coordenador === coordenador)
+    if (processo !== 'todos') list = list.filter((r) => matchesProcessoFilter(r.processo, processo))
+    if (base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, base))
+    if (coordenador !== 'todos') list = list.filter((r) => matchesCoordenadorFilter(r.coordenador, coordenador))
     if (responsavel !== 'todos') list = list.filter((r) => r.responsavel === responsavel)
     if (prefixo !== 'todos') list = list.filter((r) => r.prefixo === prefixo)
 
@@ -207,6 +210,29 @@ export function ManagePage() {
       (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),
     )
   }, [rows, visao, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query])
+
+  const totalFiltrados = sortedFiltered.length
+  const totalPaginas = Math.max(1, Math.ceil(totalFiltrados / pageSize))
+  const paginaEfetiva = Math.min(Math.max(1, pagina), totalPaginas)
+
+  useEffect(() => {
+    if (pagina !== paginaEfetiva) setPagina(paginaEfetiva)
+  }, [pagina, paginaEfetiva])
+
+  useEffect(() => {
+    setPagina(1)
+  }, [visao, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query, pageSizeStr])
+
+  const paginaRows = useMemo(() => {
+    const start = (paginaEfetiva - 1) * pageSize
+    return sortedFiltered.slice(start, start + pageSize)
+  }, [sortedFiltered, paginaEfetiva, pageSize])
+
+  const irParaPagina = (p: number) => {
+    const next = Math.min(Math.max(1, p), totalPaginas)
+    setPagina(next)
+    tabelaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const filtrosAtivos =
     vehicleId !== 'todos' ||
@@ -367,8 +393,8 @@ export function ManagePage() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatPill
-          label="Apontamentos"
-          value={String(stats.total)}
+          label="Checklists realizados"
+          value={String(checklistsRealizadosTotal)}
           icon={<ClipboardList size={18} />}
           tone="slate"
           selected={visao === 'apontamentos'}
@@ -407,14 +433,14 @@ export function ManagePage() {
               options={vehicleOptions}
               onChange={setVehicleId}
             />
-            <Select label="Processo" value={processo} options={processoOptions} onChange={setProcesso} />
-            <Select label="Base" value={base} options={baseOptions} onChange={setBase} />
-            <Select label="Coordenador" value={coordenador} options={coordOptions} onChange={setCoordenador} />
+            <Select label="Processo" value={processo} options={PROCESSO_FILTER_SELECT_OPTIONS} onChange={setProcesso} />
+            <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={setBase} />
+            <Select label="Coordenador" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setCoordenador} />
             <Select label="Responsável" value={responsavel} options={respOptions} onChange={setResponsavel} />
             <Select label="Prefixo" value={prefixo} options={prefixoOptions} onChange={setPrefixo} />
             <Select label="Data" value={data} options={DATA_OPTS} onChange={setData} />
-            <div>
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <div className="min-w-0 lg:col-span-2">
+              <div className="whitespace-nowrap text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Buscar defeito ou veículo
               </div>
               <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
@@ -446,7 +472,10 @@ export function ManagePage() {
             Carregando apontamentos...
           </div>
         )}
-        <div className={`mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}>
+        <div
+          ref={tabelaRef}
+          className={`mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}
+        >
           <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
@@ -468,7 +497,7 @@ export function ManagePage() {
                   </td>
                 </tr>
               ) : (
-                sortedFiltered.map((r) => {
+                paginaRows.map((r) => {
                   const atrasado = prazoPassou(r.prazo, r.resolvido)
                   return (
                     <tr
@@ -552,8 +581,62 @@ export function ManagePage() {
           </table>
         </div>
 
-        <div className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {sortedFiltered.length} registro(s) — mais antigos primeiro na coluna &quot;Data de apontamento&quot;.
+        <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {totalFiltrados === 0 ? (
+              <>Nenhum registro com os filtros atuais.</>
+            ) : (
+              <>
+                Mostrando{' '}
+                <span className="font-extrabold text-slate-700 dark:text-slate-300">
+                  {(paginaEfetiva - 1) * pageSize + 1}
+                </span>
+                {' — '}
+                <span className="font-extrabold text-slate-700 dark:text-slate-300">
+                  {Math.min(paginaEfetiva * pageSize, totalFiltrados)}
+                </span>
+                {' de '}
+                <span className="font-extrabold text-slate-700 dark:text-slate-300">{totalFiltrados}</span>
+                {' registro(s). Ordem: mais antigos primeiro na coluna '}
+                <span className="font-extrabold">&quot;Data de apontamento&quot;</span>.
+              </>
+            )}
+          </div>
+          {totalFiltrados > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <div className="w-[168px] shrink-0">
+                <Select
+                  label="Por página"
+                  value={pageSizeStr}
+                  options={PAGE_SIZE_OPTIONS}
+                  onChange={setPageSizeStr}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => irParaPagina(paginaEfetiva - 1)}
+                  disabled={paginaEfetiva <= 1}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft size={20} aria-hidden />
+                </button>
+                <span className="min-w-[7.5rem] px-2 text-center text-xs font-extrabold tabular-nums text-slate-600 dark:text-slate-300">
+                  {paginaEfetiva} / {totalPaginas}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => irParaPagina(paginaEfetiva + 1)}
+                  disabled={paginaEfetiva >= totalPaginas}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  aria-label="Próxima página"
+                >
+                  <ChevronRight size={20} aria-hidden />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

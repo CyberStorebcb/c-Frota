@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { StatCard } from '../components/ui/StatCard'
 import { Select } from '../components/ui/Select'
+import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
+import { PROCESSO_FILTER_SELECT_OPTIONS } from '../data/processoFilterOptions'
 import {
   Area,
   Bar,
@@ -167,11 +169,7 @@ export function DashboardPage() {
             label="Processo"
             value={processo}
             onChange={setProcesso}
-            options={[
-              { label: 'Todos', value: 'todos' },
-              { label: 'Diário', value: 'diario' },
-              { label: 'Semanal', value: 'semanal' },
-            ]}
+            options={PROCESSO_FILTER_SELECT_OPTIONS}
           />
           <Select
             label="Base"
@@ -187,11 +185,7 @@ export function DashboardPage() {
             label="Coordenador"
             value={coordenador}
             onChange={setCoordenador}
-            options={[
-              { label: 'Todos', value: 'todos' },
-              { label: 'Ana', value: 'ana' },
-              { label: 'Bruno', value: 'bruno' },
-            ]}
+            options={COORDENADOR_FILTER_SELECT_OPTIONS}
           />
           <Select
             label="Responsável"
