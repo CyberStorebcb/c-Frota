@@ -146,14 +146,20 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
   const recarregar = useCallback(async () => {
     setCarregando(true)
+    // Limpa dados legados do localStorage na primeira carga
+    localStorage.removeItem('frota-apontamentos-v1')
+
     const { data, error } = await supabase
       .from('apontamentos')
       .select('*')
       .order('data_apontamento', { ascending: true })
+
     if (error) {
       setPersistError('Erro ao carregar apontamentos: ' + error.message)
+      setRows([])
     } else {
       setRows(((data ?? []) as unknown[]).map(fromRow))
+      setPersistError(null)
     }
     setCarregando(false)
   }, [])
