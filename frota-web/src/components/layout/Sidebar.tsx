@@ -4,10 +4,10 @@ import { labelForArea } from '../../access/accessAreas'
 import { useAuth } from '../../auth/AuthContext'
 
 const baseNav = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/gerenciar', label: 'Gerenciar', icon: Settings2 },
-  { to: '/registro', label: 'Registro', icon: Car },
-  { to: '/gerenciar/checklists', label: 'Checklists', icon: ClipboardList },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/gerenciar', label: 'Gerenciar', icon: Settings2, end: true },
+  { to: '/registro', label: 'Registro', icon: Car, end: false },
+  { to: '/gerenciar/checklists', label: 'Checklists', icon: ClipboardList, end: false },
 ] as const
 
 export function Sidebar({
@@ -88,7 +88,7 @@ function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => 
   const { user } = useAuth()
   const navItems = [
     ...baseNav,
-    ...(user?.role === 'admin' ? ([{ to: '/administrador', label: 'Administrador', icon: Shield }] as const) : []),
+    ...(user?.role === 'admin' ? ([{ to: '/administrador', label: 'Administrador', icon: Shield, end: false }] as const) : []),
   ]
 
   return (
@@ -103,7 +103,7 @@ function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => 
           <li key={item.to}>
             <NavLink
               to={item.to}
-              end={item.to === '/'}
+              end={item.end}
               onClick={onNavigate}
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
