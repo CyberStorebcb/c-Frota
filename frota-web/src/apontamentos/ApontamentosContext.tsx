@@ -179,14 +179,29 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       .eq('progresso', 100)
     setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
 
-    // 2. Checklists com progresso 100 que possam ter NCs nas respostas
-    //    Não filtramos por nc_count pois ele pode estar desatualizado no banco;
-    //    verificamos os NCs diretamente no campo `respostas`.
-    const { data: clData, error: clError } = await supabase
-      .from('checklists')
-      .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, dados_veiculo, respostas, observacoes')
-      .eq('progresso', 100)
-      .order('data_inspecao', { ascending: true })
+    // 2. Checklists com NC: busca nc_count > 0 OU nulo, mais os completos
+    //    recentes onde nc_count pode estar errado (0 mas com respostas 'nc').
+    // Busca todos os checklists com NC em páginas de 1000 (limite do Supabase)
+    const fetchAllNc = async () => {
+      const all: unknown[] = []
+      let from = 0
+      const pageSize = 1000
+      while (true) {
+        const { data, error } = await supabase
+          .from('checklists')
+          .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, dados_veiculo, respostas, observacoes')
+          .gt('nc_count', 0)
+          .order('data_inspecao', { ascending: true })
+          .range(from, from + pageSize - 1)
+        if (error) return { data: null, error }
+        if (data) all.push(...data)
+        if (!data || data.length < pageSize) break
+        from += pageSize
+      }
+      return { data: all, error: null }
+    }
+
+    const { data: clData, error: clError } = await fetchAllNc()
 
     if (clError) {
       setPersistError('Erro ao carregar checklists: ' + clError.message)
@@ -213,12 +228,10 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const checklist = cl as any
       const respostas: Record<string, string> = checklist.respostas ?? {}
-      const temNc = Object.values(respostas).some((v) => v === 'nc')
-      if (!temNc) continue
-      for (const [itemId, resp] of Object.entries(respostas)) {
-        if (resp === 'nc') {
-          apontamentos.push(checklistItemToApontamento(checklist, itemId, resolucoes))
-        }
+      const ncItems = Object.entries(respostas).filter(([, v]) => v === 'nc')
+      if (ncItems.length === 0) continue
+      for (const [itemId] of ncItems) {
+        apontamentos.push(checklistItemToApontamento(checklist, itemId, resolucoes))
       }
     }
 

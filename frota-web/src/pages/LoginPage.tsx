@@ -135,7 +135,6 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [remember, setRemember] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -179,7 +178,7 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
     e.preventDefault()
     setError(null)
     setPending(true)
-    const res = await login(email, password, remember)
+    const res = await login(email, password)
     setPending(false)
     if (res.ok === false) {
       setError(res.message)
@@ -399,19 +398,6 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              <input
-                id="login-remember"
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                disabled={pending}
-                className="size-4 rounded border-slate-300 accent-blue-600 focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-900"
-              />
-              <label htmlFor="login-remember" className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                Manter conectado neste dispositivo
-              </label>
-            </div>
 
             {error ? (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">

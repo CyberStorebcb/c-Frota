@@ -130,8 +130,7 @@ function StatPill({
 export function ManagePage() {
   const { rows, carregando, marcarResolvido, checklistsRealizadosTotal } = useApontamentos()
   const { user } = useAuth()
-  const canMarkResolved =
-    user?.role === 'admin' || (user?.role === 'user' && user.userKind === 'special')
+  const canMarkResolved = user?.role === 'admin'
 
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')
   const [vehicleId, setVehicleId] = useState<string>('todos')
@@ -203,7 +202,10 @@ export function ManagePage() {
       list = list.filter(
         (r) =>
           r.defeito.toLowerCase().includes(q) ||
-          r.veiculoLabel.toLowerCase().includes(q),
+          r.veiculoLabel.toLowerCase().includes(q) ||
+          r.prefixo.toLowerCase().includes(q) ||
+          r.base.toLowerCase().includes(q) ||
+          r.responsavel.toLowerCase().includes(q),
       )
     }
     return [...list].sort(

@@ -17,10 +17,12 @@ import {
   FileText,
   RefreshCw,
   Search,
+  Trash2,
   X,
 } from 'lucide-react'
 import { supabase, type ChecklistRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
+import { useAuth } from '../auth/AuthContext'
 
 function formatDateBR(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -458,7 +460,15 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
 // Linha da tabela expansível (mobile)
 // ---------------------------------------------------------------------------
 
-function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe: () => void }) {
+function LinhaChecklist({
+  row,
+  onVerDetalhe,
+  onApagar,
+}: {
+  row: ChecklistRow
+  onVerDetalhe: () => void
+  onApagar?: () => void
+}) {
   const [expandido, setExpandido] = useState(false)
   const schema = SCHEMA_MAP[row.tipo]
   const placa = row.dados_veiculo?.placa ?? ''
@@ -509,14 +519,27 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
           </div>
         </td>
         <td className="px-4 py-3 text-right">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setExpandido((v) => !v) }}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 md:hidden"
-            aria-label="Expandir"
-          >
-            {expandido ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
+          <div className="flex items-center justify-end gap-1">
+            {onApagar && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onApagar() }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-500 hover:bg-rose-100 dark:border-rose-800/50 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/40"
+                aria-label="Apagar"
+                title="Apagar checklist"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setExpandido((v) => !v) }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 md:hidden"
+              aria-label="Expandir"
+            >
+              {expandido ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
         </td>
       </tr>
       {/* linha expandida no mobile */}
@@ -582,11 +605,16 @@ function calcSemanas(rows: ChecklistRow[], n = 8) {
 }
 
 export function ChecklistResultadosPage() {
+  const { user } = useAuth()
+  const podeGerenciar = user?.role === 'admin'
+
   const [rows, setRows]               = useState<ChecklistRow[]>([])
   const [carregando, setCarregando]   = useState(true)
   const [exportando, setExportando]   = useState(false)
   const [erro, setErro]               = useState('')
   const [totalRegistros, setTotal]    = useState(0)
+  const [confirmDelete, setConfirmDelete] = useState<ChecklistRow | null>(null)
+  const [apagando, setApagando]       = useState(false)
   const [paginaAtual, setPaginaAtual] = useState(1)
   const [query, setQuery]             = useState('')
   const [queryInput, setQueryInput]   = useState('')
@@ -634,6 +662,17 @@ export function ChecklistResultadosPage() {
       setTotal(count ?? 0)
     }
     setCarregando(false)
+  }
+
+  const apagarChecklist = async (row: ChecklistRow) => {
+    setApagando(true)
+    const r1 = await supabase.from('apontamentos').delete().like('id', `${row.id}__%`)
+    const r2 = await supabase.from('checklists').delete().eq('id', row.id)
+    if (r1.error) console.error('Erro ao apagar apontamentos:', r1.error)
+    if (r2.error) console.error('Erro ao apagar checklist:', r2.error)
+    setConfirmDelete(null)
+    setApagando(false)
+    void carregar(paginaAtual)
   }
 
   // Carrega dados para o sparkline (sem paginação, só últimas 8 semanas)
@@ -968,6 +1007,7 @@ export function ChecklistResultadosPage() {
                       key={row.id}
                       row={row}
                       onVerDetalhe={() => setDetalhe(row)}
+                      onApagar={podeGerenciar ? () => setConfirmDelete(row) : undefined}
                     />
                   ))
                 )}
@@ -1036,6 +1076,47 @@ export function ChecklistResultadosPage() {
       )}
 
       {detalhe && <ModalDetalhe row={detalhe} onClose={() => setDetalhe(null)} />}
+
+      {/* Modal de confirmação de exclusão */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-rose-100 dark:bg-rose-950/50">
+                <Trash2 size={18} className="text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <div className="text-base font-black text-slate-900 dark:text-slate-100">Apagar checklist?</div>
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Esta ação não pode ser desfeita.</div>
+              </div>
+            </div>
+            <div className="mb-5 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+              <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{confirmDelete.nome_operador}</div>
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {TIPO_BADGE[confirmDelete.tipo]?.label ?? confirmDelete.tipo} · {confirmDelete.dados_veiculo?.placa ?? '—'} · {formatDateBR(confirmDelete.data_inspecao)}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                disabled={apagando}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void apagarChecklist(confirmDelete)}
+                disabled={apagando}
+                className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {apagando ? 'Apagando...' : 'Sim, apagar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

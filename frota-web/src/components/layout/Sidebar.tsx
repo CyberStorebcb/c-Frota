@@ -1,6 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Car, ClipboardList, LayoutDashboard, LogOut, Settings2, Shield, Truck, X } from 'lucide-react'
-import { labelForArea } from '../../access/accessAreas'
 import { useAuth } from '../../auth/AuthContext'
 
 const baseNav = [
@@ -160,17 +159,13 @@ function Footer({ collapsed, onAfterLogout }: { collapsed: boolean; onAfterLogou
         <div className="mb-3 space-y-1">
           <div
             className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400"
-            title={
-              user.role === 'user' && user.userKind === 'special'
-                ? `${user.email} · ${labelForArea(user.area)}`
-                : user.email
-            }
+            title={user.email}
           >
             {user.email}
           </div>
-          {user.role === 'user' && user.userKind === 'special' ? (
+          {user.role === 'admin' ? (
             <div className="text-[11px] font-extrabold uppercase tracking-wide text-brand-600 dark:text-brand-400">
-              Especial · {labelForArea(user.area)}
+              Administrador
             </div>
           ) : null}
         </div>
