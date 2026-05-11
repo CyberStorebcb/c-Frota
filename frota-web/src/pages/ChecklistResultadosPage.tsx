@@ -6,9 +6,12 @@ import {
   CalendarCheck2,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ClipboardList,
   ExternalLink,
+  FileText,
   RefreshCw,
   Search,
   X,
@@ -42,6 +45,60 @@ const TIPOS = [
 ]
 
 // ---------------------------------------------------------------------------
+// Lightbox de imagens
+// ---------------------------------------------------------------------------
+function Lightbox({ urls, index, onClose, onPrev, onNext }: {
+  urls: string[]
+  index: number
+  onClose: () => void
+  onPrev: () => void
+  onNext: () => void
+}) {
+  const url = urls[index]!
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+      >
+        <X size={20} />
+      </button>
+      {urls.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onPrev() }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onNext() }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </>
+      )}
+      <img
+        src={url}
+        alt={`Evidência ${index + 1}`}
+        className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs font-extrabold text-white">
+        {index + 1} / {urls.length}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Modal de detalhe
 // ---------------------------------------------------------------------------
 
@@ -49,6 +106,11 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
   const schema = SCHEMA_MAP[row.tipo]
   const placa = row.dados_veiculo?.placa ?? ''
   const km = row.dados_veiculo?.km_atual ?? ''
+
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  const fotos = (row.evidencia_urls ?? []).filter((u) => /\.(jpe?g|png|gif|webp|heic)(\?|$)/i.test(u))
+  const pdfs  = (row.evidencia_urls ?? []).filter((u) => /\.pdf(\?|$)/i.test(u))
+  const outros = (row.evidencia_urls ?? []).filter((u) => !fotos.includes(u) && !pdfs.includes(u))
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-8">
@@ -139,25 +201,81 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
 
         {/* evidências */}
         {row.evidencia_urls?.length > 0 && (
-          <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
-            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+          <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+            <p className="mb-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
               Evidências ({row.evidencia_urls.length})
             </p>
-            <div className="flex flex-wrap gap-2">
-              {row.evidencia_urls.map((url, i) => (
-                <a
-                  key={url}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                >
-                  <ExternalLink size={11} />
-                  Arquivo {i + 1}
-                </a>
-              ))}
-            </div>
+
+            {/* Galeria de fotos */}
+            {fotos.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {fotos.map((url, i) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setLightboxIdx(i)}
+                    className="group relative h-20 w-20 overflow-hidden rounded-xl border-2 border-slate-200 bg-slate-100 shadow-sm transition hover:border-brand-500 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <img
+                      src={url}
+                      alt={`Foto ${i + 1}`}
+                      className="h-full w-full object-cover transition group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/20">
+                      <ExternalLink size={16} className="text-white opacity-0 drop-shadow transition group-hover:opacity-100" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* PDFs */}
+            {pdfs.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {pdfs.map((url, i) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    <FileText size={13} className="text-rose-400" />
+                    PDF {i + 1}
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Outros arquivos */}
+            {outros.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {outros.map((url, i) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    <ExternalLink size={11} />
+                    Arquivo {i + 1}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
+        )}
+
+        {/* Lightbox */}
+        {lightboxIdx !== null && (
+          <Lightbox
+            urls={fotos}
+            index={lightboxIdx}
+            onClose={() => setLightboxIdx(null)}
+            onPrev={() => setLightboxIdx((i) => (i! - 1 + fotos.length) % fotos.length)}
+            onNext={() => setLightboxIdx((i) => (i! + 1) % fotos.length)}
+          />
         )}
 
         {/* itens por grupo */}
