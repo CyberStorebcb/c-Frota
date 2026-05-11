@@ -465,65 +465,65 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
 const PAGE_SIZE = 100
 
 export function ChecklistResultadosPage() {
-  const [rows, setRows]           = useState<ChecklistRow[]>([])
-  const [carregando, setCarregando] = useState(true)
-  const [carregandoMais, setCarregandoMais] = useState(false)
-  const [temMais, setTemMais]     = useState(false)
-  const [pagina, setPagina]       = useState(0)
-  const [erro, setErro]           = useState('')
-  const [query, setQuery]         = useState('')
-  const [tipoFiltro, setTipoFiltro] = useState('')
-  const [somenteNc, setSomenteNc] = useState(false)
-  const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim]     = useState('')
-  const [detalhe, setDetalhe]     = useState<ChecklistRow | null>(null)
+  const [rows, setRows]               = useState<ChecklistRow[]>([])
+  const [carregando, setCarregando]   = useState(true)
+  const [erro, setErro]               = useState('')
+  const [totalRegistros, setTotal]    = useState(0)
+  const [paginaAtual, setPaginaAtual] = useState(1)
+  const [query, setQuery]             = useState('')
+  const [tipoFiltro, setTipoFiltro]   = useState('')
+  const [somenteNc, setSomenteNc]     = useState(false)
+  const [dataInicio, setDataInicio]   = useState('')
+  const [dataFim, setDataFim]         = useState('')
+  const [detalhe, setDetalhe]         = useState<ChecklistRow | null>(null)
 
-  const buildQuery = (from: number) => {
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE))
+
+  const buildQuery = (pagina: number) => {
+    const from = (pagina - 1) * PAGE_SIZE
     let q = supabase
       .from('checklists')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
 
-    if (tipoFiltro)  q = q.eq('tipo', tipoFiltro)
-    if (somenteNc)   q = q.gt('nc_count', 0)
-    if (dataInicio)  q = q.gte('data_inspecao', dataInicio)
-    if (dataFim)     q = q.lte('data_inspecao', dataFim)
+    if (tipoFiltro) q = q.eq('tipo', tipoFiltro)
+    if (somenteNc)  q = q.gt('nc_count', 0)
+    if (dataInicio) q = q.gte('data_inspecao', dataInicio)
+    if (dataFim)    q = q.lte('data_inspecao', dataFim)
 
     return q
   }
 
-  const carregar = async () => {
+  const carregar = async (pagina: number) => {
     setCarregando(true)
     setErro('')
-    setPagina(0)
-    const { data, error } = await buildQuery(0)
+    const { data, error, count } = await buildQuery(pagina)
     if (error) {
       setErro('Erro ao carregar dados do Supabase.')
     } else {
-      const resultado = (data as ChecklistRow[]) ?? []
-      setRows(resultado)
-      setTemMais(resultado.length === PAGE_SIZE)
-      setPagina(1)
+      setRows((data as ChecklistRow[]) ?? [])
+      setTotal(count ?? 0)
     }
     setCarregando(false)
   }
 
-  const carregarMais = async () => {
-    setCarregandoMais(true)
-    const from = pagina * PAGE_SIZE
-    const { data, error } = await buildQuery(from)
-    if (!error) {
-      const novos = (data as ChecklistRow[]) ?? []
-      setRows((prev) => [...prev, ...novos])
-      setTemMais(novos.length === PAGE_SIZE)
-      setPagina((p) => p + 1)
-    }
-    setCarregandoMais(false)
-  }
+  // Recarrega página 1 quando filtros mudam
+  useEffect(() => {
+    setPaginaAtual(1)
+    void carregar(1)
+  }, [tipoFiltro, somenteNc, dataInicio, dataFim]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Recarrega quando filtros de servidor mudam
-  useEffect(() => { void carregar() }, [tipoFiltro, somenteNc, dataInicio, dataFim]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Carrega quando a página muda (exceto reset para 1, já tratado acima)
+  useEffect(() => {
+    void carregar(paginaAtual)
+  }, [paginaAtual]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const irParaPagina = (p: number) => {
+    if (p < 1 || p > totalPaginas || p === paginaAtual) return
+    setPaginaAtual(p)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   // Filtro client-side apenas para busca por texto (nome/matrícula/placa)
   const filtrados = useMemo(() => {
@@ -567,7 +567,7 @@ export function ChecklistResultadosPage() {
         </div>
         <button
           type="button"
-          onClick={() => void carregar()}
+          onClick={() => void carregar(paginaAtual)}
           disabled={carregando}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
         >
@@ -661,7 +661,7 @@ export function ChecklistResultadosPage() {
             )}
             <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <CalendarCheck2 size={14} />
-              {filtrados.length} resultado{filtrados.length !== 1 ? 's' : ''}{temMais ? '+' : ''}
+              {totalRegistros.toLocaleString('pt-BR')} resultado{totalRegistros !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
@@ -675,7 +675,7 @@ export function ChecklistResultadosPage() {
             <p className="text-sm font-extrabold text-rose-500">{erro}</p>
             <button
               type="button"
-              onClick={() => void carregar()}
+              onClick={() => void carregar(paginaAtual)}
               className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300"
             >
               Tentar novamente
@@ -721,18 +721,61 @@ export function ChecklistResultadosPage() {
         )}
       </div>
 
-      {/* Carregar mais */}
-      {temMais && !carregando && (
-        <div className="flex justify-center">
+      {/* Paginação */}
+      {totalPaginas > 1 && !carregando && (
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
           <button
             type="button"
-            onClick={() => void carregarMais()}
-            disabled={carregandoMais}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            onClick={() => irParaPagina(paginaAtual - 1)}
+            disabled={paginaAtual === 1}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            aria-label="Página anterior"
           >
-            <RefreshCw size={15} className={carregandoMais ? 'animate-spin' : ''} />
-            {carregandoMais ? 'Carregando...' : `Carregar mais ${PAGE_SIZE}`}
+            <ChevronLeft size={16} />
           </button>
+
+          {(() => {
+            const pages: (number | '...')[] = []
+            if (totalPaginas <= 7) {
+              for (let i = 1; i <= totalPaginas; i++) pages.push(i)
+            } else {
+              pages.push(1)
+              if (paginaAtual > 3) pages.push('...')
+              for (let i = Math.max(2, paginaAtual - 1); i <= Math.min(totalPaginas - 1, paginaAtual + 1); i++) pages.push(i)
+              if (paginaAtual < totalPaginas - 2) pages.push('...')
+              pages.push(totalPaginas)
+            }
+            return pages.map((p, i) =>
+              p === '...'
+                ? <span key={`e${i}`} className="flex h-9 w-9 items-center justify-center text-sm text-slate-400 dark:text-slate-600">…</span>
+                : <button
+                    key={p}
+                    type="button"
+                    onClick={() => irParaPagina(p as number)}
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-extrabold transition ${
+                      p === paginaAtual
+                        ? 'border-blue-500 bg-blue-500 text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900'
+                    }`}
+                  >
+                    {p}
+                  </button>
+            )
+          })()}
+
+          <button
+            type="button"
+            onClick={() => irParaPagina(paginaAtual + 1)}
+            disabled={paginaAtual === totalPaginas}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            aria-label="Próxima página"
+          >
+            <ChevronRight size={16} />
+          </button>
+
+          <span className="ml-2 text-xs font-semibold text-slate-400 dark:text-slate-500">
+            Pág. {paginaAtual} de {totalPaginas.toLocaleString('pt-BR')}
+          </span>
         </div>
       )}
 
