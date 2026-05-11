@@ -72,6 +72,11 @@ export function normalizeApontamento(raw: unknown, fallback?: Apontamento): Apon
         : typeof o.osArquivo === 'string'
           ? o.osArquivo
           : (fallback?.osArquivo ?? null),
+    checklistId: typeof o.checklistId === 'string' ? o.checklistId : (fallback?.checklistId ?? undefined),
+    ncItemId:    typeof o.ncItemId    === 'string' ? o.ncItemId    : (fallback?.ncItemId    ?? undefined),
+    ncFotos: Array.isArray(o.ncFotos)
+      ? (o.ncFotos.filter((x) => typeof x === 'string') as string[])
+      : (fallback?.ncFotos ?? undefined),
   }
 }
 

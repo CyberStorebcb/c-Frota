@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import { supabase, type ChecklistRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
+import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { Send } from 'lucide-react'
 
 function formatDateBR(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -205,9 +207,36 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
   const schema = SCHEMA_MAP[row.tipo]
   const placa = row.dados_veiculo?.placa ?? ''
   const km = row.dados_veiculo?.km_atual ?? ''
+  const { addApontamento, hasByChecklist } = useApontamentos()
 
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const [lightboxUrls, setLightboxUrls] = useState<string[]>([])
+  const [enviados, setEnviados] = useState<Set<string>>(new Set())
+
+  const enviarParaGerenciar = (itemId: string, itemLabel: string, fotos: string[]) => {
+    if (hasByChecklist(row.id, itemId)) return
+    const hoje = new Date()
+    const prazo = new Date(hoje)
+    prazo.setDate(prazo.getDate() + 7)
+    const toISO = (d: Date) => d.toISOString().slice(0, 10)
+
+    addApontamento({
+      veiculoId:      `placa-${(placa || 'desconhecido').toLowerCase()}`,
+      veiculoLabel:   placa ? `${row.dados_veiculo?.prefixo ?? ''} · ${placa}`.trim().replace(/^·\s*/, '') : row.nome_operador,
+      prefixo:        row.dados_veiculo?.prefixo ?? '',
+      defeito:        `[Checklist NC] ${itemLabel}`,
+      dataApontamento: toISO(hoje),
+      prazo:          toISO(prazo),
+      processo:       'Checklist',
+      base:           row.dados_veiculo?.localidade ?? '',
+      coordenador:    row.nome_supervisor ?? '',
+      responsavel:    row.nome_operador,
+      checklistId:    row.id,
+      ncItemId:       itemId,
+      ncFotos:        fotos,
+    })
+    setEnviados((prev) => new Set(prev).add(itemId))
+  }
 
   const openLightbox = (urls: string[], idx: number) => {
     setLightboxUrls(urls)
@@ -412,14 +441,35 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
                             <p className="mt-0.5 text-xs font-semibold text-rose-500">{obsTexto}</p>
                           )}
                         </div>
-                        <span className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-extrabold ${
-                          resp === 'c'  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                          resp === 'nc' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
-                          resp === 'na' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
-                          'bg-slate-100 text-slate-400'
-                        }`}>
-                          {resp === 'c' ? 'C' : resp === 'nc' ? 'NC' : resp === 'na' ? 'N/A' : '—'}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {resp === 'nc' && (() => {
+                            const jaEnviado = enviados.has(item.id) || hasByChecklist(row.id, item.id)
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => enviarParaGerenciar(item.id, item.label, obsFotos)}
+                                disabled={jaEnviado}
+                                title={jaEnviado ? 'Já enviado para Gerenciar' : 'Enviar NC para planilha de Gerenciar'}
+                                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-extrabold transition ${
+                                  jaEnviado
+                                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 cursor-default'
+                                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800'
+                                }`}
+                              >
+                                {jaEnviado ? <CheckCircle2 size={11} /> : <Send size={11} />}
+                                {jaEnviado ? 'Enviado' : 'Gerenciar'}
+                              </button>
+                            )
+                          })()}
+                          <span className={`rounded-lg px-2 py-0.5 text-xs font-extrabold ${
+                            resp === 'c'  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                            resp === 'nc' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
+                            resp === 'na' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
+                            'bg-slate-100 text-slate-400'
+                          }`}>
+                            {resp === 'c' ? 'C' : resp === 'nc' ? 'NC' : resp === 'na' ? 'N/A' : '—'}
+                          </span>
+                        </div>
                       </div>
                       {/* Fotos do item NC inline */}
                       {obsFotos.length > 0 && (

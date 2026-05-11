@@ -35,6 +35,12 @@ export type Apontamento = {
   base: string
   coordenador: string
   responsavel: string
+  /** ID do checklist de origem (quando gerado automaticamente de NC) */
+  checklistId?: string
+  /** Fotos da não conformidade do checklist de origem */
+  ncFotos?: string[]
+  /** ID do item NC no schema do checklist */
+  ncItemId?: string
 }
 
 const SEED: Apontamento[] = [
@@ -245,12 +251,16 @@ function initialRows(): Apontamento[] {
   return [...SEED].sort(sortByApontamento)
 }
 
+export type NovoApontamento = Omit<Apontamento, 'id' | 'resolvido' | 'dataResolvido' | 'horaResolvido' | 'reparoValor' | 'reparoDescricao' | 'reparoImagens' | 'osArquivo'>
+
 type Ctx = {
   rows: Apontamento[]
   marcarResolvido: (
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
   ) => void
+  addApontamento: (novo: NovoApontamento) => string
+  hasByChecklist: (checklistId: string, ncItemId: string) => boolean
   persistError: string | null
   clearPersistError: () => void
 }
@@ -267,6 +277,27 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   }, [rows])
 
   const clearPersistError = useCallback(() => setPersistError(null), [])
+
+  const addApontamento = useCallback((novo: NovoApontamento): string => {
+    const id = `cl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const apontamento: Apontamento = {
+      ...novo,
+      id,
+      resolvido: false,
+      dataResolvido: null,
+      horaResolvido: null,
+      reparoValor: null,
+      reparoDescricao: null,
+      reparoImagens: [],
+      osArquivo: null,
+    }
+    setRows((prev) => [...prev, apontamento].sort(sortByApontamento))
+    return id
+  }, [])
+
+  const hasByChecklist = useCallback((checklistId: string, ncItemId: string): boolean => {
+    return rows.some((r) => r.checklistId === checklistId && r.ncItemId === ncItemId)
+  }, [rows])
 
   const marcarResolvido = useCallback(
     (id: string, payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null }) => {
@@ -296,8 +327,8 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   )
 
   const value = useMemo(
-    () => ({ rows, marcarResolvido, persistError, clearPersistError }),
-    [rows, marcarResolvido, persistError, clearPersistError],
+    () => ({ rows, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError }),
+    [rows, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>

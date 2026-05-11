@@ -14,6 +14,7 @@ import {
   Settings2,
   Truck,
   X,
+  ZoomIn,
 } from 'lucide-react'
 import type { Apontamento } from '../apontamentos/ApontamentosContext'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
@@ -473,7 +474,9 @@ export function ManagePage() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
-                        {r.processo}
+                        {r.checklistId
+                          ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"><ClipboardList size={10} />Checklist NC</span>
+                          : r.processo}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                         {r.base}
@@ -588,6 +591,32 @@ export function ManagePage() {
                   <X size={18} />
                 </button>
               </div>
+
+              {/* Fotos da NC de origem (quando apontamento vem de checklist) */}
+              {currentResolve?.ncFotos && currentResolve.ncFotos.length > 0 && (
+                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
+                  <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-rose-500 dark:text-rose-400">
+                    Foto(s) da não conformidade registrada no checklist
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {currentResolve.ncFotos.map((src, i) => (
+                      <a
+                        key={src}
+                        href={src}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative h-24 w-24 overflow-hidden rounded-xl border-2 border-rose-200 bg-slate-100 shadow-sm transition hover:border-rose-400 dark:border-rose-800 dark:bg-slate-900"
+                        title="Ver foto em tamanho real"
+                      >
+                        <img src={src} alt={`NC foto ${i + 1}`} className="h-full w-full object-cover transition group-hover:scale-105" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                          <ZoomIn size={18} className="text-white opacity-0 drop-shadow transition group-hover:opacity-100" />
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
