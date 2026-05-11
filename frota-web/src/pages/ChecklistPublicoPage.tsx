@@ -444,7 +444,7 @@ function FormularioChecklist({
       }
     }
 
-    const { error } = await supabase.from('checklists').insert({
+    const { data: checklistData, error } = await supabase.from('checklists').insert({
       tipo: schema.id,
       nome_operador: operador,
       matricula,
@@ -459,12 +459,52 @@ function FormularioChecklist({
       descricao_problema: descricaoProblema,
       nome_supervisor: supervisor,
       evidencia_urls: evidenciaUrls,
-    })
+    }).select('id').single()
 
     if (error) {
       setErroEnvio('Erro ao enviar. Verifique sua conexão e tente novamente.')
       setEnviando(false)
       return
+    }
+
+    // Cria automaticamente um apontamento pendente para cada item NC
+    if (ncCount > 0 && checklistData?.id) {
+      const checklistId = checklistData.id as string
+      const placa = dadosVeiculo.placa ?? ''
+      const prefixo = dadosVeiculo.prefixo ?? ''
+      const localidade = dadosVeiculo.localidade ?? ''
+      const hoje = dataInspecao
+      const prazo = new Date(hoje)
+      prazo.setDate(prazo.getDate() + 7)
+      const prazoISO = prazo.toISOString().slice(0, 10)
+
+      const itensNcParaApontar = todosItens.filter((it) => respostas[it.id] === 'nc')
+
+      const apontamentos = itensNcParaApontar.map((it) => ({
+        id: `cl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${it.id}`,
+        veiculo_id:       `placa-${placa.toLowerCase() || 'desconhecido'}`,
+        veiculo_label:    prefixo && placa ? `${prefixo} · ${placa}` : placa || operador,
+        prefixo,
+        defeito:          `[Checklist NC] ${it.label}`,
+        data_apontamento: hoje,
+        prazo:            prazoISO,
+        resolvido:        false,
+        data_resolvido:   null,
+        hora_resolvido:   null,
+        reparo_valor:     null,
+        reparo_descricao: null,
+        reparo_imagens:   [],
+        os_arquivo:       null,
+        processo:         'Checklist',
+        base:             localidade,
+        coordenador:      supervisor,
+        responsavel:      operador,
+        checklist_id:     checklistId,
+        nc_item_id:       it.id,
+        nc_fotos:         fotasUrls[it.id] ?? [],
+      }))
+
+      await supabase.from('apontamentos').insert(apontamentos)
     }
 
     // Monta lista de itens NC para a tela de conclusão
