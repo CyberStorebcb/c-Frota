@@ -138,12 +138,10 @@ type Ctx = {
 const ApontamentosContext = createContext<Ctx | null>(null)
 
 export function ApontamentosProvider({ children }: { children: ReactNode }) {
-  const [rows, setRows]           = useState<Apontamento[]>([])
-  const [carregando, setCarregando] = useState(true)
+  const [rows, setRows]               = useState<Apontamento[]>([])
+  const [carregando, setCarregando]   = useState(true)
   const [persistError, setPersistError] = useState<string | null>(null)
   const clearPersistError = useCallback(() => setPersistError(null), [])
-
-  // Subscrição realtime
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const recarregar = useCallback(async () => {
@@ -160,7 +158,6 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     setCarregando(false)
   }, [])
 
-  // Carga inicial + realtime
   useEffect(() => {
     void recarregar()
 
@@ -189,7 +186,6 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       osArquivo: null,
     }
 
-    // Otimista: adiciona localmente imediatamente
     setRows((prev) => [...prev, apontamento].sort(sortByApontamento))
 
     const { error } = await supabase
@@ -197,7 +193,6 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       .insert(toInsert(apontamento))
 
     if (error) {
-      // Reverte se falhou
       setRows((prev) => prev.filter((r) => r.id !== id))
       setPersistError('Erro ao salvar apontamento: ' + error.message)
     }
@@ -213,7 +208,6 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     const hoje = localIsoDate(now)
     const hora = localTimeHHmm(now)
 
-    // Otimista
     setRows((prev) =>
       prev.map((r) =>
         r.id === id
