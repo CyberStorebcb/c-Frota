@@ -144,8 +144,7 @@ export function AdministradorPage() {
                 <select
                   value={u.role}
                   onChange={(e) => void alterarRole(u.id, e.target.value as 'admin' | 'user')}
-                  disabled={u.id === currentUser?.id}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-slate-700 outline-none focus:ring-2 focus:ring-brand-500/30 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-slate-700 outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 >
                   <option value="user">Usuário</option>
                   <option value="admin">Admin</option>

@@ -17,7 +17,13 @@ type Ctx = {
 
 const AuthContext = createContext<Ctx | null>(null)
 
-async function fetchRole(userId: string): Promise<'admin' | 'user'> {
+async function fetchRole(userId: string, email: string): Promise<'admin' | 'user'> {
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase()
+  if (adminEmail && email.trim().toLowerCase() === adminEmail) {
+    // Garante que o e-mail de admin sempre tenha role=admin no banco
+    await supabase.from('profiles').upsert({ id: userId, role: 'admin' }, { onConflict: 'id' })
+    return 'admin'
+  }
   const { data } = await supabase
     .from('profiles')
     .select('role')
@@ -42,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Carrega sessão existente
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const role = await fetchRole(session.user.id)
+        const role = await fetchRole(session.user.id, session.user.email ?? '')
         setUser(toAuthUser(session.user, role))
       }
       setLoading(false)
@@ -52,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event: string, session: Session | null) => {
         if (session?.user) {
-          const role = await fetchRole(session.user.id)
+          const role = await fetchRole(session.user.id, session.user.email ?? '')
           setUser(toAuthUser(session.user, role))
         } else {
           setUser(null)
