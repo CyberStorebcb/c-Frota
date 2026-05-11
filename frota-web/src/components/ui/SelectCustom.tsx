@@ -14,6 +14,12 @@ interface SelectCustomProps {
   className?: string
 }
 
+// Radix Select.Item não aceita value="" — usamos sentinela interno
+const EMPTY_SENTINEL = '__empty__'
+
+function toRadix(v: string) { return v === '' ? EMPTY_SENTINEL : v }
+function fromRadix(v: string) { return v === EMPTY_SENTINEL ? '' : v }
+
 export function SelectCustom({
   value,
   onChange,
@@ -24,7 +30,7 @@ export function SelectCustom({
   const selected = options.find((o) => o.value === value)
 
   return (
-    <Select.Root value={value} onValueChange={onChange}>
+    <Select.Root value={toRadix(value)} onValueChange={(v) => onChange(fromRadix(v))}>
       <Select.Trigger
         className={[
           'inline-flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm font-semibold outline-none transition-colors',
@@ -60,7 +66,7 @@ export function SelectCustom({
             {options.map((opt) => (
               <Select.Item
                 key={opt.value}
-                value={opt.value}
+                value={toRadix(opt.value)}
                 className={[
                   'relative flex cursor-pointer select-none items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold outline-none',
                   'text-slate-700 dark:text-slate-200',
