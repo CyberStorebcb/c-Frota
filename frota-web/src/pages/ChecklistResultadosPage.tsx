@@ -461,51 +461,79 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
 // Página principal
 // ---------------------------------------------------------------------------
 
+const PAGE_SIZE = 100
+
 export function ChecklistResultadosPage() {
-  const [rows, setRows] = useState<ChecklistRow[]>([])
+  const [rows, setRows]           = useState<ChecklistRow[]>([])
   const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState('')
-  const [query, setQuery] = useState('')
+  const [carregandoMais, setCarregandoMais] = useState(false)
+  const [temMais, setTemMais]     = useState(false)
+  const [pagina, setPagina]       = useState(0)
+  const [erro, setErro]           = useState('')
+  const [query, setQuery]         = useState('')
   const [tipoFiltro, setTipoFiltro] = useState('')
   const [somenteNc, setSomenteNc] = useState(false)
   const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim] = useState('')
-  const [detalhe, setDetalhe] = useState<ChecklistRow | null>(null)
+  const [dataFim, setDataFim]     = useState('')
+  const [detalhe, setDetalhe]     = useState<ChecklistRow | null>(null)
+
+  const buildQuery = (from: number) => {
+    let q = supabase
+      .from('checklists')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (tipoFiltro)  q = q.eq('tipo', tipoFiltro)
+    if (somenteNc)   q = q.gt('nc_count', 0)
+    if (dataInicio)  q = q.gte('data_inspecao', dataInicio)
+    if (dataFim)     q = q.lte('data_inspecao', dataFim)
+
+    return q
+  }
 
   const carregar = async () => {
     setCarregando(true)
     setErro('')
-    const { data, error } = await supabase
-      .from('checklists')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(500)
-
+    setPagina(0)
+    const { data, error } = await buildQuery(0)
     if (error) {
       setErro('Erro ao carregar dados do Supabase.')
     } else {
-      setRows((data as ChecklistRow[]) ?? [])
+      const resultado = (data as ChecklistRow[]) ?? []
+      setRows(resultado)
+      setTemMais(resultado.length === PAGE_SIZE)
+      setPagina(1)
     }
     setCarregando(false)
   }
 
-  useEffect(() => { void carregar() }, [])
+  const carregarMais = async () => {
+    setCarregandoMais(true)
+    const from = pagina * PAGE_SIZE
+    const { data, error } = await buildQuery(from)
+    if (!error) {
+      const novos = (data as ChecklistRow[]) ?? []
+      setRows((prev) => [...prev, ...novos])
+      setTemMais(novos.length === PAGE_SIZE)
+      setPagina((p) => p + 1)
+    }
+    setCarregandoMais(false)
+  }
 
+  // Recarrega quando filtros de servidor mudam
+  useEffect(() => { void carregar() }, [tipoFiltro, somenteNc, dataInicio, dataFim]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Filtro client-side apenas para busca por texto (nome/matrícula/placa)
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase()
+    if (!q) return rows
     return rows.filter((r) => {
-      if (tipoFiltro && r.tipo !== tipoFiltro) return false
-      if (somenteNc && r.nc_count === 0) return false
-      if (dataInicio && r.data_inspecao < dataInicio) return false
-      if (dataFim && r.data_inspecao > dataFim) return false
-      if (q) {
-        const placa = r.dados_veiculo?.placa ?? ''
-        const haystack = `${r.nome_operador} ${r.matricula} ${placa} ${r.tipo}`.toLowerCase()
-        if (!haystack.includes(q)) return false
-      }
-      return true
+      const placa = r.dados_veiculo?.placa ?? ''
+      const haystack = `${r.nome_operador} ${r.matricula} ${placa}`.toLowerCase()
+      return haystack.includes(q)
     })
-  }, [rows, query, tipoFiltro, somenteNc, dataInicio, dataFim])
+  }, [rows, query])
 
   const totalNc = filtrados.reduce((acc, r) => acc + r.nc_count, 0)
 
@@ -635,7 +663,7 @@ export function ChecklistResultadosPage() {
             )}
             <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <CalendarCheck2 size={14} />
-              {filtrados.length} resultado{filtrados.length !== 1 ? 's' : ''}
+              {filtrados.length} resultado{filtrados.length !== 1 ? 's' : ''}{temMais ? '+' : ''}
             </div>
           </div>
         </div>
@@ -694,6 +722,21 @@ export function ChecklistResultadosPage() {
           </div>
         )}
       </div>
+
+      {/* Carregar mais */}
+      {temMais && !carregando && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => void carregarMais()}
+            disabled={carregandoMais}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+          >
+            <RefreshCw size={15} className={carregandoMais ? 'animate-spin' : ''} />
+            {carregandoMais ? 'Carregando...' : `Carregar mais ${PAGE_SIZE}`}
+          </button>
+        </div>
+      )}
 
       {detalhe && <ModalDetalhe row={detalhe} onClose={() => setDetalhe(null)} />}
     </div>
