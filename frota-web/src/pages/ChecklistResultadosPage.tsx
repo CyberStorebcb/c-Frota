@@ -4,6 +4,7 @@ import { SelectCustom } from '../components/ui/SelectCustom'
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowUpDown,
   CalendarCheck2,
   CheckCircle2,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardList,
+  Download,
   ExternalLink,
   FileText,
   RefreshCw,
@@ -44,6 +46,90 @@ const TIPOS = [
   { id: 'motocicleta', label: 'Motocicleta' },
   { id: 'veiculo-leve', label: 'Veículo Leve' },
 ]
+
+// Badge colorido por tipo
+const TIPO_BADGE: Record<string, { label: string; cls: string }> = {
+  sky:           { label: 'SKY',          cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' },
+  munck:         { label: 'Munck',        cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  'picape-leve': { label: 'Picape Leve',  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  'picape-4x4':  { label: 'Picape 4x4',  cls: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' },
+  motocicleta:   { label: 'Moto',         cls: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300' },
+  'veiculo-leve':{ label: 'Veíc. Leve',  cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+}
+
+// Exportação CSV
+function exportarCSV(rows: ChecklistRow[]) {
+  const cols = ['Data', 'Tipo', 'Operador', 'Matrícula', 'Placa', 'KM', 'Prefixo', 'Processo', 'Localidade', 'C', 'NC', 'Problemas', 'Supervisor']
+  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const linhas = rows.map((r) => {
+    const dv = r.dados_veiculo ?? {}
+    const c  = Object.values(r.respostas).filter((v) => v === 'c').length
+    return [
+      r.data_inspecao,
+      TIPO_BADGE[r.tipo]?.label ?? r.tipo,
+      r.nome_operador,
+      r.matricula,
+      dv.placa ?? '',
+      dv.km_atual ?? '',
+      dv.prefixo ?? '',
+      dv.processo ?? '',
+      dv.localidade ?? '',
+      c,
+      r.nc_count,
+      r.problemas ?? '',
+      r.nome_supervisor ?? '',
+    ].map(String).map(escape).join(',')
+  })
+  const csv = [cols.map(escape).join(','), ...linhas].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = `checklists_${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// Sparkline SVG — tendência semanal de NC
+function Sparkline({ semanas }: { semanas: { label: string; nc: number; total: number }[] }) {
+  if (semanas.length < 2) return null
+  const maxNc = Math.max(...semanas.map((s) => s.nc), 1)
+  const W = 220, H = 48, pad = 4
+  const xs = semanas.map((_, i) => pad + (i / (semanas.length - 1)) * (W - pad * 2))
+  const ys = semanas.map((s) => pad + (1 - s.nc / maxNc) * (H - pad * 2))
+  const path = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i]!.toFixed(1)}`).join(' ')
+  const area = `${path} L${xs[xs.length-1]!.toFixed(1)},${H} L${xs[0]!.toFixed(1)},${H} Z`
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+          Tendência NC — últimas {semanas.length} semanas
+        </span>
+        <span className="text-xs font-extrabold text-rose-500">
+          {semanas[semanas.length - 1]?.nc ?? 0} NC esta semana
+        </span>
+      </div>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="w-full overflow-visible">
+        <defs>
+          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgb(239,68,68)" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="rgb(239,68,68)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#sparkGrad)" />
+        <path d={path} fill="none" stroke="rgb(239,68,68)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {xs.map((x, i) => (
+          <circle key={i} cx={x} cy={ys[i]} r="3" fill="rgb(239,68,68)" />
+        ))}
+      </svg>
+      <div className="mt-1 flex justify-between">
+        {semanas.map((s, i) => (
+          <span key={i} className="text-[9px] font-semibold text-slate-400 dark:text-slate-600">{s.label}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Helper: extrai texto e URLs de fotos de uma observação
@@ -391,9 +477,12 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
           </div>
         </td>
         <td className="px-4 py-3">
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {schema?.nome ?? row.tipo}
-          </span>
+          {(() => {
+            const b = TIPO_BADGE[row.tipo]
+            return b
+              ? <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-extrabold ${b.cls}`}>{b.label}</span>
+              : <span className="text-sm font-semibold text-slate-500">{row.tipo}</span>
+          })()}
         </td>
         <td className="px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
           {placa || <span className="text-slate-400">—</span>}
@@ -464,41 +553,78 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
 
 const PAGE_SIZE = 100
 
+type OrdemCol = 'data_inspecao' | 'created_at' | 'nc_count' | 'nome_operador'
+type OrdemDir = 'asc' | 'desc'
+
+// Agrupa rows por semana ISO e retorna até N semanas mais recentes
+function calcSemanas(rows: ChecklistRow[], n = 8) {
+  const map = new Map<string, { nc: number; total: number }>()
+  for (const r of rows) {
+    const d = new Date(r.data_inspecao)
+    const day = d.getDay()
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - ((day + 6) % 7))
+    const key = monday.toISOString().slice(0, 10)
+    const cur = map.get(key) ?? { nc: 0, total: 0 }
+    cur.total++
+    if (r.nc_count > 0) cur.nc++
+    map.set(key, cur)
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-n)
+    .map(([key, val]) => ({
+      label: key.slice(5).replace('-', '/'),
+      ...val,
+    }))
+}
+
 export function ChecklistResultadosPage() {
   const [rows, setRows]               = useState<ChecklistRow[]>([])
   const [carregando, setCarregando]   = useState(true)
+  const [exportando, setExportando]   = useState(false)
   const [erro, setErro]               = useState('')
   const [totalRegistros, setTotal]    = useState(0)
   const [paginaAtual, setPaginaAtual] = useState(1)
   const [query, setQuery]             = useState('')
+  const [queryInput, setQueryInput]   = useState('')
   const [tipoFiltro, setTipoFiltro]   = useState('')
   const [somenteNc, setSomenteNc]     = useState(false)
   const [dataInicio, setDataInicio]   = useState('')
   const [dataFim, setDataFim]         = useState('')
+  const [ordemCol, setOrdemCol]       = useState<OrdemCol>('created_at')
+  const [ordemDir, setOrdemDir]       = useState<OrdemDir>('desc')
   const [detalhe, setDetalhe]         = useState<ChecklistRow | null>(null)
+  const [sparkRows, setSparkRows]     = useState<ChecklistRow[]>([])
 
   const totalPaginas = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE))
 
-  const buildQuery = (pagina: number) => {
-    const from = (pagina - 1) * PAGE_SIZE
-    let q = supabase
-      .from('checklists')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1)
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyFilters = (q: any): any => {
     if (tipoFiltro) q = q.eq('tipo', tipoFiltro)
     if (somenteNc)  q = q.gt('nc_count', 0)
     if (dataInicio) q = q.gte('data_inspecao', dataInicio)
     if (dataFim)    q = q.lte('data_inspecao', dataFim)
-
+    if (query)      q = q.or(`nome_operador.ilike.%${query}%,matricula.ilike.%${query}%`)
     return q
+  }
+
+  const buildQuery = (pagina: number) => {
+    const from = (pagina - 1) * PAGE_SIZE
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const base: any = supabase
+      .from('checklists')
+      .select('*', { count: 'exact' })
+      .order(ordemCol, { ascending: ordemDir === 'asc' })
+      .range(from, from + PAGE_SIZE - 1)
+    return applyFilters(base) as ReturnType<typeof supabase.from> & { then: unknown }
   }
 
   const carregar = async (pagina: number) => {
     setCarregando(true)
     setErro('')
-    const { data, error, count } = await buildQuery(pagina)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error, count } = await (buildQuery(pagina) as any)
     if (error) {
       setErro('Erro ao carregar dados do Supabase.')
     } else {
@@ -508,16 +634,36 @@ export function ChecklistResultadosPage() {
     setCarregando(false)
   }
 
-  // Recarrega página 1 quando filtros mudam
+  // Carrega dados para o sparkline (sem paginação, só últimas 8 semanas)
+  const carregarSpark = async () => {
+    const oitoSemanas = new Date()
+    oitoSemanas.setDate(oitoSemanas.getDate() - 56)
+    const { data } = await supabase
+      .from('checklists')
+      .select('data_inspecao,nc_count')
+      .gte('data_inspecao', oitoSemanas.toISOString().slice(0, 10))
+      .order('data_inspecao', { ascending: true })
+    if (data) setSparkRows(data as ChecklistRow[])
+  }
+
+  // Debounce na busca por texto
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(queryInput), 400)
+    return () => clearTimeout(t)
+  }, [queryInput])
+
+  // Recarrega página 1 quando filtros/ordem mudam
   useEffect(() => {
     setPaginaAtual(1)
     void carregar(1)
-  }, [tipoFiltro, somenteNc, dataInicio, dataFim]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tipoFiltro, somenteNc, dataInicio, dataFim, query, ordemCol, ordemDir]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Carrega quando a página muda (exceto reset para 1, já tratado acima)
+  // Carrega nova página quando paginaAtual muda
   useEffect(() => {
     void carregar(paginaAtual)
   }, [paginaAtual]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { void carregarSpark() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const irParaPagina = (p: number) => {
     if (p < 1 || p > totalPaginas || p === paginaAtual) return
@@ -525,18 +671,32 @@ export function ChecklistResultadosPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Filtro client-side apenas para busca por texto (nome/matrícula/placa)
-  const filtrados = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter((r) => {
-      const placa = r.dados_veiculo?.placa ?? ''
-      const haystack = `${r.nome_operador} ${r.matricula} ${placa}`.toLowerCase()
-      return haystack.includes(q)
-    })
-  }, [rows, query])
+  const toggleOrdem = (col: OrdemCol) => {
+    if (ordemCol === col) {
+      setOrdemDir((d) => (d === 'desc' ? 'asc' : 'desc'))
+    } else {
+      setOrdemCol(col)
+      setOrdemDir('desc')
+    }
+  }
 
+  const handleExportar = async () => {
+    setExportando(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const base: any = supabase
+      .from('checklists')
+      .select('*')
+      .order(ordemCol, { ascending: ordemDir === 'asc' })
+      .limit(50000)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (applyFilters(base) as any)
+    if (data) exportarCSV(data as ChecklistRow[])
+    setExportando(false)
+  }
+
+  const filtrados = rows  // filtro de texto já vai pro servidor
   const totalNc = filtrados.reduce((acc, r) => acc + r.nc_count, 0)
+  const semanas = useMemo(() => calcSemanas(sparkRows), [sparkRows])
 
   return (
     <div className="space-y-5">
@@ -565,15 +725,26 @@ export function ChecklistResultadosPage() {
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => void carregar(paginaAtual)}
-          disabled={carregando}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
-        >
-          <RefreshCw size={16} className={carregando ? 'animate-spin' : ''} />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExportar()}
+            disabled={exportando || carregando}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+          >
+            <Download size={16} className={exportando ? 'animate-bounce' : ''} />
+            {exportando ? 'Exportando...' : 'Exportar CSV'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void carregar(paginaAtual)}
+            disabled={carregando}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+          >
+            <RefreshCw size={16} className={carregando ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Cards de resumo */}
@@ -593,6 +764,9 @@ export function ChecklistResultadosPage() {
         ))}
       </div>
 
+      {/* Sparkline de tendência NC */}
+      <Sparkline semanas={semanas} />
+
       {/* Filtros */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
         <div className="flex flex-col gap-3">
@@ -601,9 +775,9 @@ export function ChecklistResultadosPage() {
             <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
               <Search size={15} className="shrink-0 text-slate-400" />
               <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Operador, matrícula, placa..."
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
+                placeholder="Operador, matrícula..."
                 className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100"
               />
             </div>
@@ -649,10 +823,10 @@ export function ChecklistResultadosPage() {
                 className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
               />
             </div>
-            {(dataInicio || dataFim || tipoFiltro || somenteNc || query) && (
+            {(dataInicio || dataFim || tipoFiltro || somenteNc || queryInput) && (
               <button
                 type="button"
-                onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro(''); setSomenteNc(false); setQuery('') }}
+                onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro(''); setSomenteNc(false); setQueryInput(''); setQuery('') }}
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
               >
                 <X size={12} />
@@ -691,11 +865,32 @@ export function ChecklistResultadosPage() {
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
-                  <th className="px-4 py-3">Operador</th>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Placa</th>
-                  <th className="px-4 py-3">Data</th>
-                  <th className="px-4 py-3">Resultado</th>
+                  {(
+                    [
+                      { label: 'Operador', col: 'nome_operador' as OrdemCol },
+                      { label: 'Tipo',     col: null },
+                      { label: 'Placa',    col: null },
+                      { label: 'Data',     col: 'data_inspecao' as OrdemCol },
+                      { label: 'Resultado',col: 'nc_count' as OrdemCol },
+                    ] as { label: string; col: OrdemCol | null }[]
+                  ).map(({ label, col }) => (
+                    <th key={label} className="px-4 py-3">
+                      {col ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleOrdem(col)}
+                          className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-200"
+                        >
+                          {label}
+                          {ordemCol === col
+                            ? (ordemDir === 'desc'
+                              ? <ChevronDown size={12} className="text-blue-500" />
+                              : <ChevronUp size={12} className="text-blue-500" />)
+                            : <ArrowUpDown size={11} className="opacity-40" />}
+                        </button>
+                      ) : label}
+                    </th>
+                  ))}
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
