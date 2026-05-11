@@ -1,13 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const url = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://placeholder.supabase.co'
+const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'placeholder'
 
-if (!url || !key) {
+export const supabaseConfigured =
+  !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseConfigured) {
   console.warn('[supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não configurados.')
 }
 
-export const supabase = createClient(url ?? '', key ?? '')
+export const supabase = createClient(url, key)
 
 export type ChecklistRow = {
   id: string
