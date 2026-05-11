@@ -437,7 +437,10 @@ function FormularioChecklist({
     for (const [itemId, urls] of Object.entries(fotasUrls)) {
       if (urls.length > 0) {
         const t = observacoesFinais[itemId] ?? ''
-        observacoesFinais[itemId] = t ? `${t} [${urls.length} foto(s)]` : `[${urls.length} foto(s)]`
+        // Salva as URLs reais separadas por \n após o texto da observação
+        observacoesFinais[itemId] = t
+          ? `${t}\n__fotos__:${urls.join('|')}`
+          : `__fotos__:${urls.join('|')}`
       }
     }
 

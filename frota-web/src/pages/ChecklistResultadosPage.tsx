@@ -45,6 +45,18 @@ const TIPOS = [
 ]
 
 // ---------------------------------------------------------------------------
+// Helper: extrai texto e URLs de fotos de uma observação
+// ---------------------------------------------------------------------------
+function parseObs(raw: string): { texto: string; fotos: string[] } {
+  const marker = '__fotos__:'
+  const idx = raw.indexOf(marker)
+  if (idx === -1) return { texto: raw, fotos: [] }
+  const texto = raw.slice(0, idx).replace(/\n$/, '').trim()
+  const fotos = raw.slice(idx + marker.length).split('|').filter(Boolean)
+  return { texto, fotos }
+}
+
+// ---------------------------------------------------------------------------
 // Lightbox de imagens
 // ---------------------------------------------------------------------------
 function Lightbox({ urls, index, onClose, onPrev, onNext }: {
@@ -108,6 +120,13 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
   const km = row.dados_veiculo?.km_atual ?? ''
 
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  const [lightboxUrls, setLightboxUrls] = useState<string[]>([])
+
+  const openLightbox = (urls: string[], idx: number) => {
+    setLightboxUrls(urls)
+    setLightboxIdx(idx)
+  }
+
   const fotos = (row.evidencia_urls ?? []).filter((u) => /\.(jpe?g|png|gif|webp|heic)(\?|$)/i.test(u))
   const pdfs  = (row.evidencia_urls ?? []).filter((u) => /\.pdf(\?|$)/i.test(u))
   const outros = (row.evidencia_urls ?? []).filter((u) => !fotos.includes(u) && !pdfs.includes(u))
@@ -213,7 +232,7 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
                   <button
                     key={url}
                     type="button"
-                    onClick={() => setLightboxIdx(i)}
+                    onClick={() => openLightbox(fotos, i)}
                     className="group relative h-20 w-20 overflow-hidden rounded-xl border-2 border-slate-200 bg-slate-100 shadow-sm transition hover:border-brand-500 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
                   >
                     <img
@@ -268,13 +287,13 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
         )}
 
         {/* Lightbox */}
-        {lightboxIdx !== null && (
+        {lightboxIdx !== null && lightboxUrls.length > 0 && (
           <Lightbox
-            urls={fotos}
+            urls={lightboxUrls}
             index={lightboxIdx}
-            onClose={() => setLightboxIdx(null)}
-            onPrev={() => setLightboxIdx((i) => (i! - 1 + fotos.length) % fotos.length)}
-            onNext={() => setLightboxIdx((i) => (i! + 1) % fotos.length)}
+            onClose={() => { setLightboxIdx(null); setLightboxUrls([]) }}
+            onPrev={() => setLightboxIdx((i) => (i! - 1 + lightboxUrls.length) % lightboxUrls.length)}
+            onNext={() => setLightboxIdx((i) => (i! + 1) % lightboxUrls.length)}
           />
         )}
 
@@ -288,30 +307,52 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
               <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
                 {grupo.itens.map((item, idx) => {
                   const resp = row.respostas[item.id]
-                  const obs = row.observacoes[item.id]
+                  const obsRaw = row.observacoes[item.id] ?? ''
+                  const { texto: obsTexto, fotos: obsFotos } = parseObs(obsRaw)
                   const isLast = idx === grupo.itens.length - 1
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-start justify-between gap-3 px-4 py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800' : ''} ${resp === 'nc' ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`}
+                      className={`px-4 py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800' : ''} ${resp === 'nc' ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`}
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          {item.imperativo && <span className="mr-1">🚫</span>}
-                          {item.label}
-                        </p>
-                        {obs && (
-                          <p className="mt-0.5 text-xs font-semibold text-rose-500">{obs}</p>
-                        )}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            {item.imperativo && <span className="mr-1">🚫</span>}
+                            {item.label}
+                          </p>
+                          {obsTexto && (
+                            <p className="mt-0.5 text-xs font-semibold text-rose-500">{obsTexto}</p>
+                          )}
+                        </div>
+                        <span className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-extrabold ${
+                          resp === 'c'  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          resp === 'nc' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
+                          resp === 'na' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
+                          'bg-slate-100 text-slate-400'
+                        }`}>
+                          {resp === 'c' ? 'C' : resp === 'nc' ? 'NC' : resp === 'na' ? 'N/A' : '—'}
+                        </span>
                       </div>
-                      <span className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-extrabold ${
-                        resp === 'c'  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                        resp === 'nc' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
-                        resp === 'na' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
-                        'bg-slate-100 text-slate-400'
-                      }`}>
-                        {resp === 'c' ? 'C' : resp === 'nc' ? 'NC' : resp === 'na' ? 'N/A' : '—'}
-                      </span>
+                      {/* Fotos do item NC inline */}
+                      {obsFotos.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {obsFotos.map((url, fi) => (
+                            <button
+                              key={url}
+                              type="button"
+                              onClick={() => openLightbox(obsFotos, fi)}
+                              className="group relative h-16 w-16 overflow-hidden rounded-lg border-2 border-rose-200 bg-slate-100 shadow-sm transition hover:border-rose-400 dark:border-rose-900/50 dark:bg-slate-800"
+                            >
+                              <img
+                                src={url}
+                                alt={`Foto NC ${fi + 1}`}
+                                className="h-full w-full object-cover transition group-hover:scale-105"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
