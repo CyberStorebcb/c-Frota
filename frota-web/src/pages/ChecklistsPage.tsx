@@ -68,7 +68,7 @@ function ChecklistForm({ schema, onVoltar }: { schema: ChecklistSchemaDef; onVol
     setDadosVeiculo((prev) => ({ ...prev, [id]: valor }))
 
   return (
-    <div className="pb-24">
+    <div className="pb-32 lg:pb-8">
 
       {/* Cabeçalho */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -128,8 +128,8 @@ function ChecklistForm({ schema, onVoltar }: { schema: ChecklistSchemaDef; onVol
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
 
         {/* Sidebar de dados do veículo */}
-        <div className="lg:sticky lg:top-4 lg:w-64 lg:shrink-0">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
+        <div className="lg:sticky lg:top-0 lg:w-64 lg:shrink-0 lg:self-start">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                 Dados do Veículo
@@ -304,7 +304,7 @@ function ChecklistForm({ schema, onVoltar }: { schema: ChecklistSchemaDef; onVol
       </div>
 
       {/* Barra inferior — mobile/tablet */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             {ncImperativos > 0 ? (
