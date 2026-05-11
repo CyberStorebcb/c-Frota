@@ -20,8 +20,6 @@ const AuthContext = createContext<Ctx | null>(null)
 async function fetchRole(userId: string, email: string): Promise<'admin' | 'user'> {
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase()
   if (adminEmail && email.trim().toLowerCase() === adminEmail) {
-    // Garante que o e-mail de admin sempre tenha role=admin no banco
-    await supabase.from('profiles').upsert({ id: userId, role: 'admin' }, { onConflict: 'id' })
     return 'admin'
   }
   const { data } = await supabase
