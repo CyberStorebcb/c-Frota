@@ -484,7 +484,7 @@ function FormularioChecklist({
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 pb-28 dark:bg-slate-950">
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
 
       {/* ── Header fixo ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -859,7 +859,7 @@ function FormularioChecklist({
       </div>
 
       {/* ── Barra de envio fixa ──────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white px-4 pt-3 dark:border-slate-800 dark:bg-slate-950" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div className="min-w-0">
             {erroEnvio ? (
