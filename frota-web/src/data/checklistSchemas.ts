@@ -10,12 +10,11 @@ export interface ChecklistGrupo {
   itens: ChecklistItem[]
 }
 
-// Campo extra de dados do veículo (além de placa/km/data comuns)
 export interface CampoExtra {
   id: string
   label: string
   tipo: 'text' | 'select' | 'number'
-  opcoes?: string[]      // usado quando tipo === 'select'
+  opcoes?: string[]
   obrigatorio?: boolean
 }
 
@@ -23,14 +22,80 @@ export interface ChecklistSchemaDef {
   id: string
   nome: string
   descricao: string
-  camposExtras?: CampoExtra[]   // campos de dados do veículo específicos do tipo
+  camposExtras?: CampoExtra[]
   grupos: ChecklistGrupo[]
-  temEvidencia?: boolean        // exibe upload de arquivo
-  temSupervisor?: boolean       // exibe campo nome do supervisor
-  temProblemas?: boolean        // exibe campo problemas verificados + descrição
+  temEvidencia?: boolean
+  temSupervisor?: boolean
+  temProblemas?: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Campos comuns a todos os checklists
+// Matrícula e Nome do operador já vêm da tela de identificação.
+// Preencha as listas opcoes[] com os dados reais da sua frota.
+// ---------------------------------------------------------------------------
+const CAMPOS_COMUNS: CampoExtra[] = [
+  {
+    id: 'placa',
+    label: 'PLACA',
+    tipo: 'select',
+    obrigatorio: true,
+    opcoes: [
+      // Ex: 'POY2583', 'ABC1234'
+    ],
+  },
+  {
+    id: 'marca_modelo',
+    label: 'MARCA/MODELO',
+    tipo: 'select',
+    obrigatorio: true,
+    opcoes: [
+      // Ex: 'VW/8.160', 'Ford/Ranger'
+    ],
+  },
+  {
+    id: 'km_atual',
+    label: 'KM ATUAL',
+    tipo: 'number',
+    obrigatorio: true,
+  },
+  {
+    id: 'horimetro',
+    label: 'HORÍMETRO ATUAL',
+    tipo: 'number',
+    obrigatorio: false,
+  },
+  {
+    id: 'prefixo',
+    label: 'PREFIXO',
+    tipo: 'select',
+    obrigatorio: true,
+    opcoes: [
+      // Ex: 'BDC304'
+    ],
+  },
+  {
+    id: 'processo',
+    label: 'PROCESSO',
+    tipo: 'select',
+    obrigatorio: true,
+    opcoes: [
+      // Ex: 'GOMAN - ADM'
+    ],
+  },
+  {
+    id: 'localidade',
+    label: 'LOCALIDADE',
+    tipo: 'text',
+    obrigatorio: true,
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Schemas
+// ---------------------------------------------------------------------------
 export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
+  // ── SKY ──────────────────────────────────────────────────────────────────
   {
     id: 'sky',
     nome: 'Checklist SKY',
@@ -38,54 +103,7 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
     temEvidencia: true,
     temSupervisor: true,
     temProblemas: true,
-    camposExtras: [
-      {
-        id: 'placa',
-        label: 'PLACA',
-        tipo: 'select',
-        obrigatorio: true,
-        opcoes: [],
-      },
-      {
-        id: 'marca_modelo',
-        label: 'MARCA/MODELO',
-        tipo: 'select',
-        obrigatorio: true,
-        opcoes: [],
-      },
-      {
-        id: 'km_atual',
-        label: 'KM ATUAL',
-        tipo: 'number',
-        obrigatorio: true,
-      },
-      {
-        id: 'horimetro',
-        label: 'HORÍMETRO ATUAL',
-        tipo: 'number',
-        obrigatorio: true,
-      },
-      {
-        id: 'prefixo',
-        label: 'PREFIXO',
-        tipo: 'select',
-        obrigatorio: true,
-        opcoes: [],
-      },
-      {
-        id: 'processo',
-        label: 'PROCESSO',
-        tipo: 'select',
-        obrigatorio: true,
-        opcoes: [],
-      },
-      {
-        id: 'localidade',
-        label: 'LOCALIDADE',
-        tipo: 'text',
-        obrigatorio: true,
-      },
-    ],
+    camposExtras: CAMPOS_COMUNS,
     grupos: [
       {
         id: 'inspecao',
@@ -121,7 +139,7 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
         titulo: 'Verificação — Antes da Condução',
         itens: [
           { id: 'sky-24', label: 'Verificar cintas de travamento, fixação e repouso correto da lança', imperativo: true },
-          { id: 'sky-25', label: 'Verificar fixação de todo o equipamento de modo geral (Verificar base do implemento, trincas, parafusos e soldas)', imperativo: true },
+          { id: 'sky-25', label: 'Verificar fixação de todo o equipamento de modo geral (base do implemento, trincas, parafusos e soldas)', imperativo: true },
           { id: 'sky-26', label: 'Verificar a fixação das coberturas da lança e cestos' },
         ],
       },
@@ -129,7 +147,7 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
         id: 'teste_operacao',
         titulo: 'Teste de Operação — Ligado',
         itens: [
-          { id: 'sky-27', label: 'Gráfico de alcance (Gráfico de alcance em local visível para o operador)', imperativo: true },
+          { id: 'sky-27', label: 'Gráfico de alcance (em local visível para o operador)', imperativo: true },
           { id: 'sky-28', label: 'Verificar se há vazamento (nível do reservatório hidráulico, mangueiras e conexões)', imperativo: true },
           { id: 'sky-29', label: 'Verificar as partes de fibra (Lança, cestos, liners, trincas, furos, rachaduras e limpeza)', imperativo: true },
           { id: 'sky-30', label: 'Checar operação dos comandos (Superior e Inferior) pinos e cabos das barras de nivelamento', imperativo: true },
@@ -140,10 +158,16 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
       },
     ],
   },
+
+  // ── MUNCK ─────────────────────────────────────────────────────────────────
   {
     id: 'munck',
     nome: 'Checklist Munck',
     descricao: 'Caminhões com guindaste Munck',
+    temEvidencia: true,
+    temSupervisor: true,
+    temProblemas: true,
+    camposExtras: CAMPOS_COMUNS,
     grupos: [
       {
         id: 'geral',
@@ -187,10 +211,16 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
       },
     ],
   },
+
+  // ── PICAPE LEVE ───────────────────────────────────────────────────────────
   {
     id: 'picape-leve',
     nome: 'Checklist Picape Leve',
     descricao: 'Strada, Saveiro e similares',
+    temEvidencia: true,
+    temSupervisor: true,
+    temProblemas: true,
+    camposExtras: CAMPOS_COMUNS,
     grupos: [
       {
         id: 'geral',
@@ -231,10 +261,16 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
       },
     ],
   },
+
+  // ── PICAPE 4x4 ────────────────────────────────────────────────────────────
   {
     id: 'picape-4x4',
     nome: 'Checklist Picape 4x4',
     descricao: 'Hilux, L200 Triton e similares',
+    temEvidencia: true,
+    temSupervisor: true,
+    temProblemas: true,
+    camposExtras: CAMPOS_COMUNS,
     grupos: [
       {
         id: 'geral',
@@ -252,7 +288,7 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
         id: 'tracao',
         titulo: 'Tração 4x4',
         itens: [
-          { id: 'p4-07', label: 'Sistema 4x4 engaja/desengatado corretamente' },
+          { id: 'p4-07', label: 'Sistema 4x4 engaja/desengata corretamente' },
           { id: 'p4-08', label: 'Atuador de tração dianteira (sem folga excessiva)' },
           { id: 'p4-09', label: 'Half-shafts / semi-eixos (coifas íntegras, sem folgas)' },
           { id: 'p4-10', label: 'Barulhos ou vibrações ao engajar 4x4' },
@@ -284,10 +320,16 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
       },
     ],
   },
+
+  // ── MOTOCICLETA ───────────────────────────────────────────────────────────
   {
     id: 'motocicleta',
     nome: 'Checklist Motocicleta',
     descricao: 'Honda Bros e similares',
+    temEvidencia: true,
+    temSupervisor: true,
+    temProblemas: true,
+    camposExtras: CAMPOS_COMUNS,
     grupos: [
       {
         id: 'geral',
@@ -324,10 +366,16 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
       },
     ],
   },
+
+  // ── VEÍCULO LEVE ──────────────────────────────────────────────────────────
   {
     id: 'veiculo-leve',
     nome: 'Checklist Veículo Leve',
     descricao: 'Argo, Gol, Polo e similares',
+    temEvidencia: true,
+    temSupervisor: true,
+    temProblemas: true,
+    camposExtras: CAMPOS_COMUNS,
     grupos: [
       {
         id: 'geral',
