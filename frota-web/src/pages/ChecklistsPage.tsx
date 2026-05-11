@@ -8,10 +8,29 @@ import {
   CheckCircle2,
   ChevronLeft,
   ClipboardList,
-  Radio,
   Search,
   Truck,
 } from 'lucide-react'
+
+function IconSkyLift({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {/* cesto */}
+      <rect x="2" y="1" width="6" height="4" rx="0.8" />
+      {/* braço inferior */}
+      <line x1="8" y1="4" x2="14" y2="11" />
+      {/* braço superior */}
+      <line x1="14" y1="11" x2="9" y2="15" />
+      {/* torre/pivô */}
+      <line x1="14" y1="11" x2="14" y2="18" />
+      {/* chassi */}
+      <rect x="10" y="18" width="10" height="3" rx="0.6" />
+      {/* rodas */}
+      <circle cx="12" cy="22" r="1" />
+      <circle cx="19" cy="22" r="1" />
+    </svg>
+  )
+}
 import { CHECKLIST_SCHEMAS } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 
@@ -19,7 +38,7 @@ import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 // Metadados visuais por tipo (ícone, cor) — não pertencem ao schema público
 // ---------------------------------------------------------------------------
 const CARD_META: Record<string, { icon: React.ReactNode; cor: string; corBg: string }> = {
-  sky:           { icon: <Radio size={24} />,  cor: 'text-sky-500',     corBg: 'bg-sky-500/10 dark:bg-sky-500/15' },
+  sky:           { icon: <IconSkyLift size={24} />, cor: 'text-sky-500',     corBg: 'bg-sky-500/10 dark:bg-sky-500/15' },
   munck:         { icon: <Truck size={24} />,  cor: 'text-amber-500',   corBg: 'bg-amber-500/10 dark:bg-amber-500/15' },
   'picape-leve': { icon: <Car size={24} />,    cor: 'text-emerald-500', corBg: 'bg-emerald-500/10 dark:bg-emerald-500/15' },
   'picape-4x4':  { icon: <Car size={24} />,    cor: 'text-violet-500',  corBg: 'bg-violet-500/10 dark:bg-violet-500/15' },

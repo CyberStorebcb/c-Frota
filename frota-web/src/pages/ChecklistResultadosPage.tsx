@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { SelectCustom } from '../components/ui/SelectCustom'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -607,15 +608,12 @@ export function ChecklistResultadosPage() {
               />
             </div>
 
-            <select
+            <SelectCustom
               value={tipoFiltro}
-              onChange={(e) => setTipoFiltro(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-100"
-            >
-              {TIPOS.map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
+              onChange={setTipoFiltro}
+              options={TIPOS.map((t) => ({ value: t.id, label: t.label }))}
+              placeholder="Todos"
+            />
 
             <button
               type="button"
