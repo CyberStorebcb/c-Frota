@@ -262,8 +262,7 @@ export function RegistroVeiculosPage() {
   const refresh = () => setVehicles(getDisplayedFleetVehicles())
 
   const { user } = useAuth()
-  const canRegisterVehicle =
-    user?.role === 'admin' || (user?.role === 'user' && user.userKind === 'special')
+  const canRegisterVehicle = user?.role === 'admin'
 
   useEffect(() => {
     if (!menuForId) return

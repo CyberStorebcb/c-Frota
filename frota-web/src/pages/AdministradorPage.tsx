@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, RefreshCw, Search, Shield, Trash2 } from 'lucide-react'
+import { ExternalLink, RefreshCw, Search, Shield } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthContext'
 
