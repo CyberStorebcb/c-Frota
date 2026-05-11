@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  ExternalLink,
   RefreshCw,
   Search,
   X,
@@ -46,6 +47,8 @@ const TIPOS = [
 
 function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void }) {
   const schema = SCHEMA_MAP[row.tipo]
+  const placa = row.dados_veiculo?.placa ?? ''
+  const km = row.dados_veiculo?.km_atual ?? ''
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-8">
@@ -58,8 +61,8 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
             </div>
             <div className="mt-0.5 text-sm font-semibold text-slate-500 dark:text-slate-400">
               {row.nome_operador} · Mat. {row.matricula}
-              {row.placa ? ` · ${row.placa}` : ''}
-              {row.km ? ` · ${row.km} km` : ''}
+              {placa ? ` · ${placa}` : ''}
+              {km ? ` · ${km} km` : ''}
             </div>
             <div className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-400">
               <span>{formatDateBR(row.data_inspecao)}</span>
@@ -77,22 +80,88 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
         </div>
 
         {/* resumo */}
-        <div className="flex gap-4 border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+        <div className="flex flex-wrap gap-4 border-b border-slate-100 px-5 py-3 dark:border-slate-800">
           <div className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 size={15} />
-            {Object.values(row.respostas).filter((v) => v === 'ok').length} OK
+            {Object.values(row.respostas).filter((v) => v === 'c').length} C
           </div>
-          <div className={`flex items-center gap-1.5 text-sm font-extrabold ${row.nok_count > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+          <div className={`flex items-center gap-1.5 text-sm font-extrabold ${row.nc_count > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
             <AlertTriangle size={15} />
-            {row.nok_count} NOK
+            {row.nc_count} NC
           </div>
+          {row.nc_imperativos > 0 && (
+            <div className="flex items-center gap-1.5 text-sm font-extrabold text-rose-600">
+              🚫 {row.nc_imperativos} imperativos com NC
+            </div>
+          )}
           <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-400">
             {Object.values(row.respostas).filter((v) => v === 'na').length} N/A
           </div>
         </div>
 
+        {/* dados extras do veículo */}
+        {Object.keys(row.dados_veiculo ?? {}).length > 0 && (
+          <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+              Dados do Veículo
+            </p>
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              {Object.entries(row.dados_veiculo).map(([k, v]) => (
+                <div key={k} className="text-xs">
+                  <span className="font-extrabold uppercase text-slate-500">{k.replace(/_/g, ' ')}</span>
+                  {': '}
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* problemas */}
+        {(row.problemas || row.descricao_problema) && (
+          <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+            <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-rose-500">
+              Problemas Verificados
+            </p>
+            {row.problemas && (
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{row.problemas}</p>
+            )}
+            {row.descricao_problema && (
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{row.descricao_problema}</p>
+            )}
+            {row.nome_supervisor && (
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                Supervisor: {row.nome_supervisor}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* evidências */}
+        {row.evidencia_urls?.length > 0 && (
+          <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+              Evidências ({row.evidencia_urls.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {row.evidencia_urls.map((url, i) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  <ExternalLink size={11} />
+                  Arquivo {i + 1}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* itens por grupo */}
-        <div className="max-h-[60vh] overflow-y-auto p-5 space-y-4">
+        <div className="max-h-[50vh] overflow-y-auto p-5 space-y-4">
           {schema?.grupos.map((grupo) => (
             <div key={grupo.id}>
               <p className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -106,10 +175,11 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-start justify-between gap-3 px-4 py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800' : ''} ${resp === 'nok' ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`}
+                      className={`flex items-start justify-between gap-3 px-4 py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800' : ''} ${resp === 'nc' ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`}
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          {item.imperativo && <span className="mr-1">🚫</span>}
                           {item.label}
                         </p>
                         {obs && (
@@ -117,12 +187,12 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
                         )}
                       </div>
                       <span className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-extrabold ${
-                        resp === 'ok'  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                        resp === 'nok' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
-                        resp === 'na'  ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
+                        resp === 'c'  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                        resp === 'nc' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' :
+                        resp === 'na' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
                         'bg-slate-100 text-slate-400'
                       }`}>
-                        {resp?.toUpperCase() ?? '—'}
+                        {resp === 'c' ? 'C' : resp === 'nc' ? 'NC' : resp === 'na' ? 'N/A' : '—'}
                       </span>
                     </div>
                   )
@@ -143,6 +213,8 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
 function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe: () => void }) {
   const [expandido, setExpandido] = useState(false)
   const schema = SCHEMA_MAP[row.tipo]
+  const placa = row.dados_veiculo?.placa ?? ''
+  const km = row.dados_veiculo?.km_atual ?? ''
 
   return (
     <>
@@ -164,7 +236,7 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
           </span>
         </td>
         <td className="px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          {row.placa || <span className="text-slate-400">—</span>}
+          {placa || <span className="text-slate-400">—</span>}
         </td>
         <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
           {formatDateBR(row.data_inspecao)}
@@ -172,11 +244,15 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-              {Object.values(row.respostas).filter((v) => v === 'ok').length} OK
+              {Object.values(row.respostas).filter((v) => v === 'c').length} C
             </span>
-            {row.nok_count > 0 && (
-              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-extrabold text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
-                {row.nok_count} NOK
+            {row.nc_count > 0 && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${
+                row.nc_imperativos > 0
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
+              }`}>
+                {row.nc_count} NC{row.nc_imperativos > 0 ? ' 🚫' : ''}
               </span>
             )}
           </div>
@@ -198,9 +274,9 @@ function LinhaChecklist({ row, onVerDetalhe }: { row: ChecklistRow; onVerDetalhe
           <td colSpan={6} className="px-4 py-3">
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Enviado em {formatDateTimeBR(row.created_at)}
-              {row.km ? ` · ${row.km} km` : ''}
+              {km ? ` · ${km} km` : ''}
             </div>
-            {row.nok_count > 0 && (
+            {row.nc_count > 0 && (
               <div className="mt-2 space-y-1">
                 {Object.entries(row.observacoes).filter(([, v]) => v).map(([id, obs]) => {
                   const item = schema?.grupos.flatMap((g) => g.itens).find((i) => i.id === id)
@@ -232,7 +308,7 @@ export function ChecklistResultadosPage() {
   const [erro, setErro] = useState('')
   const [query, setQuery] = useState('')
   const [tipoFiltro, setTipoFiltro] = useState('')
-  const [somenteNok, setSomenteNok] = useState(false)
+  const [somenteNc, setSomenteNc] = useState(false)
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [detalhe, setDetalhe] = useState<ChecklistRow | null>(null)
@@ -260,18 +336,19 @@ export function ChecklistResultadosPage() {
     const q = query.trim().toLowerCase()
     return rows.filter((r) => {
       if (tipoFiltro && r.tipo !== tipoFiltro) return false
-      if (somenteNok && r.nok_count === 0) return false
+      if (somenteNc && r.nc_count === 0) return false
       if (dataInicio && r.data_inspecao < dataInicio) return false
       if (dataFim && r.data_inspecao > dataFim) return false
       if (q) {
-        const haystack = `${r.nome_operador} ${r.matricula} ${r.placa} ${r.tipo}`.toLowerCase()
+        const placa = r.dados_veiculo?.placa ?? ''
+        const haystack = `${r.nome_operador} ${r.matricula} ${placa} ${r.tipo}`.toLowerCase()
         if (!haystack.includes(q)) return false
       }
       return true
     })
-  }, [rows, query, tipoFiltro, somenteNok, dataInicio, dataFim])
+  }, [rows, query, tipoFiltro, somenteNc, dataInicio, dataFim])
 
-  const totalNok = filtrados.reduce((acc, r) => acc + r.nok_count, 0)
+  const totalNc = filtrados.reduce((acc, r) => acc + r.nc_count, 0)
 
   return (
     <div className="space-y-5">
@@ -315,9 +392,9 @@ export function ChecklistResultadosPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: 'Total enviados', value: filtrados.length, color: 'text-slate-900 dark:text-slate-100' },
-          { label: 'Com NOK', value: filtrados.filter((r) => r.nok_count > 0).length, color: 'text-rose-500' },
-          { label: 'Itens NOK', value: totalNok, color: 'text-rose-500' },
-          { label: 'Todos OK', value: filtrados.filter((r) => r.nok_count === 0).length, color: 'text-emerald-600 dark:text-emerald-400' },
+          { label: 'Com NC', value: filtrados.filter((r) => r.nc_count > 0).length, color: 'text-rose-500' },
+          { label: 'Itens NC', value: totalNc, color: 'text-rose-500' },
+          { label: 'Todos C', value: filtrados.filter((r) => r.nc_count === 0).length, color: 'text-emerald-600 dark:text-emerald-400' },
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
             <div className={`text-2xl font-black ${color}`}>{value}</div>
@@ -331,7 +408,7 @@ export function ChecklistResultadosPage() {
       {/* Filtros */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
         <div className="flex flex-col gap-3">
-          {/* linha 1: busca + tipo + toggle NOK */}
+          {/* linha 1: busca + tipo + toggle NC */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
               <Search size={15} className="shrink-0 text-slate-400" />
@@ -355,15 +432,15 @@ export function ChecklistResultadosPage() {
 
             <button
               type="button"
-              onClick={() => setSomenteNok((v) => !v)}
+              onClick={() => setSomenteNc((v) => !v)}
               className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-extrabold transition ${
-                somenteNok
+                somenteNc
                   ? 'border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400'
                   : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400'
               }`}
             >
               <AlertTriangle size={14} />
-              Somente NOK
+              Somente NC
             </button>
           </div>
 
@@ -387,10 +464,10 @@ export function ChecklistResultadosPage() {
                 className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
               />
             </div>
-            {(dataInicio || dataFim || tipoFiltro || somenteNok || query) && (
+            {(dataInicio || dataFim || tipoFiltro || somenteNc || query) && (
               <button
                 type="button"
-                onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro(''); setSomenteNok(false); setQuery('') }}
+                onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro(''); setSomenteNc(false); setQuery('') }}
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
               >
                 <X size={12} />

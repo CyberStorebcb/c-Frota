@@ -1,6 +1,7 @@
 export interface ChecklistItem {
   id: string
   label: string
+  imperativo?: boolean   // true = item marcado com 🚫 (impede condução se NC)
 }
 
 export interface ChecklistGrupo {
@@ -9,11 +10,24 @@ export interface ChecklistGrupo {
   itens: ChecklistItem[]
 }
 
+// Campo extra de dados do veículo (além de placa/km/data comuns)
+export interface CampoExtra {
+  id: string
+  label: string
+  tipo: 'text' | 'select' | 'number'
+  opcoes?: string[]      // usado quando tipo === 'select'
+  obrigatorio?: boolean
+}
+
 export interface ChecklistSchemaDef {
   id: string
   nome: string
   descricao: string
+  camposExtras?: CampoExtra[]   // campos de dados do veículo específicos do tipo
   grupos: ChecklistGrupo[]
+  temEvidencia?: boolean        // exibe upload de arquivo
+  temSupervisor?: boolean       // exibe campo nome do supervisor
+  temProblemas?: boolean        // exibe campo problemas verificados + descrição
 }
 
 export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
@@ -21,45 +35,107 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
     id: 'sky',
     nome: 'Checklist SKY',
     descricao: 'Veículos com cesto aéreo (Sky)',
+    temEvidencia: true,
+    temSupervisor: true,
+    temProblemas: true,
+    camposExtras: [
+      {
+        id: 'placa',
+        label: 'PLACA',
+        tipo: 'select',
+        obrigatorio: true,
+        opcoes: [],
+      },
+      {
+        id: 'marca_modelo',
+        label: 'MARCA/MODELO',
+        tipo: 'select',
+        obrigatorio: true,
+        opcoes: [],
+      },
+      {
+        id: 'km_atual',
+        label: 'KM ATUAL',
+        tipo: 'number',
+        obrigatorio: true,
+      },
+      {
+        id: 'horimetro',
+        label: 'HORÍMETRO ATUAL',
+        tipo: 'number',
+        obrigatorio: true,
+      },
+      {
+        id: 'prefixo',
+        label: 'PREFIXO',
+        tipo: 'select',
+        obrigatorio: true,
+        opcoes: [],
+      },
+      {
+        id: 'processo',
+        label: 'PROCESSO',
+        tipo: 'select',
+        obrigatorio: true,
+        opcoes: [],
+      },
+      {
+        id: 'localidade',
+        label: 'LOCALIDADE',
+        tipo: 'text',
+        obrigatorio: true,
+      },
+    ],
     grupos: [
       {
-        id: 'geral',
-        titulo: 'Inspeção Geral',
+        id: 'inspecao',
+        titulo: 'Inspeção do Veículo — Antes de Operar',
         itens: [
-          { id: 'sky-01', label: 'Nível de óleo do motor' },
-          { id: 'sky-02', label: 'Nível de água / fluido de arrefecimento' },
-          { id: 'sky-03', label: 'Nível do fluido de freio' },
-          { id: 'sky-04', label: 'Nível da direção hidráulica' },
-          { id: 'sky-05', label: 'Pneus (calibragem e condição visual)' },
-          { id: 'sky-06', label: 'Faróis, lanternas e pisca-alertas' },
-          { id: 'sky-07', label: 'Espelhos retrovisores' },
-          { id: 'sky-08', label: 'Cinto de segurança' },
+          { id: 'sky-01', label: 'Adesivo IDT (CGB, Fone, Frota, tag)' },
+          { id: 'sky-02', label: 'Pneus em uso e estepe (verifique calibragem, estado dos sulcos)', imperativo: true },
+          { id: 'sky-03', label: 'Rodas (verifique amassados, trincas e sinais de afrouxamento dos parafusos)', imperativo: true },
+          { id: 'sky-04', label: 'Radiador de água (verifique nível do líquido e complete se necessário)', imperativo: true },
+          { id: 'sky-05', label: 'Carroceria (verifique batidas, amassados e arranhões, organização e limpeza)' },
+          { id: 'sky-06', label: 'Trava do capô (verifique estado geral)', imperativo: true },
+          { id: 'sky-07', label: 'Retrovisores (verifique fixação, estado e trincas)', imperativo: true },
+          { id: 'sky-08', label: 'Porta escada (Base, cinda de amarração)' },
+          { id: 'sky-09', label: 'Documentos obrigatórios (CNH, CRLV, AET, C.D.D)', imperativo: true },
+          { id: 'sky-10', label: 'Cartão de abastecimento (Verificar se possui)', imperativo: true },
+          { id: 'sky-11', label: 'Faróis, piscas, lanternas e luz do freio (verifique o funcionamento)', imperativo: true },
+          { id: 'sky-12', label: 'Painel, vidros (para-brisa), bancos e portas (verifique estado geral)', imperativo: true },
+          { id: 'sky-13', label: 'Funcionamento do limpador do para-brisa (nível do reservatório)' },
+          { id: 'sky-14', label: 'Sistema de direção (verifique folgas)', imperativo: true },
+          { id: 'sky-15', label: 'Funcionamento do velocímetro (Tacógrafo, Horímetro, Hodômetro, Rastreador)' },
+          { id: 'sky-16', label: 'Freios de estacionamento e de serviço (verifique o funcionamento)', imperativo: true },
+          { id: 'sky-17', label: 'Buzina e alarme de ré (verifique o funcionamento)', imperativo: true },
+          { id: 'sky-18', label: 'Suspensão e molas' },
+          { id: 'sky-19', label: 'Cabine e cabine auxiliar (verifique a higienização, vidros, portas, objetos)' },
+          { id: 'sky-20', label: 'Cintos de segurança (Motorista e Passageiros)', imperativo: true },
+          { id: 'sky-21', label: 'Acessórios (Macaco Hidráulico / Chave de Roda / Triângulo, V. e Extintor)', imperativo: true },
+          { id: 'sky-22', label: 'Bomba de ARLA e unidade dosadora', imperativo: true },
+          { id: 'sky-23', label: 'Pasta de documentação do veículo' },
         ],
       },
       {
-        id: 'cesto',
-        titulo: 'Equipamento Cesto Aéreo',
+        id: 'antes_conducao',
+        titulo: 'Verificação — Antes da Condução',
         itens: [
-          { id: 'sky-09', label: 'Óleo hidráulico do cesto (nível e vazamentos)' },
-          { id: 'sky-10', label: 'Mangueiras hidráulicas (estado e fixação)' },
-          { id: 'sky-11', label: 'Comandos do cesto (funcionamento superior e inferior)' },
-          { id: 'sky-12', label: 'Sistema de emergência (descida manual)' },
-          { id: 'sky-13', label: 'Cesto (trincas, deformações, plataforma)' },
-          { id: 'sky-14', label: 'Correntes / cintos de segurança do cesto' },
-          { id: 'sky-15', label: 'Estabilizadores / sapatas (nivelamento)' },
-          { id: 'sky-16', label: 'Sinalização sonora e luminosa do equipamento' },
-          { id: 'sky-17', label: 'Aterramento elétrico do equipamento' },
+          { id: 'sky-24', label: 'Verificar cintas de travamento, fixação e repouso correto da lança', imperativo: true },
+          { id: 'sky-25', label: 'Verificar fixação de todo o equipamento de modo geral (Verificar base do implemento, trincas, parafusos e soldas)', imperativo: true },
+          { id: 'sky-26', label: 'Verificar a fixação das coberturas da lança e cestos' },
         ],
       },
       {
-        id: 'documentacao',
-        titulo: 'Documentação',
+        id: 'teste_operacao',
+        titulo: 'Teste de Operação — Ligado',
         itens: [
-          { id: 'sky-18', label: 'CRLV em dia' },
-          { id: 'sky-19', label: 'Laudo ART do equipamento (dentro da validade)' },
-          { id: 'sky-20', label: 'Extintor de incêndio (lacre e validade)' },
-          { id: 'sky-21', label: 'Kit de primeiros socorros' },
-          { id: 'sky-22', label: 'Triângulo de sinalização' },
+          { id: 'sky-27', label: 'Gráfico de alcance (Gráfico de alcance em local visível para o operador)', imperativo: true },
+          { id: 'sky-28', label: 'Verificar se há vazamento (nível do reservatório hidráulico, mangueiras e conexões)', imperativo: true },
+          { id: 'sky-29', label: 'Verificar as partes de fibra (Lança, cestos, liners, trincas, furos, rachaduras e limpeza)', imperativo: true },
+          { id: 'sky-30', label: 'Checar operação dos comandos (Superior e Inferior) pinos e cabos das barras de nivelamento', imperativo: true },
+          { id: 'sky-31', label: 'Checar a proteção das alavancas dos comandos do cesto', imperativo: true },
+          { id: 'sky-32', label: 'Checar operação das patolas (Sistema de estabilização)', imperativo: true },
+          { id: 'sky-33', label: 'Par de calços tipo berço (Possui e está em bom estado de conservação?)', imperativo: true },
         ],
       },
     ],

@@ -1,36 +1,39 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
-import { CheckCircle2, ClipboardList } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ClipboardList, Paperclip, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
+import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 
-type Resposta = 'ok' | 'nok' | 'na' | null
+type Resposta = 'c' | 'nc' | 'na' | null
 
 const OPCOES = [
   {
-    valor: 'ok' as const,
-    label: 'OK',
+    valor: 'c' as const,
+    label: 'C',
+    titulo: 'Conforme',
     activeClass: 'bg-emerald-500 border-emerald-500 text-white',
     idleClass: 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300',
   },
   {
-    valor: 'nok' as const,
-    label: 'NOK',
+    valor: 'nc' as const,
+    label: 'NC',
+    titulo: 'Não Conforme',
     activeClass: 'bg-rose-500 border-rose-500 text-white',
     idleClass: 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300',
   },
   {
     valor: 'na' as const,
-    label: 'N/A',
-    activeClass: 'bg-slate-500 border-slate-500 text-white',
+    label: 'NA',
+    titulo: 'Não Aplicável',
+    activeClass: 'bg-slate-400 border-slate-400 text-white',
     idleClass: 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300',
   },
 ]
 
 // ---------------------------------------------------------------------------
-// Tela de identificação do operador
+// Tela de identificação
 // ---------------------------------------------------------------------------
-
 function TelaIdentificacao({ onConfirmar }: { onConfirmar: (nome: string, matricula: string) => void }) {
   const [nome, setNome] = useState('')
   const [matricula, setMatricula] = useState('')
@@ -51,21 +54,16 @@ function TelaIdentificacao({ onConfirmar }: { onConfirmar: (nome: string, matric
             <ClipboardList size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-              Identificação
-            </h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">Identificação</h1>
             <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
               Informe seus dados para iniciar o checklist
             </p>
           </div>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                Nome completo
-              </label>
+              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Nome completo</label>
               <input
                 autoFocus
                 value={nome}
@@ -75,23 +73,16 @@ function TelaIdentificacao({ onConfirmar }: { onConfirmar: (nome: string, matric
               />
             </div>
             <div className="px-4 py-3">
-              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                Matrícula
-              </label>
+              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Matrícula</label>
               <input
                 value={matricula}
                 onChange={(e) => { setMatricula(e.target.value); setErro('') }}
                 placeholder="Ex: 00123"
-                inputMode="text"
                 className="mt-0.5 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
               />
             </div>
           </div>
-
-          {erro && (
-            <p className="text-center text-sm font-extrabold text-rose-500">{erro}</p>
-          )}
-
+          {erro && <p className="text-center text-sm font-extrabold text-rose-500">{erro}</p>}
           <button
             type="submit"
             className="w-full rounded-2xl bg-slate-900 py-4 text-base font-extrabold text-white transition active:scale-[.98] dark:bg-slate-100 dark:text-slate-900"
@@ -107,60 +98,73 @@ function TelaIdentificacao({ onConfirmar }: { onConfirmar: (nome: string, matric
 // ---------------------------------------------------------------------------
 // Tela de conclusão
 // ---------------------------------------------------------------------------
-
-function TelaConclusao({ nokCount }: { nokCount: number }) {
+function TelaConclusao({ ncImperativos, ncCount }: { ncImperativos: number; ncCount: number }) {
+  const bloqueado = ncImperativos > 0
   return (
     <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
       <div className="flex w-full max-w-sm flex-col items-center gap-5 text-center">
-        <div className={`grid h-20 w-20 place-items-center rounded-full ${nokCount > 0 ? 'bg-rose-100 text-rose-500' : 'bg-emerald-100 text-emerald-500'}`}>
-          <CheckCircle2 size={40} />
+        <div className={`grid h-20 w-20 place-items-center rounded-full ${bloqueado ? 'bg-rose-100 text-rose-500' : ncCount > 0 ? 'bg-amber-100 text-amber-500' : 'bg-emerald-100 text-emerald-500'}`}>
+          {bloqueado ? <AlertTriangle size={40} /> : <CheckCircle2 size={40} />}
         </div>
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">
-            Checklist enviado!
+            {bloqueado ? 'Veículo impedido!' : 'Checklist enviado!'}
           </h1>
           <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-            {nokCount > 0
-              ? `${nokCount} item${nokCount > 1 ? 's' : ''} com NOK foram registrados. A equipe de manutenção será informada.`
-              : 'Todos os itens estão OK. Bom trabalho!'}
+            {bloqueado
+              ? `${ncImperativos} item(s) impeditivo(s) marcado(s) como NC. O veículo está impedido de ser conduzido.`
+              : ncCount > 0
+                ? `${ncCount} item(s) com NC registrados. Supervisão informada.`
+                : 'Todos os itens estão Conformes. Bom trabalho!'}
           </p>
         </div>
-        <p className="text-xs font-semibold text-slate-400">
-          Você já pode fechar esta página.
-        </p>
+        {bloqueado && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900/50 dark:bg-rose-900/20">
+            <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
+              ⚠ O VEÍCULO ESTARÁ IMPEDIDO DE SER CONDUZIDO, CASO ALGUM ITEM MARCADO COM 🚫 "IMPEDITIVO" ESTEJA NÃO CONFORME
+            </p>
+          </div>
+        )}
+        <p className="text-xs font-semibold text-slate-400">Você já pode fechar esta página.</p>
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Formulário público
+// Formulário principal
 // ---------------------------------------------------------------------------
-
 function FormularioChecklist({
-  tipo,
+  schema,
   operador,
   matricula,
 }: {
-  tipo: string
+  schema: ChecklistSchemaDef
   operador: string
   matricula: string
 }) {
-  const schema = SCHEMA_MAP[tipo]!
   const totalItens = schema.grupos.reduce((acc, g) => acc + g.itens.length, 0)
 
   const [respostas, setRespostas] = useState<Record<string, Resposta>>({})
   const [observacoes, setObservacoes] = useState<Record<string, string>>({})
-  const [placa, setPlaca] = useState('')
-  const [km, setKm] = useState('')
-  const [data, setData] = useState(() => new Date().toISOString().split('T')[0] ?? '')
+  const [dadosVeiculo, setDadosVeiculo] = useState<Record<string, string>>({})
+  const [dataInspecao, setDataInspecao] = useState(() => new Date().toISOString().split('T')[0] ?? '')
+  const [problemas, setProblemas] = useState('')
+  const [descricaoProblema, setDescricaoProblema] = useState('')
+  const [supervisor, setSupervisor] = useState('')
+  const [arquivos, setArquivos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
   const [erroEnvio, setErroEnvio] = useState('')
   const [concluido, setConcluido] = useState(false)
-  const [nokFinal, setNokFinal] = useState(0)
+  const [ncFinal, setNcFinal] = useState(0)
+  const [ncImpFinal, setNcImpFinal] = useState(0)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const respondidos = Object.values(respostas).filter((v) => v !== null).length
-  const nokCount = Object.values(respostas).filter((v) => v === 'nok').length
+  const ncCount = Object.values(respostas).filter((v) => v === 'nc').length
+  const ncImperativos = schema.grupos
+    .flatMap((g) => g.itens)
+    .filter((item) => item.imperativo && respostas[item.id] === 'nc').length
   const progresso = totalItens > 0 ? Math.round((respondidos / totalItens) * 100) : 0
   const tudo100 = progresso === 100
 
@@ -170,26 +174,55 @@ function FormularioChecklist({
   const setObs = (id: string, texto: string) =>
     setObservacoes((prev) => ({ ...prev, [id]: texto }))
 
+  const setDado = (id: string, valor: string) =>
+    setDadosVeiculo((prev) => ({ ...prev, [id]: valor }))
+
+  const handleArquivos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const novos = Array.from(e.target.files ?? []).slice(0, 10 - arquivos.length)
+    setArquivos((prev) => [...prev, ...novos].slice(0, 10))
+    e.target.value = ''
+  }
+
+  const removerArquivo = (idx: number) =>
+    setArquivos((prev) => prev.filter((_, i) => i !== idx))
+
   const handleEnviar = async () => {
     if (!tudo100) return
     setEnviando(true)
     setErroEnvio('')
 
+    // Upload de evidências para Supabase Storage (bucket: checklist-evidencias)
+    const evidenciaUrls: string[] = []
+    for (const file of arquivos) {
+      const path = `${schema.id}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`
+      const { error } = await supabase.storage
+        .from('checklist-evidencias')
+        .upload(path, file, { upsert: false })
+      if (!error) {
+        const { data } = supabase.storage.from('checklist-evidencias').getPublicUrl(path)
+        evidenciaUrls.push(data.publicUrl)
+      }
+    }
+
     const respostasLimpas = Object.fromEntries(
-      Object.entries(respostas).filter((e): e is [string, 'ok' | 'nok' | 'na'] => e[1] !== null),
+      Object.entries(respostas).filter((e): e is [string, 'c' | 'nc' | 'na'] => e[1] !== null),
     )
 
     const { error } = await supabase.from('checklists').insert({
-      tipo,
+      tipo: schema.id,
       nome_operador: operador,
       matricula,
-      placa: placa.trim(),
-      km: km.trim(),
-      data_inspecao: data,
+      dados_veiculo: { ...dadosVeiculo, data_inspecao: dataInspecao },
+      data_inspecao: dataInspecao,
       respostas: respostasLimpas,
       observacoes,
       progresso: 100,
-      nok_count: nokCount,
+      nc_count: ncCount,
+      nc_imperativos: ncImperativos,
+      problemas,
+      descricao_problema: descricaoProblema,
+      nome_supervisor: supervisor,
+      evidencia_urls: evidenciaUrls,
     })
 
     if (error) {
@@ -198,11 +231,12 @@ function FormularioChecklist({
       return
     }
 
-    setNokFinal(nokCount)
+    setNcFinal(ncCount)
+    setNcImpFinal(ncImperativos)
     setConcluido(true)
   }
 
-  if (concluido) return <TelaConclusao nokCount={nokFinal} />
+  if (concluido) return <TelaConclusao ncImperativos={ncImpFinal} ncCount={ncFinal} />
 
   return (
     <div className="min-h-dvh bg-slate-50 pb-28 dark:bg-slate-950">
@@ -214,21 +248,17 @@ function FormularioChecklist({
             <ClipboardList size={16} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-black text-slate-900 dark:text-slate-100">
-              {schema.nome}
-            </div>
+            <div className="truncate text-sm font-black text-slate-900 dark:text-slate-100">{schema.nome}</div>
             <div className="mt-0.5 flex items-center gap-2">
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${
-                    nokCount > 0 ? 'bg-rose-500' : tudo100 ? 'bg-emerald-500' : 'bg-blue-500'
+                    ncImperativos > 0 ? 'bg-rose-500' : tudo100 ? 'bg-emerald-500' : 'bg-blue-500'
                   }`}
                   style={{ width: `${progresso}%` }}
                 />
               </div>
-              <span className="shrink-0 text-[10px] font-extrabold tabular-nums text-slate-500">
-                {respondidos}/{totalItens}
-              </span>
+              <span className="shrink-0 text-[10px] font-extrabold tabular-nums text-slate-500">{respondidos}/{totalItens}</span>
             </div>
           </div>
           <div className="shrink-0 text-right">
@@ -240,36 +270,62 @@ function FormularioChecklist({
 
       <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
 
+        {/* Legenda NC imperativo */}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/40 dark:bg-amber-900/10">
+          <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400">
+            🚫 Itens com este símbolo são <strong>IMPEDITIVOS</strong> — se marcados como NC, o veículo não poderá ser conduzido.
+          </p>
+        </div>
+
         {/* Dados do veículo */}
-        <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Dados do Veículo
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-px bg-slate-100 dark:bg-slate-800 sm:grid-cols-3">
-            {(
-              [
-                { label: 'Placa', value: placa, onChange: setPlaca, placeholder: 'ABC-1234' },
-                { label: 'KM Atual', value: km, onChange: setKm, placeholder: '0', inputMode: 'numeric' as const },
-                { label: 'Data', value: data, onChange: setData, type: 'date', wide: true },
-              ] as Array<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string; wide?: boolean; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'] }>
-            ).map(({ label, value, onChange, placeholder, wide, type, inputMode }) => (
+          <div className="grid grid-cols-2 gap-px bg-slate-100 dark:bg-slate-800">
+            {/* Data de inspeção — sempre presente */}
+            <div className="flex flex-col gap-0.5 bg-white px-4 py-3 dark:bg-slate-950">
+              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Data</label>
+              <input
+                type="date"
+                value={dataInspecao}
+                onChange={(e) => setDataInspecao(e.target.value)}
+                className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+              />
+            </div>
+
+            {/* Campos extras definidos no schema */}
+            {(schema.camposExtras ?? []).map((campo) => (
               <div
-                key={label}
-                className={`flex flex-col gap-0.5 bg-white px-4 py-3 dark:bg-slate-950 ${wide ? 'col-span-2 sm:col-span-1' : ''}`}
+                key={campo.id}
+                className={`flex flex-col gap-0.5 bg-white px-4 py-3 dark:bg-slate-950 ${
+                  campo.id === 'localidade' ? 'col-span-2' : ''
+                }`}
               >
                 <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                  {label}
+                  {campo.label}{campo.obrigatorio ? ' *' : ''}
                 </label>
-                <input
-                  type={type ?? 'text'}
-                  inputMode={inputMode}
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  placeholder={placeholder}
-                  className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100 dark::[color-scheme:dark]"
-                />
+                {campo.tipo === 'select' && campo.opcoes && campo.opcoes.length > 0 ? (
+                  <select
+                    value={dadosVeiculo[campo.id] ?? ''}
+                    onChange={(e) => setDado(campo.id, e.target.value)}
+                    className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:text-slate-100"
+                  >
+                    <option value="">Escolher</option>
+                    {campo.opcoes.map((op) => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={campo.tipo === 'number' ? 'number' : 'text'}
+                    inputMode={campo.tipo === 'number' ? 'numeric' : 'text'}
+                    value={dadosVeiculo[campo.id] ?? ''}
+                    onChange={(e) => setDado(campo.id, e.target.value)}
+                    placeholder="Sua resposta"
+                    className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -277,15 +333,25 @@ function FormularioChecklist({
 
         {/* Grupos de itens */}
         {schema.grupos.map((grupo) => (
-          <div
-            key={grupo.id}
-            className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
-          >
+          <div key={grupo.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
             <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                 {grupo.titulo}
               </p>
             </div>
+
+            {/* Cabeçalho das colunas */}
+            <div className="grid grid-cols-[1fr_auto] border-b border-slate-100 bg-slate-50/50 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Item</span>
+              <div className="flex gap-2">
+                {OPCOES.map((o) => (
+                  <span key={o.valor} className="w-14 text-center text-[10px] font-extrabold uppercase tracking-widest text-slate-400 sm:w-16">
+                    {o.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
             {grupo.itens.map((item, idx) => {
               const resp = respostas[item.id] ?? null
               const obs = observacoes[item.id] ?? ''
@@ -293,37 +359,38 @@ function FormularioChecklist({
               return (
                 <div
                   key={item.id}
-                  className={`px-4 py-4 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800/80' : ''} ${resp === 'nok' ? 'bg-rose-50/40 dark:bg-rose-900/10' : ''}`}
+                  className={`px-4 py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800/80' : ''} ${resp === 'nc' ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`}
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-extrabold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                        {idx + 1}
-                      </span>
-                      <span className="text-[15px] font-semibold leading-snug text-slate-800 dark:text-slate-100">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2 pt-1">
+                      {item.imperativo && (
+                        <span className="mt-0.5 shrink-0 text-sm" title="Item impeditivo">🚫</span>
+                      )}
+                      <span className="text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
                         {item.label}
                       </span>
                     </div>
-                    <div className="flex shrink-0 gap-2 pl-9 sm:pl-0">
+                    <div className="flex shrink-0 gap-2">
                       {OPCOES.map(({ valor, label, activeClass, idleClass }) => (
                         <button
                           key={valor}
                           type="button"
+                          title={OPCOES.find(o => o.valor === valor)?.titulo}
                           onClick={() => setResposta(item.id, valor)}
-                          className={`flex h-12 w-16 items-center justify-center rounded-xl border-2 text-sm font-extrabold transition-transform active:scale-95 sm:h-10 sm:w-14 ${resp === valor ? activeClass : idleClass}`}
+                          className={`flex h-11 w-14 items-center justify-center rounded-xl border-2 text-xs font-extrabold transition-transform active:scale-95 sm:h-10 sm:w-16 ${resp === valor ? activeClass : idleClass}`}
                         >
                           {label}
                         </button>
                       ))}
                     </div>
                   </div>
-                  {resp === 'nok' && (
+                  {resp === 'nc' && (
                     <textarea
                       rows={2}
                       value={obs}
                       onChange={(e) => setObs(item.id, e.target.value)}
                       placeholder="Descreva o problema encontrado..."
-                      className="mt-3 w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 focus:border-rose-400 dark:border-rose-800/60 dark:bg-slate-900/60 dark:text-slate-100"
+                      className="mt-2 w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 focus:border-rose-400 dark:border-rose-800/60 dark:bg-slate-900/60 dark:text-slate-100"
                     />
                   )}
                 </div>
@@ -331,6 +398,121 @@ function FormularioChecklist({
             })}
           </div>
         ))}
+
+        {/* Problemas verificados */}
+        {schema.temProblemas && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Problemas Verificados
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                Aponte qualquer problema(s) apresentado(s) (freios, motor, câmbio, pneus, etc.)
+              </p>
+            </div>
+            <div className="space-y-px bg-slate-100 dark:bg-slate-800">
+              <div className="bg-white px-4 py-3 dark:bg-slate-950">
+                <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Problemas</label>
+                <textarea
+                  rows={3}
+                  value={problemas}
+                  onChange={(e) => setProblemas(e.target.value)}
+                  placeholder="Descreva os problemas encontrados..."
+                  className="mt-1 w-full resize-none bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                />
+              </div>
+              <div className="bg-white px-4 py-3 dark:bg-slate-950">
+                <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Descrição do Problema</label>
+                <textarea
+                  rows={2}
+                  value={descricaoProblema}
+                  onChange={(e) => setDescricaoProblema(e.target.value)}
+                  placeholder="Sua resposta"
+                  className="mt-1 w-full resize-none bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Evidência NR12 */}
+        {schema.temEvidencia && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Evidência NR12 *
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Faça upload de até 10 arquivos. Tamanho máximo de 10 MB por item.
+              </p>
+            </div>
+            <div className="px-4 py-3">
+              {arquivos.length > 0 && (
+                <div className="mb-3 space-y-2">
+                  {arquivos.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                      <span className="min-w-0 truncate text-sm font-semibold text-slate-700 dark:text-slate-300">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removerArquivo(idx)}
+                        className="shrink-0 text-slate-400 hover:text-rose-500"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {arquivos.length < 10 && (
+                <>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={handleArquivos}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300"
+                  >
+                    <Paperclip size={16} />
+                    Adicionar arquivo
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Aviso imperativo */}
+        {ncImperativos > 0 && (
+          <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 dark:border-rose-800 dark:bg-rose-900/20">
+            <p className="text-sm font-extrabold text-rose-600 dark:text-rose-400">
+              ⚠ ATENÇÃO!!! O VEÍCULO ESTARÁ IMPEDIDO DE SER CONDUZIDO, CASO ALGUM ITEM MARCADO COM 🚫 "IMPEDITIVO" ESTEJA NÃO CONFORME.
+            </p>
+          </div>
+        )}
+
+        {/* Nome do supervisor */}
+        {schema.temSupervisor && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="px-4 py-3">
+              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                Nome do Supervisor <span className="text-slate-400 normal-case font-semibold">(Nome completo)</span>
+              </label>
+              <input
+                value={supervisor}
+                onChange={(e) => setSupervisor(e.target.value)}
+                placeholder="Nome completo do supervisor"
+                className="mt-1 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+              />
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Barra de envio fixa */}
@@ -339,18 +521,17 @@ function FormularioChecklist({
           <div className="min-w-0">
             {erroEnvio ? (
               <p className="text-sm font-extrabold text-rose-500">{erroEnvio}</p>
-            ) : nokCount > 0 ? (
-              <p className="truncate text-sm font-extrabold text-rose-500">
-                {nokCount} item{nokCount > 1 ? 's' : ''} com NOK
-              </p>
+            ) : ncImperativos > 0 ? (
+              <p className="text-sm font-extrabold text-rose-500">🚫 {ncImperativos} item(s) impeditivo(s) NC</p>
+            ) : ncCount > 0 ? (
+              <p className="truncate text-sm font-extrabold text-amber-600 dark:text-amber-400">{ncCount} item(s) NC</p>
             ) : tudo100 ? (
               <p className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 size={16} />
-                Pronto para enviar
+                <CheckCircle2 size={16} /> Pronto para enviar
               </p>
             ) : (
               <p className="truncate text-sm font-semibold text-slate-500 dark:text-slate-400">
-                {totalItens - respondidos} item{totalItens - respondidos !== 1 ? 's' : ''} restante{totalItens - respondidos !== 1 ? 's' : ''}
+                {totalItens - respondidos} item(s) restante(s)
               </p>
             )}
           </div>
@@ -369,25 +550,18 @@ function FormularioChecklist({
 }
 
 // ---------------------------------------------------------------------------
-// Página raiz da rota pública
+// Página raiz
 // ---------------------------------------------------------------------------
-
 export function ChecklistPublicoPage() {
   const { tipo } = useParams<{ tipo: string }>()
   const [operador, setOperador] = useState<string | null>(null)
   const [matricula, setMatricula] = useState<string | null>(null)
 
-  if (!tipo || !SCHEMA_MAP[tipo]) {
-    return <Navigate to="/" replace />
-  }
+  if (!tipo || !SCHEMA_MAP[tipo]) return <Navigate to="/" replace />
 
   if (!operador || !matricula) {
-    return (
-      <TelaIdentificacao
-        onConfirmar={(n, m) => { setOperador(n); setMatricula(m) }}
-      />
-    )
+    return <TelaIdentificacao onConfirmar={(n, m) => { setOperador(n); setMatricula(m) }} />
   }
 
-  return <FormularioChecklist tipo={tipo} operador={operador} matricula={matricula} />
+  return <FormularioChecklist schema={SCHEMA_MAP[tipo]!} operador={operador} matricula={matricula} />
 }

@@ -17,13 +17,18 @@ export type ChecklistRow = {
   tipo: string
   nome_operador: string
   matricula: string
-  placa: string
-  km: string
+  // dados extras do veículo (placa, modelo, km, horímetro, prefixo, processo, localidade…)
+  dados_veiculo: Record<string, string>
   data_inspecao: string
-  respostas: Record<string, 'ok' | 'nok' | 'na'>
+  respostas: Record<string, 'c' | 'nc' | 'na'>
   observacoes: Record<string, string>
   progresso: number
-  nok_count: number
+  nc_count: number
+  nc_imperativos: number   // itens imperativos com NC (impedem condução)
+  problemas: string
+  descricao_problema: string
+  nome_supervisor: string
+  evidencia_urls: string[] // URLs dos arquivos enviados ao Supabase Storage
   created_at: string
 }
 
