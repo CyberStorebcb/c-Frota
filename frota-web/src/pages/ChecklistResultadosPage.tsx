@@ -750,21 +750,80 @@ export function ChecklistResultadosPage() {
       </div>
 
       {/* Cards de resumo */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: 'Total enviados', value: filtrados.length, color: 'text-slate-900 dark:text-slate-100' },
-          { label: 'Com NC', value: filtrados.filter((r) => r.nc_count > 0).length, color: 'text-rose-500' },
-          { label: 'Itens NC', value: totalNc, color: 'text-rose-500' },
-          { label: 'Todos C', value: filtrados.filter((r) => r.nc_count === 0).length, color: 'text-emerald-600 dark:text-emerald-400' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
-            <div className={`text-2xl font-black ${color}`}>{value}</div>
-            <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {label}
+      {(() => {
+        const comNc = filtrados.filter((r) => r.nc_count > 0).length
+        const semNc = filtrados.filter((r) => r.nc_count === 0).length
+        const taxaNc = filtrados.length > 0 ? Math.round((comNc / filtrados.length) * 100) : 0
+        return (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Total */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{filtrados.length}</div>
+                  <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Checklists
+                  </div>
+                </div>
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                  <ClipboardList size={17} className="text-slate-500 dark:text-slate-400" />
+                </div>
+              </div>
+              <div className="mt-2 text-[10px] font-semibold text-slate-400">nesta página</div>
+            </div>
+
+            {/* Aprovados */}
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-soft dark:border-emerald-900/30 dark:bg-emerald-950/20">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{semNc}</div>
+                  <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-500">
+                    Sem NC
+                  </div>
+                </div>
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
+                  <CheckCircle2 size={17} className="text-emerald-500" />
+                </div>
+              </div>
+              <div className="mt-2 text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-500/60">todos conformes</div>
+            </div>
+
+            {/* Checklists com NC */}
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 shadow-soft dark:border-amber-900/30 dark:bg-amber-950/20">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{comNc}</div>
+                  <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-amber-700 dark:text-amber-500">
+                    Com NC
+                  </div>
+                </div>
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                  <AlertTriangle size={17} className="text-amber-500" />
+                </div>
+              </div>
+              <div className="mt-2 text-[10px] font-semibold text-amber-600/70 dark:text-amber-500/60">{taxaNc}% dos checklists</div>
+            </div>
+
+            {/* Total de itens NC */}
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 shadow-soft dark:border-rose-900/30 dark:bg-rose-950/20">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{totalNc}</div>
+                  <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-rose-700 dark:text-rose-500">
+                    Itens NC
+                  </div>
+                </div>
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-rose-100 dark:bg-rose-900/40">
+                  <CalendarCheck2 size={17} className="text-rose-500" />
+                </div>
+              </div>
+              <div className="mt-2 text-[10px] font-semibold text-rose-600/70 dark:text-rose-500/60">
+                {comNc > 0 ? `~${(totalNc / comNc).toFixed(1)} por checklist` : 'nenhum'}
+              </div>
             </div>
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* Sparkline de tendência NC */}
       <Sparkline semanas={semanas} />

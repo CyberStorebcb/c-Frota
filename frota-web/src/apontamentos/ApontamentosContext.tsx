@@ -179,11 +179,13 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       .eq('progresso', 100)
     setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
 
-    // 2. Checklists com NC (apenas campos necessários) → linhas da tabela Gerenciar
+    // 2. Checklists com progresso 100 que possam ter NCs nas respostas
+    //    Não filtramos por nc_count pois ele pode estar desatualizado no banco;
+    //    verificamos os NCs diretamente no campo `respostas`.
     const { data: clData, error: clError } = await supabase
       .from('checklists')
       .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, dados_veiculo, respostas, observacoes')
-      .gt('nc_count', 0)
+      .eq('progresso', 100)
       .order('data_inspecao', { ascending: true })
 
     if (clError) {
@@ -205,11 +207,14 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     )
 
     // 4. Expande cada checklist em um apontamento por item NC
+    //    Só gera apontamentos para checklists que realmente têm respostas 'nc'.
     const apontamentos: Apontamento[] = []
     for (const cl of (clData ?? []) as unknown[]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const checklist = cl as any
       const respostas: Record<string, string> = checklist.respostas ?? {}
+      const temNc = Object.values(respostas).some((v) => v === 'nc')
+      if (!temNc) continue
       for (const [itemId, resp] of Object.entries(respostas)) {
         if (resp === 'nc') {
           apontamentos.push(checklistItemToApontamento(checklist, itemId, resolucoes))

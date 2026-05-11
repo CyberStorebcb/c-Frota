@@ -383,7 +383,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-orange-400 dark:hover:border-orange-500',
       },
       {
-        label: 'Adesão da Frota',
+        label: 'Aderência da Frota',
         value: mediaPorVeiculo,
         Icon: Gauge,
         iconWrap: 'bg-sky-50 text-sky-600 group-hover:scale-110 dark:bg-sky-950/50 dark:text-sky-400',
