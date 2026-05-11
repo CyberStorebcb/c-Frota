@@ -33,3 +33,28 @@ export type ChecklistRow = {
 }
 
 export type ChecklistInsert = Omit<ChecklistRow, 'id' | 'created_at'>
+
+export type ApontamentoRow = {
+  id: string
+  veiculo_id: string
+  veiculo_label: string
+  prefixo: string
+  defeito: string
+  data_apontamento: string
+  prazo: string
+  resolvido: boolean
+  data_resolvido: string | null
+  hora_resolvido: string | null
+  reparo_valor: number | null
+  reparo_descricao: string | null
+  reparo_imagens: string[]
+  os_arquivo: string | null
+  processo: string
+  base: string
+  coordenador: string
+  responsavel: string
+  checklist_id: string | null
+  nc_item_id: string | null
+  nc_fotos: string[]
+  created_at: string
+}

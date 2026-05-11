@@ -7,6 +7,7 @@ import {
   ClipboardList,
   History,
   Inbox,
+  Loader2,
   TrendingUp,
   RotateCcw,
   Upload,
@@ -116,7 +117,7 @@ function StatPill({
 }
 
 export function ManagePage() {
-  const { rows, marcarResolvido } = useApontamentos()
+  const { rows, carregando, marcarResolvido } = useApontamentos()
   const { user } = useAuth()
   const canMarkResolved =
     user?.role === 'admin' || (user?.role === 'user' && user.userKind === 'special')
@@ -238,6 +239,7 @@ export function ManagePage() {
   const [resolveDescricao, setResolveDescricao] = useState<string>('')
   const [resolveImgs, setResolveImgs] = useState<string[]>([])
   const [resolveOsFile, setResolveOsFile] = useState<{ name: string; data: string } | null>(null)
+  const [salvando, setSalvando] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const osFileRef = useRef<HTMLInputElement | null>(null)
 
@@ -300,17 +302,19 @@ export function ManagePage() {
     }
   }
 
-  const confirmResolve = () => {
+  const confirmResolve = async () => {
     if (!canMarkResolved || !resolveId) return
+    setSalvando(true)
     const v = resolveValor.trim()
     const valor = v ? parseCurrency(v) : null
     const desc = resolveDescricao.trim()
-    marcarResolvido(resolveId, {
+    await marcarResolvido(resolveId, {
       valor: Number.isFinite(valor ?? NaN) ? valor : null,
       descricao: desc ? desc : null,
       imagens: resolveImgs,
       osArquivo: resolveOsFile?.data ?? null,
     })
+    setSalvando(false)
     closeResolveModal()
   }
 
@@ -436,7 +440,13 @@ export function ManagePage() {
           </button>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+        {carregando && (
+          <div className="mt-4 flex items-center justify-center gap-2 py-10 text-sm font-semibold text-slate-500 dark:text-slate-400">
+            <Loader2 size={18} className="animate-spin" />
+            Carregando apontamentos...
+          </div>
+        )}
+        <div className={`mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}>
           <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
@@ -751,11 +761,14 @@ export function ManagePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={confirmResolve}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-soft hover:bg-emerald-700"
+                  onClick={() => void confirmResolve()}
+                  disabled={salvando}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-soft hover:bg-emerald-700 disabled:opacity-60"
                 >
-                  <Check size={18} strokeWidth={3} />
-                  Confirmar resolvido
+                  {salvando
+                    ? <Loader2 size={18} className="animate-spin" />
+                    : <Check size={18} strokeWidth={3} />}
+                  {salvando ? 'Salvando...' : 'Confirmar resolvido'}
                 </button>
               </div>
             </div>

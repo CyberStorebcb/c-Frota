@@ -22,7 +22,7 @@ import {
 import { supabase, type ChecklistRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
-import { Send } from 'lucide-react'
+import { Loader2, Send } from 'lucide-react'
 
 function formatDateBR(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -213,29 +213,35 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
   const [lightboxUrls, setLightboxUrls] = useState<string[]>([])
   const [enviados, setEnviados] = useState<Set<string>>(new Set())
 
-  const enviarParaGerenciar = (itemId: string, itemLabel: string, fotos: string[]) => {
-    if (hasByChecklist(row.id, itemId)) return
+  const [enviando, setEnviando] = useState<Set<string>>(new Set())
+
+  const enviarParaGerenciar = async (itemId: string, itemLabel: string, fotos: string[]) => {
+    if (hasByChecklist(row.id, itemId) || enviados.has(itemId) || enviando.has(itemId)) return
+    setEnviando((prev) => new Set(prev).add(itemId))
+
     const hoje = new Date()
     const prazo = new Date(hoje)
     prazo.setDate(prazo.getDate() + 7)
     const toISO = (d: Date) => d.toISOString().slice(0, 10)
 
-    addApontamento({
-      veiculoId:      `placa-${(placa || 'desconhecido').toLowerCase()}`,
-      veiculoLabel:   placa ? `${row.dados_veiculo?.prefixo ?? ''} · ${placa}`.trim().replace(/^·\s*/, '') : row.nome_operador,
-      prefixo:        row.dados_veiculo?.prefixo ?? '',
-      defeito:        `[Checklist NC] ${itemLabel}`,
+    await addApontamento({
+      veiculoId:       `placa-${(placa || 'desconhecido').toLowerCase()}`,
+      veiculoLabel:    placa ? `${row.dados_veiculo?.prefixo ?? ''} · ${placa}`.trim().replace(/^·\s*/, '') : row.nome_operador,
+      prefixo:         row.dados_veiculo?.prefixo ?? '',
+      defeito:         `[Checklist NC] ${itemLabel}`,
       dataApontamento: toISO(hoje),
-      prazo:          toISO(prazo),
-      processo:       'Checklist',
-      base:           row.dados_veiculo?.localidade ?? '',
-      coordenador:    row.nome_supervisor ?? '',
-      responsavel:    row.nome_operador,
-      checklistId:    row.id,
-      ncItemId:       itemId,
-      ncFotos:        fotos,
+      prazo:           toISO(prazo),
+      processo:        'Checklist',
+      base:            row.dados_veiculo?.localidade ?? '',
+      coordenador:     row.nome_supervisor ?? '',
+      responsavel:     row.nome_operador,
+      checklistId:     row.id,
+      ncItemId:        itemId,
+      ncFotos:         fotos,
     })
+
     setEnviados((prev) => new Set(prev).add(itemId))
+    setEnviando((prev) => { const s = new Set(prev); s.delete(itemId); return s })
   }
 
   const openLightbox = (urls: string[], idx: number) => {
@@ -444,20 +450,27 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
                         <div className="flex shrink-0 items-center gap-2">
                           {resp === 'nc' && (() => {
                             const jaEnviado = enviados.has(item.id) || hasByChecklist(row.id, item.id)
+                            const estaEnviando = enviando.has(item.id)
                             return (
                               <button
                                 type="button"
-                                onClick={() => enviarParaGerenciar(item.id, item.label, obsFotos)}
-                                disabled={jaEnviado}
+                                onClick={() => void enviarParaGerenciar(item.id, item.label, obsFotos)}
+                                disabled={jaEnviado || estaEnviando}
                                 title={jaEnviado ? 'Já enviado para Gerenciar' : 'Enviar NC para planilha de Gerenciar'}
                                 className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-extrabold transition ${
                                   jaEnviado
                                     ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 cursor-default'
-                                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800'
+                                    : estaEnviando
+                                      ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 cursor-wait'
+                                      : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800'
                                 }`}
                               >
-                                {jaEnviado ? <CheckCircle2 size={11} /> : <Send size={11} />}
-                                {jaEnviado ? 'Enviado' : 'Gerenciar'}
+                                {jaEnviado
+                                  ? <CheckCircle2 size={11} />
+                                  : estaEnviando
+                                    ? <Loader2 size={11} className="animate-spin" />
+                                    : <Send size={11} />}
+                                {jaEnviado ? 'Enviado' : estaEnviando ? '...' : 'Gerenciar'}
                               </button>
                             )
                           })()}

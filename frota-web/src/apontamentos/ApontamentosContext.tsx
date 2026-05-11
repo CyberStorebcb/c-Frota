@@ -4,234 +4,103 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
-import { loadApontamentosFromStorage, saveApontamentosToStorage } from './apontamentosPersist'
+import { supabase } from '../lib/supabase'
 
+// ---------------------------------------------------------------------------
+// Tipo público
+// ---------------------------------------------------------------------------
 export type Apontamento = {
   id: string
   veiculoId: string
   veiculoLabel: string
-  /** Prefixo numérico do veículo (filtro) */
   prefixo: string
   defeito: string
   dataApontamento: string
   prazo: string
   resolvido: boolean
-  /** ISO yyyy-mm-dd — preenchida ao marcar como resolvido */
   dataResolvido: string | null
-  /** Horário local (HH:mm) — preenchido ao marcar como resolvido */
   horaResolvido: string | null
-  /** Valor gasto no reparo (R$) */
   reparoValor: number | null
-  /** Descrição do serviço executado (opcional) */
   reparoDescricao: string | null
-  /** Imagens anexadas (data URLs) */
   reparoImagens: string[]
-  /** Arquivo da OS anexado (data URL — PDF ou imagem) */
   osArquivo: string | null
   processo: string
   base: string
   coordenador: string
   responsavel: string
-  /** ID do checklist de origem (quando gerado automaticamente de NC) */
   checklistId?: string
-  /** Fotos da não conformidade do checklist de origem */
   ncFotos?: string[]
-  /** ID do item NC no schema do checklist */
   ncItemId?: string
 }
 
-const SEED: Apontamento[] = [
-  {
-    id: '1',
-    veiculoId: 'v-0101',
-    veiculoLabel: '0101 · ABC-1D23',
-    prefixo: '0101',
-    defeito: 'Luz de freio acesa no painel',
-    dataApontamento: '2026-01-08',
-    prazo: '2026-01-20',
-    resolvido: false,
-    dataResolvido: null,
-    horaResolvido: null,
-    reparoValor: null,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Checklist',
-    base: 'Base 01',
-    coordenador: 'Carlos Mendes',
-    responsavel: 'João Silva',
-  },
-  {
-    id: '2',
-    veiculoId: 'v-0201',
-    veiculoLabel: '0201 · GHI-7J89',
-    prefixo: '0201',
-    defeito: 'Pneu traseiro direito com desgaste irregular',
-    dataApontamento: '2026-02-14',
-    prazo: '2026-02-28',
-    resolvido: false,
-    dataResolvido: null,
-    horaResolvido: null,
-    reparoValor: null,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Corretiva',
-    base: 'Base 02',
-    coordenador: 'Ana Costa',
-    responsavel: 'Maria Souza',
-  },
-  {
-    id: '3',
-    veiculoId: 'v-0101',
-    veiculoLabel: '0101 · ABC-1D23',
-    prefixo: '0101',
-    defeito: 'Ar condicionado sem refrigeração',
-    dataApontamento: '2026-03-02',
-    prazo: '2026-03-15',
-    resolvido: true,
-    dataResolvido: '2026-03-12',
-    horaResolvido: '14:20',
-    reparoValor: 350,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Checklist',
-    base: 'Base 01',
-    coordenador: 'Carlos Mendes',
-    responsavel: 'João Silva',
-  },
-  {
-    id: '4',
-    veiculoId: 'v-0302',
-    veiculoLabel: '0302 · QRS-6T78',
-    prefixo: '0302',
-    defeito: 'Documentação CRLV vencendo em 30 dias',
-    dataApontamento: '2026-03-18',
-    prazo: '2026-04-01',
-    resolvido: false,
-    dataResolvido: null,
-    horaResolvido: null,
-    reparoValor: null,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Checklist',
-    base: 'Base 03',
-    coordenador: 'Ana Costa',
-    responsavel: 'Pedro Lima',
-  },
-  {
-    id: '5',
-    veiculoId: 'v-0102',
-    veiculoLabel: '0102 · DEF-4G56',
-    prefixo: '0102',
-    defeito: 'Ruído na suspensão dianteira',
-    dataApontamento: '2026-04-01',
-    prazo: '2026-04-10',
-    resolvido: false,
-    dataResolvido: null,
-    horaResolvido: null,
-    reparoValor: null,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Corretiva',
-    base: 'Base 01',
-    coordenador: 'Carlos Mendes',
-    responsavel: 'Maria Souza',
-  },
-  {
-    id: '6',
-    veiculoId: 'v-0202',
-    veiculoLabel: '0202 · JKL-0M12',
-    prefixo: '0202',
-    defeito: 'Retrovisor lateral com trinca',
-    dataApontamento: '2026-04-22',
-    prazo: '2026-05-05',
-    resolvido: false,
-    dataResolvido: null,
-    horaResolvido: null,
-    reparoValor: null,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Checklist',
-    base: 'Base 02',
-    coordenador: 'Ana Costa',
-    responsavel: 'Pedro Lima',
-  },
-  {
-    id: '7',
-    veiculoId: 'v-0201',
-    veiculoLabel: '0201 · GHI-7J89',
-    prefixo: '0201',
-    defeito: 'Vidro lateral com risco',
-    dataApontamento: '2026-01-05',
-    prazo: '2026-01-22',
-    resolvido: true,
-    dataResolvido: '2026-01-17',
-    horaResolvido: '09:10',
-    reparoValor: 120,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Corretiva',
-    base: 'Base 02',
-    coordenador: 'Ana Costa',
-    responsavel: 'Maria Souza',
-  },
-  {
-    id: '8',
-    veiculoId: 'v-0302',
-    veiculoLabel: '0302 · QRS-6T78',
-    prefixo: '0302',
-    defeito: 'Estepe sem calibragem',
-    dataApontamento: '2026-02-02',
-    prazo: '2026-02-12',
-    resolvido: true,
-    dataResolvido: '2026-02-10',
-    horaResolvido: '16:05',
-    reparoValor: 60,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Checklist',
-    base: 'Base 03',
-    coordenador: 'Ana Costa',
-    responsavel: 'Pedro Lima',
-  },
-  {
-    id: '9',
-    veiculoId: 'v-0102',
-    veiculoLabel: '0102 · DEF-4G56',
-    prefixo: '0102',
-    defeito: 'Farol baixo com umidade',
-    dataApontamento: '2026-04-05',
-    prazo: '2026-04-18',
-    resolvido: true,
-    dataResolvido: '2026-04-11',
-    horaResolvido: '11:42',
-    reparoValor: 220,
-    reparoDescricao: null,
-    reparoImagens: [],
-    osArquivo: null,
-    processo: 'Corretiva',
-    base: 'Base 01',
-    coordenador: 'Carlos Mendes',
-    responsavel: 'João Silva',
-  },
-]
+export type NovoApontamento = Omit<
+  Apontamento,
+  'id' | 'resolvido' | 'dataResolvido' | 'horaResolvido' | 'reparoValor' | 'reparoDescricao' | 'reparoImagens' | 'osArquivo'
+>
 
-const SEED_BY_ID = new Map(SEED.map((r) => [r.id, r]))
-
-function sortByApontamento(a: Apontamento, b: Apontamento) {
-  return new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime()
+// ---------------------------------------------------------------------------
+// Conversão Supabase row ↔ Apontamento
+// ---------------------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromRow(r: any): Apontamento {
+  return {
+    id:              r.id,
+    veiculoId:       r.veiculo_id       ?? '',
+    veiculoLabel:    r.veiculo_label    ?? '',
+    prefixo:         r.prefixo          ?? '',
+    defeito:         r.defeito          ?? '',
+    dataApontamento: r.data_apontamento ?? '',
+    prazo:           r.prazo            ?? '',
+    resolvido:       Boolean(r.resolvido),
+    dataResolvido:   r.data_resolvido   ?? null,
+    horaResolvido:   r.hora_resolvido   ?? null,
+    reparoValor:     r.reparo_valor     != null ? Number(r.reparo_valor) : null,
+    reparoDescricao: r.reparo_descricao ?? null,
+    reparoImagens:   Array.isArray(r.reparo_imagens) ? r.reparo_imagens : [],
+    osArquivo:       r.os_arquivo       ?? null,
+    processo:        r.processo         ?? '',
+    base:            r.base             ?? '',
+    coordenador:     r.coordenador      ?? '',
+    responsavel:     r.responsavel      ?? '',
+    checklistId:     r.checklist_id     ?? undefined,
+    ncItemId:        r.nc_item_id       ?? undefined,
+    ncFotos:         Array.isArray(r.nc_fotos) && r.nc_fotos.length > 0 ? r.nc_fotos : undefined,
+  }
 }
 
+function toInsert(a: Apontamento): Record<string, unknown> {
+  return {
+    id:               a.id,
+    veiculo_id:       a.veiculoId,
+    veiculo_label:    a.veiculoLabel,
+    prefixo:          a.prefixo,
+    defeito:          a.defeito,
+    data_apontamento: a.dataApontamento,
+    prazo:            a.prazo,
+    resolvido:        a.resolvido,
+    data_resolvido:   a.dataResolvido,
+    hora_resolvido:   a.horaResolvido,
+    reparo_valor:     a.reparoValor,
+    reparo_descricao: a.reparoDescricao,
+    reparo_imagens:   a.reparoImagens,
+    os_arquivo:       a.osArquivo,
+    processo:         a.processo,
+    base:             a.base,
+    coordenador:      a.coordenador,
+    responsavel:      a.responsavel,
+    checklist_id:     a.checklistId ?? null,
+    nc_item_id:       a.ncItemId    ?? null,
+    nc_fotos:         a.ncFotos     ?? [],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers de data local
+// ---------------------------------------------------------------------------
 function localIsoDate(d: Date) {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -245,40 +114,68 @@ function localTimeHHmm(d: Date) {
   return `${h}:${m}`
 }
 
-function initialRows(): Apontamento[] {
-  const loaded = loadApontamentosFromStorage(SEED_BY_ID)
-  if (loaded?.length) return loaded
-  return [...SEED].sort(sortByApontamento)
+function sortByApontamento(a: Apontamento, b: Apontamento) {
+  return new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime()
 }
 
-export type NovoApontamento = Omit<Apontamento, 'id' | 'resolvido' | 'dataResolvido' | 'horaResolvido' | 'reparoValor' | 'reparoDescricao' | 'reparoImagens' | 'osArquivo'>
-
+// ---------------------------------------------------------------------------
+// Contexto
+// ---------------------------------------------------------------------------
 type Ctx = {
   rows: Apontamento[]
+  carregando: boolean
   marcarResolvido: (
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
-  ) => void
-  addApontamento: (novo: NovoApontamento) => string
+  ) => Promise<void>
+  addApontamento: (novo: NovoApontamento) => Promise<string>
   hasByChecklist: (checklistId: string, ncItemId: string) => boolean
   persistError: string | null
   clearPersistError: () => void
+  recarregar: () => Promise<void>
 }
 
 const ApontamentosContext = createContext<Ctx | null>(null)
 
 export function ApontamentosProvider({ children }: { children: ReactNode }) {
-  const [rows, setRows] = useState<Apontamento[]>(initialRows)
+  const [rows, setRows]           = useState<Apontamento[]>([])
+  const [carregando, setCarregando] = useState(true)
   const [persistError, setPersistError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const res = saveApontamentosToStorage(rows)
-    setPersistError(res.ok === false ? res.message : null)
-  }, [rows])
-
   const clearPersistError = useCallback(() => setPersistError(null), [])
 
-  const addApontamento = useCallback((novo: NovoApontamento): string => {
+  // Subscrição realtime
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  const recarregar = useCallback(async () => {
+    setCarregando(true)
+    const { data, error } = await supabase
+      .from('apontamentos')
+      .select('*')
+      .order('data_apontamento', { ascending: true })
+    if (error) {
+      setPersistError('Erro ao carregar apontamentos: ' + error.message)
+    } else {
+      setRows(((data ?? []) as unknown[]).map(fromRow))
+    }
+    setCarregando(false)
+  }, [])
+
+  // Carga inicial + realtime
+  useEffect(() => {
+    void recarregar()
+
+    const ch = supabase
+      .channel('apontamentos-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, () => {
+        void recarregar()
+      })
+      .subscribe()
+
+    channelRef.current = ch
+    return () => { void supabase.removeChannel(ch) }
+  }, [recarregar])
+
+  const addApontamento = useCallback(async (novo: NovoApontamento): Promise<string> => {
     const id = `cl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     const apontamento: Apontamento = {
       ...novo,
@@ -291,20 +188,32 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       reparoImagens: [],
       osArquivo: null,
     }
+
+    // Otimista: adiciona localmente imediatamente
     setRows((prev) => [...prev, apontamento].sort(sortByApontamento))
+
+    const { error } = await supabase
+      .from('apontamentos')
+      .insert(toInsert(apontamento))
+
+    if (error) {
+      // Reverte se falhou
+      setRows((prev) => prev.filter((r) => r.id !== id))
+      setPersistError('Erro ao salvar apontamento: ' + error.message)
+    }
+
     return id
   }, [])
 
-  const hasByChecklist = useCallback((checklistId: string, ncItemId: string): boolean => {
-    return rows.some((r) => r.checklistId === checklistId && r.ncItemId === ncItemId)
-  }, [rows])
-
-  const marcarResolvido = useCallback(
-    (id: string, payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null }) => {
-    // Importante: usar data local (Brasília etc), não UTC do toISOString().
+  const marcarResolvido = useCallback(async (
+    id: string,
+    payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
+  ) => {
     const now = new Date()
     const hoje = localIsoDate(now)
     const hora = localTimeHHmm(now)
+
+    // Otimista
     setRows((prev) =>
       prev.map((r) =>
         r.id === id
@@ -314,21 +223,40 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
               dataResolvido: hoje,
               horaResolvido: hora,
               reparoValor: payload?.valor ?? r.reparoValor ?? null,
-              reparoDescricao:
-                typeof payload?.descricao === 'string' ? payload.descricao : r.reparoDescricao ?? null,
+              reparoDescricao: typeof payload?.descricao === 'string' ? payload.descricao : r.reparoDescricao ?? null,
               reparoImagens: payload?.imagens?.slice(0, 3) ?? r.reparoImagens ?? [],
               osArquivo: payload?.osArquivo !== undefined ? payload.osArquivo : r.osArquivo ?? null,
             }
           : r,
       ),
     )
-    },
-    [],
-  )
+
+    const { error } = await supabase
+      .from('apontamentos')
+      .update({
+        resolvido:        true,
+        data_resolvido:   hoje,
+        hora_resolvido:   hora,
+        reparo_valor:     payload?.valor ?? null,
+        reparo_descricao: payload?.descricao ?? null,
+        reparo_imagens:   payload?.imagens?.slice(0, 3) ?? [],
+        os_arquivo:       payload?.osArquivo ?? null,
+      })
+      .eq('id', id)
+
+    if (error) {
+      setPersistError('Erro ao atualizar apontamento: ' + error.message)
+      void recarregar()
+    }
+  }, [recarregar])
+
+  const hasByChecklist = useCallback((checklistId: string, ncItemId: string): boolean => {
+    return rows.some((r) => r.checklistId === checklistId && r.ncItemId === ncItemId)
+  }, [rows])
 
   const value = useMemo(
-    () => ({ rows, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError }),
-    [rows, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError],
+    () => ({ rows, carregando, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError, recarregar }),
+    [rows, carregando, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError, recarregar],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>
@@ -336,8 +264,6 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
 export function useApontamentos() {
   const ctx = useContext(ApontamentosContext)
-  if (!ctx) {
-    throw new Error('useApontamentos deve ser usado dentro de ApontamentosProvider')
-  }
+  if (!ctx) throw new Error('useApontamentos deve ser usado dentro de ApontamentosProvider')
   return ctx
 }
