@@ -110,25 +110,33 @@ function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => 
                 [
                   'group relative flex items-center rounded-xl px-3 py-2 text-sm font-extrabold',
                   collapsed ? 'justify-center' : 'gap-3',
-                  'transition-colors',
+                  'transition-all duration-150',
                   isActive
-                    ? 'bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900/60 dark:hover:text-slate-100',
+                    // Ativo: fundo sutil com borda interna colorida + texto brilhante
+                    ? 'bg-brand-600/10 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 ring-1 ring-inset ring-brand-600/20 dark:ring-brand-500/20'
+                    // Inativo: texto atenuado, hover apenas clareia levemente (sem fundo pesado)
+                    : 'text-slate-500 hover:bg-slate-100/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-200',
                 ].join(' ')
               }
             >
               <span
                 className={[
-                  'grid h-9 w-9 place-items-center rounded-xl border border-transparent',
-                  'bg-slate-50 text-slate-700 group-hover:bg-white dark:bg-slate-900/40 dark:text-slate-200 dark:group-hover:bg-slate-900',
+                  'grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors duration-150',
+                  // Ativo: ícone com fundo colorido
+                  'group-[&[aria-current=page]]:bg-brand-600/15 group-[&[aria-current=page]]:text-brand-600',
+                  'group-[&[aria-current=page]]:dark:bg-brand-500/15 group-[&[aria-current=page]]:dark:text-brand-400',
+                  // Inativo: fundo neutro, hover clareia
+                  'bg-transparent text-slate-500 group-hover:bg-slate-200/60 group-hover:text-slate-700',
+                  'dark:text-slate-400 dark:group-hover:bg-slate-700/40 dark:group-hover:text-slate-200',
                 ].join(' ')}
               >
-                <item.icon size={18} className="opacity-90" />
+                <item.icon size={18} />
               </span>
 
               {!collapsed ? <span className="truncate">{item.label}</span> : null}
 
-              <span className="pointer-events-none absolute inset-y-2 left-0 w-1 rounded-r-full bg-brand-600 opacity-0 group-[&[aria-current=page]]:opacity-100" />
+              {/* Indicador lateral: barra colorida visível apenas no estado ativo */}
+              <span className="pointer-events-none absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-brand-600 opacity-0 transition-opacity duration-150 group-[&[aria-current=page]]:opacity-100 dark:bg-brand-400" />
             </NavLink>
           </li>
         ))}
