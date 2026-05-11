@@ -18,6 +18,7 @@
     "gen:catalogos": "npm run gen:sky && npm run gen:munck && npm run gen:moto && npm run gen:picape4x4 && npm run gen:picapeleve && npm run gen:veiculosleves"
   },
   "dependencies": {
+    "@radix-ui/react-select": "^2.2.6",
     "@supabase/supabase-js": "^2.105.4",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.14.0",
@@ -45,6 +46,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "xlsx": "^0.18.5"
   }
 }

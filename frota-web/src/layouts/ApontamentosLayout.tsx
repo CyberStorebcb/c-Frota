@@ -12,10 +12,7 @@ function ApontamentosShell() {
           role="alert"
           className="flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
         >
-          <span>
-            Não foi possível salvar no navegador: {persistError}. Suas alterações ficam só nesta sessão
-            até recarregar.
-          </span>
+          <span>{persistError}</span>
           <button
             type="button"
             onClick={clearPersistError}

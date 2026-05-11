@@ -9,18 +9,21 @@ import {
   type ReactNode,
 } from 'react'
 import { supabase } from '../lib/supabase'
+import { SCHEMA_MAP } from '../data/checklistSchemas'
 
 // ---------------------------------------------------------------------------
 // Tipo público
 // ---------------------------------------------------------------------------
 export type Apontamento = {
-  id: string
+  id: string           // `${checklistId}__${itemId}`
+  checklistId: string
+  ncItemId: string
   veiculoId: string
   veiculoLabel: string
   prefixo: string
   defeito: string
   dataApontamento: string
-  prazo: string
+  prazo: string | null
   resolvido: boolean
   dataResolvido: string | null
   horaResolvido: string | null
@@ -32,9 +35,7 @@ export type Apontamento = {
   base: string
   coordenador: string
   responsavel: string
-  checklistId?: string
-  ncFotos?: string[]
-  ncItemId?: string
+  ncFotos: string[]
 }
 
 export type NovoApontamento = Omit<
@@ -43,18 +44,23 @@ export type NovoApontamento = Omit<
 >
 
 // ---------------------------------------------------------------------------
-// Conversão Supabase row ↔ Apontamento
+// Resolução armazenada na tabela `apontamentos`
 // ---------------------------------------------------------------------------
+type Resolucao = {
+  id: string          // `${checklistId}__${itemId}`
+  resolvido: boolean
+  dataResolvido: string | null
+  horaResolvido: string | null
+  reparoValor: number | null
+  reparoDescricao: string | null
+  reparoImagens: string[]
+  osArquivo: string | null
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fromRow(r: any): Apontamento {
+function rowToResolucao(r: any): Resolucao {
   return {
     id:              r.id,
-    veiculoId:       r.veiculo_id       ?? '',
-    veiculoLabel:    r.veiculo_label    ?? '',
-    prefixo:         r.prefixo          ?? '',
-    defeito:         r.defeito          ?? '',
-    dataApontamento: r.data_apontamento ?? '',
-    prazo:           r.prazo            ?? '',
     resolvido:       Boolean(r.resolvido),
     dataResolvido:   r.data_resolvido   ?? null,
     horaResolvido:   r.hora_resolvido   ?? null,
@@ -62,39 +68,59 @@ function fromRow(r: any): Apontamento {
     reparoDescricao: r.reparo_descricao ?? null,
     reparoImagens:   Array.isArray(r.reparo_imagens) ? r.reparo_imagens : [],
     osArquivo:       r.os_arquivo       ?? null,
-    processo:        r.processo         ?? '',
-    base:            r.base             ?? '',
-    coordenador:     r.coordenador      ?? '',
-    responsavel:     r.responsavel      ?? '',
-    checklistId:     r.checklist_id     ?? undefined,
-    ncItemId:        r.nc_item_id       ?? undefined,
-    ncFotos:         Array.isArray(r.nc_fotos) && r.nc_fotos.length > 0 ? r.nc_fotos : undefined,
   }
 }
 
-function toInsert(a: Apontamento): Record<string, unknown> {
+// ---------------------------------------------------------------------------
+// Converte checklist + item NC → Apontamento
+// ---------------------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<string, Resolucao>): Apontamento {
+  const id = `${cl.id}__${itemId}`
+  const dv = cl.dados_veiculo ?? {}
+  const placa   = dv.placa   ?? ''
+  const prefixo = dv.prefixo ?? ''
+  const schema  = SCHEMA_MAP[cl.tipo as string]
+  const item    = schema?.grupos.flatMap((g) => g.itens).find((i) => i.id === itemId)
+  const label   = item?.label ?? itemId
+
+  // Fotos NC do item (extraídas do campo observacoes com marcador __fotos__)
+  const obsRaw: string = cl.observacoes?.[itemId] ?? ''
+  const fotosMarker = '__fotos__:'
+  const fotosIdx = obsRaw.indexOf(fotosMarker)
+  const ncFotos = fotosIdx >= 0
+    ? obsRaw.slice(fotosIdx + fotosMarker.length).split('|').filter(Boolean)
+    : []
+
+  const res = resolucoes.get(id)
+
+  // Prazo: data_apontamento + 7 dias
+  const dp = new Date(cl.data_inspecao + 'T12:00:00')
+  dp.setDate(dp.getDate() + 7)
+  const prazo = dp.toISOString().slice(0, 10)
+
   return {
-    id:               a.id,
-    veiculo_id:       a.veiculoId,
-    veiculo_label:    a.veiculoLabel,
-    prefixo:          a.prefixo,
-    defeito:          a.defeito,
-    data_apontamento: a.dataApontamento,
-    prazo:            a.prazo,
-    resolvido:        a.resolvido,
-    data_resolvido:   a.dataResolvido,
-    hora_resolvido:   a.horaResolvido,
-    reparo_valor:     a.reparoValor,
-    reparo_descricao: a.reparoDescricao,
-    reparo_imagens:   a.reparoImagens,
-    os_arquivo:       a.osArquivo,
-    processo:         a.processo,
-    base:             a.base,
-    coordenador:      a.coordenador,
-    responsavel:      a.responsavel,
-    checklist_id:     a.checklistId ?? null,
-    nc_item_id:       a.ncItemId    ?? null,
-    nc_fotos:         a.ncFotos     ?? [],
+    id,
+    checklistId:     cl.id,
+    ncItemId:        itemId,
+    veiculoId:       `placa-${placa.toLowerCase() || 'desconhecido'}`,
+    veiculoLabel:    prefixo && placa ? `${prefixo} · ${placa}` : placa || cl.nome_operador,
+    prefixo,
+    defeito:         `[Checklist NC] ${label}`,
+    dataApontamento: cl.data_inspecao,
+    prazo,
+    resolvido:       res?.resolvido       ?? false,
+    dataResolvido:   res?.dataResolvido   ?? null,
+    horaResolvido:   res?.horaResolvido   ?? null,
+    reparoValor:     res?.reparoValor     ?? null,
+    reparoDescricao: res?.reparoDescricao ?? null,
+    reparoImagens:   res?.reparoImagens   ?? [],
+    osArquivo:       res?.osArquivo       ?? null,
+    processo:        'Checklist',
+    base:            dv.localidade ?? '',
+    coordenador:     cl.nome_supervisor ?? '',
+    responsavel:     cl.nome_operador,
+    ncFotos,
   }
 }
 
@@ -114,10 +140,6 @@ function localTimeHHmm(d: Date) {
   return `${h}:${m}`
 }
 
-function sortByApontamento(a: Apontamento, b: Apontamento) {
-  return new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime()
-}
-
 // ---------------------------------------------------------------------------
 // Contexto
 // ---------------------------------------------------------------------------
@@ -128,7 +150,6 @@ type Ctx = {
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
   ) => Promise<void>
-  addApontamento: (novo: NovoApontamento) => Promise<string>
   hasByChecklist: (checklistId: string, ncItemId: string) => boolean
   persistError: string | null
   clearPersistError: () => void
@@ -146,21 +167,48 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
   const recarregar = useCallback(async () => {
     setCarregando(true)
-    // Limpa dados legados do localStorage na primeira carga
     localStorage.removeItem('frota-apontamentos-v1')
 
-    const { data, error } = await supabase
-      .from('apontamentos')
-      .select('*')
-      .order('data_apontamento', { ascending: true })
+    // 1. Busca checklists com NC (apenas campos necessários)
+    const { data: clData, error: clError } = await supabase
+      .from('checklists')
+      .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, dados_veiculo, respostas, observacoes')
+      .gt('nc_count', 0)
+      .order('data_inspecao', { ascending: true })
 
-    if (error) {
-      setPersistError('Erro ao carregar apontamentos: ' + error.message)
-      setRows([])
-    } else {
-      setRows(((data ?? []) as unknown[]).map(fromRow))
-      setPersistError(null)
+    if (clError) {
+      setPersistError('Erro ao carregar checklists: ' + clError.message)
+      setCarregando(false)
+      return
     }
+
+    // 2. Busca resoluções da tabela apontamentos
+    const { data: resData } = await supabase
+      .from('apontamentos')
+      .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo')
+
+    const resolucoes = new Map<string, Resolucao>(
+      ((resData ?? []) as unknown[]).map((r) => {
+        const res = rowToResolucao(r)
+        return [res.id, res]
+      })
+    )
+
+    // 3. Expande cada checklist em um apontamento por item NC
+    const apontamentos: Apontamento[] = []
+    for (const cl of (clData ?? []) as unknown[]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const checklist = cl as any
+      const respostas: Record<string, string> = checklist.respostas ?? {}
+      for (const [itemId, resp] of Object.entries(respostas)) {
+        if (resp === 'nc') {
+          apontamentos.push(checklistItemToApontamento(checklist, itemId, resolucoes))
+        }
+      }
+    }
+
+    setRows(apontamentos)
+    setPersistError(null)
     setCarregando(false)
   }, [])
 
@@ -172,39 +220,14 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, () => {
         void recarregar()
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checklists' }, () => {
+        void recarregar()
+      })
       .subscribe()
 
     channelRef.current = ch
     return () => { void supabase.removeChannel(ch) }
   }, [recarregar])
-
-  const addApontamento = useCallback(async (novo: NovoApontamento): Promise<string> => {
-    const id = `cl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    const apontamento: Apontamento = {
-      ...novo,
-      id,
-      resolvido: false,
-      dataResolvido: null,
-      horaResolvido: null,
-      reparoValor: null,
-      reparoDescricao: null,
-      reparoImagens: [],
-      osArquivo: null,
-    }
-
-    setRows((prev) => [...prev, apontamento].sort(sortByApontamento))
-
-    const { error } = await supabase
-      .from('apontamentos')
-      .insert(toInsert(apontamento))
-
-    if (error) {
-      setRows((prev) => prev.filter((r) => r.id !== id))
-      setPersistError('Erro ao salvar apontamento: ' + error.message)
-    }
-
-    return id
-  }, [])
 
   const marcarResolvido = useCallback(async (
     id: string,
@@ -214,6 +237,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     const hoje = localIsoDate(now)
     const hora = localTimeHHmm(now)
 
+    // Atualiza localmente de imediato
     setRows((prev) =>
       prev.map((r) =>
         r.id === id
@@ -222,18 +246,27 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
               resolvido: true,
               dataResolvido: hoje,
               horaResolvido: hora,
-              reparoValor: payload?.valor ?? r.reparoValor ?? null,
+              reparoValor:     payload?.valor ?? r.reparoValor ?? null,
               reparoDescricao: typeof payload?.descricao === 'string' ? payload.descricao : r.reparoDescricao ?? null,
-              reparoImagens: payload?.imagens?.slice(0, 3) ?? r.reparoImagens ?? [],
-              osArquivo: payload?.osArquivo !== undefined ? payload.osArquivo : r.osArquivo ?? null,
+              reparoImagens:   payload?.imagens?.slice(0, 3) ?? r.reparoImagens ?? [],
+              osArquivo:       payload?.osArquivo !== undefined ? payload.osArquivo : r.osArquivo ?? null,
             }
           : r,
       ),
     )
 
+    // Upsert na tabela apontamentos (resolução)
+    const row = rows.find((r) => r.id === id)
     const { error } = await supabase
       .from('apontamentos')
-      .update({
+      .upsert({
+        id,
+        veiculo_id:       row?.veiculoId      ?? '',
+        veiculo_label:    row?.veiculoLabel   ?? '',
+        prefixo:          row?.prefixo        ?? '',
+        defeito:          row?.defeito        ?? '',
+        data_apontamento: row?.dataApontamento ?? hoje,
+        prazo:            row?.prazo          ?? hoje,
         resolvido:        true,
         data_resolvido:   hoje,
         hora_resolvido:   hora,
@@ -241,22 +274,28 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         reparo_descricao: payload?.descricao ?? null,
         reparo_imagens:   payload?.imagens?.slice(0, 3) ?? [],
         os_arquivo:       payload?.osArquivo ?? null,
+        processo:         row?.processo ?? 'Checklist',
+        base:             row?.base ?? '',
+        coordenador:      row?.coordenador ?? '',
+        responsavel:      row?.responsavel ?? '',
+        checklist_id:     row?.checklistId ?? null,
+        nc_item_id:       row?.ncItemId ?? null,
+        nc_fotos:         row?.ncFotos ?? [],
       })
-      .eq('id', id)
 
     if (error) {
-      setPersistError('Erro ao atualizar apontamento: ' + error.message)
+      setPersistError('Erro ao salvar resolução: ' + error.message)
       void recarregar()
     }
-  }, [recarregar])
+  }, [rows, recarregar])
 
   const hasByChecklist = useCallback((checklistId: string, ncItemId: string): boolean => {
-    return rows.some((r) => r.checklistId === checklistId && r.ncItemId === ncItemId)
+    return rows.some((r) => r.checklistId === checklistId && r.ncItemId === ncItemId && r.resolvido)
   }, [rows])
 
   const value = useMemo(
-    () => ({ rows, carregando, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError, recarregar }),
-    [rows, carregando, marcarResolvido, addApontamento, hasByChecklist, persistError, clearPersistError, recarregar],
+    () => ({ rows, carregando, marcarResolvido, hasByChecklist, persistError, clearPersistError, recarregar }),
+    [rows, carregando, marcarResolvido, hasByChecklist, persistError, clearPersistError, recarregar],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>

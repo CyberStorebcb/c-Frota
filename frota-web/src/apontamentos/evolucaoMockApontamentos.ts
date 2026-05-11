@@ -38,6 +38,9 @@ function mk(
     base: id % 2 === 0 ? 'Base 01' : 'Base 02',
     coordenador: 'Coord. Mock',
     responsavel: 'Resp. Mock',
+    checklistId: `mock-cl-${sid}`,
+    ncItemId:    `mock-item-${sid}`,
+    ncFotos:     [],
   }
 }
 

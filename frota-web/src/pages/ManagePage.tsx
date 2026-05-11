@@ -227,8 +227,8 @@ export function ManagePage() {
     setData('todos')
   }
 
-  const prazoPassou = (prazoIso: string, resolvido: boolean) => {
-    if (resolvido) return false
+  const prazoPassou = (prazoIso: string | null, resolvido: boolean) => {
+    if (resolvido || !prazoIso) return false
     const t = new Date(prazoIso + 'T23:59:59').getTime()
     return Date.now() > t
   }
@@ -502,7 +502,7 @@ export function ManagePage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
                         <span className={atrasado ? 'font-black text-rose-600 dark:text-rose-400' : ''}>
-                          {formatDateBR(r.prazo)}
+                          {r.prazo ? formatDateBR(r.prazo) : '—'}
                         </span>
                         {atrasado ? (
                           <span className="ml-2 text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400">
