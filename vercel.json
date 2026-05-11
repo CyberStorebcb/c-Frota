@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd frota-web && npm install && npm run build",
+  "outputDirectory": "frota-web/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
