@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Car, LayoutDashboard, LogOut, Settings2, Shield, Truck, X } from 'lucide-react'
+import { Car, ClipboardList, LayoutDashboard, LogOut, Settings2, Shield, Truck, X } from 'lucide-react'
 import { labelForArea } from '../../access/accessAreas'
 import { useAuth } from '../../auth/AuthContext'
 
@@ -7,6 +7,7 @@ const baseNav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/gerenciar', label: 'Gerenciar', icon: Settings2 },
   { to: '/registro', label: 'Registro', icon: Car },
+  { to: '/gerenciar/checklists', label: 'Checklists', icon: ClipboardList },
 ] as const
 
 export function Sidebar({

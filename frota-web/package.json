@@ -18,6 +18,7 @@
     "gen:catalogos": "npm run gen:sky && npm run gen:munck && npm run gen:moto && npm run gen:picape4x4 && npm run gen:picapeleve && npm run gen:veiculosleves"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.14.0",
     "pdf-lib": "^1.17.1",
