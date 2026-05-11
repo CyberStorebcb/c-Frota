@@ -66,19 +66,30 @@ function TelaIdentificacao({
         </div>
 
         {/* Resumo do checklist */}
-        <div className="mb-4 flex items-center justify-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-          {schema.grupos.map((g) => (
-            <div key={g.id} className="flex flex-col items-center">
-              <span className="text-lg font-black text-slate-900 dark:text-slate-100">{g.itens.length}</span>
-              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                {g.titulo.split('—')[0].trim().split(' ').slice(0, 2).join(' ')}
+        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <div className="grid divide-x divide-slate-100 dark:divide-slate-800" style={{ gridTemplateColumns: `repeat(${schema.grupos.length + 1}, 1fr)` }}>
+            {schema.grupos.map((g, i) => (
+              <div key={g.id} className="flex flex-col items-center px-2 py-3 text-center">
+                <span className="text-xl font-black text-slate-900 dark:text-slate-100">{g.itens.length}</span>
+                <span className="mt-0.5 text-[10px] font-extrabold uppercase leading-tight text-slate-400 dark:text-slate-500">
+                  Grupo {i + 1}
+                </span>
+              </div>
+            ))}
+            <div className="flex flex-col items-center bg-slate-50 px-2 py-3 text-center dark:bg-slate-900/40">
+              <span className="text-xl font-black text-slate-900 dark:text-slate-100">{totalItens}</span>
+              <span className="mt-0.5 text-[10px] font-extrabold uppercase leading-tight text-slate-400 dark:text-slate-500">
+                Total
               </span>
             </div>
-          ))}
-          <div className="h-8 w-px bg-slate-200 dark:bg-slate-800" />
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-black text-slate-900 dark:text-slate-100">{totalItens}</span>
-            <span className="text-[10px] font-semibold text-slate-400">Total</span>
+          </div>
+          {/* nomes completos dos grupos */}
+          <div className="border-t border-slate-100 px-4 py-2 dark:border-slate-800">
+            {schema.grupos.map((g, i) => (
+              <p key={g.id} className="text-[10px] font-semibold leading-relaxed text-slate-500 dark:text-slate-400">
+                <span className="font-extrabold text-slate-700 dark:text-slate-300">Grupo {i + 1}:</span> {g.titulo}
+              </p>
+            ))}
           </div>
         </div>
 
