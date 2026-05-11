@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Loader2, Lock, LogIn, Mail, MessageSquare, Moon, Sparkles, Sun, Zap } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Lock, LogIn, Mail, MessageSquare, Moon, Sparkles, Sun, Zap } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import { useTheme } from '../theme/ThemeProvider'
@@ -134,6 +134,7 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -377,15 +378,24 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
                 <input
                   id="login-password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={pending}
-                  className={`w-full rounded-2xl border py-4 pl-12 pr-4 text-sm font-bold outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-60 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
+                  className={`w-full rounded-2xl border py-4 pl-12 pr-12 text-sm font-bold outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-60 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 
