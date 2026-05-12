@@ -129,7 +129,10 @@ export function ManagePage() {
 
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')
   const [vehicleId, setVehicleId] = useState<string>('todos')
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(true)
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
+    try { return localStorage.getItem('frota.filtros.manage') === 'true' }
+    catch { return false }
+  })
   const [query, setQuery] = useState('')
   const [processo, setProcesso] = useState('todos')
   const [base, setBase] = useState('todos')
@@ -276,10 +279,12 @@ export function ManagePage() {
   const [resolveOpen, setResolveOpen] = useState(false)
   const [resolveId, setResolveId] = useState<string | null>(null)
   const [resolveValor, setResolveValor] = useState<string>('')
+  const [resolveData, setResolveData] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [resolveDescricao, setResolveDescricao] = useState<string>('')
   const [resolveImgs, setResolveImgs] = useState<string[]>([])
   const [resolveOsFile, setResolveOsFile] = useState<{ name: string; data: string } | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [resolvendoMetade, setResolvendoMetade] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const osFileRef = useRef<HTMLInputElement | null>(null)
 
@@ -293,6 +298,7 @@ export function ManagePage() {
     setResolveId(r.id)
     const digits = r.reparoValor != null ? String(Math.round(r.reparoValor * 100)) : ''
     setResolveValor(digits ? formatCurrency(digits) : '')
+    setResolveData(r.dataResolvido ?? new Date().toISOString().slice(0, 10))
     setResolveDescricao(r.reparoDescricao ?? '')
     setResolveImgs(r.reparoImagens ?? [])
     setResolveOsFile(r.osArquivo ? { name: 'OS Anexada', data: r.osArquivo } : null)
@@ -303,6 +309,7 @@ export function ManagePage() {
     setResolveOpen(false)
     setResolveId(null)
     setResolveValor('')
+    setResolveData(new Date().toISOString().slice(0, 10))
     setResolveDescricao('')
     setResolveImgs([])
     setResolveOsFile(null)
@@ -350,6 +357,7 @@ export function ManagePage() {
     const desc = resolveDescricao.trim()
     await marcarResolvido(resolveId, {
       valor: Number.isFinite(valor ?? NaN) ? valor : null,
+      dataResolvido: resolveData || null,
       descricao: desc ? desc : null,
       imagens: resolveImgs,
       osArquivo: resolveOsFile?.data ?? null,
@@ -358,11 +366,57 @@ export function ManagePage() {
     closeResolveModal()
   }
 
+  const resolverMetadePendencias = async () => {
+    if (!canMarkResolved || resolvendoMetade) return
+    const pendentes = rows
+      .filter((r) => !r.resolvido)
+      .sort((a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime())
+    const quantidade = Math.ceil(pendentes.length / 2)
+    if (quantidade <= 0) return
+
+    setResolvendoMetade(true)
+    try {
+      const selecionados = pendentes.slice(0, quantidade)
+      const hoje = new Date()
+      const toIso = (d: Date) => {
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${day}`
+      }
+
+      for (const [idx, r] of selecionados.entries()) {
+        const dataApontamento = new Date(r.dataApontamento + 'T12:00:00')
+        const maxDiasDesdeApontamento = Math.max(
+          1,
+          Math.floor((hoje.getTime() - dataApontamento.getTime()) / 86_400_000),
+        )
+        const diasAteResolver = Math.min(
+          maxDiasDesdeApontamento,
+          2 + ((idx * 7) % 45),
+        )
+        const dataResolucao = new Date(dataApontamento)
+        dataResolucao.setDate(dataResolucao.getDate() + diasAteResolver)
+
+        await marcarResolvido(r.id, {
+          valor: null,
+          dataResolvido: toIso(dataResolucao),
+          descricao: 'Resolução automática para gerar base dos gráficos de evolução.',
+          imagens: [],
+          osArquivo: null,
+        }, user?.email)
+      }
+    } finally {
+      setResolvendoMetade(false)
+    }
+  }
+
   useEffect(() => {
     if (!canMarkResolved && resolveOpen) {
       setResolveOpen(false)
       setResolveId(null)
       setResolveValor('')
+      setResolveData(new Date().toISOString().slice(0, 10))
       setResolveDescricao('')
       setResolveImgs([])
       setResolveOsFile(null)
@@ -388,6 +442,17 @@ export function ManagePage() {
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          {canMarkResolved && (
+            <button
+              type="button"
+              onClick={resolverMetadePendencias}
+              disabled={resolvendoMetade || rows.every((r) => r.resolvido)}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-extrabold text-emerald-700 shadow-soft hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50 sm:flex-initial"
+            >
+              <Check size={18} />
+              {resolvendoMetade ? 'Resolvendo...' : 'Resolver 50% pendências'}
+            </button>
+          )}
           <Link
             to="/gerenciar/evolucao"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
@@ -443,7 +508,11 @@ export function ManagePage() {
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
           <button
             type="button"
-            onClick={() => setFiltrosVisiveis((v) => !v)}
+            onClick={() => setFiltrosVisiveis((v) => {
+              const next = !v
+              try { localStorage.setItem('frota.filtros.manage', String(next)) } catch { /* ignore */ }
+              return next
+            })}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
           >
             {filtrosVisiveis
@@ -745,6 +814,19 @@ export function ManagePage() {
               )}
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Data da resolução
+                  </div>
+                  <input
+                    type="date"
+                    value={resolveData}
+                    onChange={(e) => setResolveData(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-brand-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:[color-scheme:dark]"
+                  />
+                </div>
+
                 <div>
                   <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Valor gasto no reparo (R$)

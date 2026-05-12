@@ -310,7 +310,10 @@ export function DashboardPage() {
   const [filtroCoordenador, setFiltroCoordenador] = useState<string>('todos')
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>('todos')
   const [filtroPrefixo, setFiltroPrefixo] = useState<string>('todos')
-  const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(true)
+  const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(() => {
+    try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
+    catch { return false }
+  })
 
   const baseEfetiva =
     filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
@@ -433,7 +436,11 @@ export function DashboardPage() {
               id="dashboard-toggle-filtros"
               aria-expanded={filtrosAvancadosVisiveis}
               aria-controls="dashboard-filtros-avancados"
-              onClick={() => setFiltrosAvancadosVisiveis((v) => !v)}
+              onClick={() => setFiltrosAvancadosVisiveis((v) => {
+                const next = !v
+                try { localStorage.setItem('frota.filtros.dashboard', String(next)) } catch { /* ignore */ }
+                return next
+              })}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:bg-transparent dark:text-slate-200 dark:hover:bg-white/5 sm:gap-2 sm:px-3.5 sm:text-[11px]"
             >
               {filtrosAvancadosVisiveis ? (

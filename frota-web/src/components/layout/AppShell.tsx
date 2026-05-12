@@ -3,14 +3,31 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 
+const SIDEBAR_COLLAPSED_KEY = 'frota.sidebar.collapsed'
+
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
 export function AppShellLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed)
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), [])
-  const toggleCollapsed = useCallback(() => setSidebarCollapsed((v) => !v), [])
-  const collapseSidebar = useCallback(() => setSidebarCollapsed(true), [])
+  const toggleCollapsed = useCallback(() => setSidebarCollapsed((v) => {
+    const next = !v
+    try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)) } catch { /* ignore */ }
+    return next
+  }), [])
+  const collapseSidebar = useCallback(() => {
+    setSidebarCollapsed(true)
+    try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, 'true') } catch { /* ignore */ }
+  }, [])
 
   return (
     <div className="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">

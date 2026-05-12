@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   AlertCircle,
+  Ban,
   Bike,
   BrainCircuit,
   Calendar,
   Car,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   LayoutGrid,
@@ -24,13 +26,16 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { supabase, supabaseConfigured } from '../lib/supabase'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import {
   addFleetVehicle,
+  FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY,
   FLEET_STATUS_BY_PLACA_STORAGE_KEY,
   getDisplayedFleetVehicles,
   isEmbeddedCatalogFleetVehicleId,
   removeFleetVehicle,
+  setFleetVehicleManutencao,
   setFleetVehicleStatus,
   VEHICLE_TYPE_IDS,
   type FleetVehicle,
@@ -129,6 +134,7 @@ function VehicleOverflowMenu({
   refresh,
   showNotification,
   placement = 'up',
+  isAdmin = false,
 }: {
   vehicle: FleetVehicle
   menuForId: string | null
@@ -136,12 +142,13 @@ function VehicleOverflowMenu({
   refresh: () => void
   showNotification: (message: string, type: 'success' | 'error') => void
   placement?: 'up' | 'down'
+  isAdmin?: boolean
 }) {
   const menuOpen = menuForId === vehicle.id
   const menuPosition =
     placement === 'up'
-      ? 'absolute bottom-10 right-0 z-20 min-w-[140px]'
-      : 'absolute right-0 top-full z-30 mt-1 min-w-[140px]'
+      ? 'absolute bottom-10 right-0 z-20 min-w-[160px]'
+      : 'absolute right-0 top-full z-30 mt-1 min-w-[160px]'
 
   return (
     <div className="relative shrink-0">
@@ -164,44 +171,70 @@ function VehicleOverflowMenu({
           onClick={(e) => e.stopPropagation()}
           role="menu"
         >
-          {vehicle.status === 'OPERACIONAL' ? (
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
-              onClick={() => {
-                setFleetVehicleStatus(vehicle.placa, 'MANUTENÇÃO')
-                refresh()
-                setMenuForId(null)
-                showNotification('Estado: em manutenção.', 'success')
-              }}
-            >
-              Marcar em manutenção
-            </button>
-          ) : (
+          {isAdmin && vehicle.status !== 'ATIVO' && (
             <button
               type="button"
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
               onClick={() => {
-                setFleetVehicleStatus(vehicle.placa, 'OPERACIONAL')
-                refresh()
-                setMenuForId(null)
-                showNotification('Estado: operacional.', 'success')
+                setFleetVehicleStatus(vehicle.placa, 'ATIVO')
+                refresh(); setMenuForId(null)
+                showNotification('Estado: ativo.', 'success')
               }}
             >
-              Marcar operacional
+              Marcar ativo
             </button>
           )}
-          {!isEmbeddedCatalogFleetVehicleId(vehicle.id) ? (
+          {isAdmin && vehicle.status !== 'INATIVO' && (
+            <button
+              type="button"
+              role="menuitem"
+              className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
+              onClick={() => {
+                setFleetVehicleStatus(vehicle.placa, 'INATIVO')
+                refresh(); setMenuForId(null)
+                showNotification('Veículo marcado como inativo.', 'success')
+              }}
+            >
+              Marcar inativo
+            </button>
+          )}
+          {isAdmin && !vehicle.emManutencao && (
+            <button
+              type="button"
+              role="menuitem"
+              className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+              onClick={() => {
+                setFleetVehicleManutencao(vehicle.placa, true)
+                refresh(); setMenuForId(null)
+                showNotification('Veículo marcado como em manutenção.', 'success')
+              }}
+            >
+              Marcar em manutenção
+            </button>
+          )}
+          {isAdmin && vehicle.emManutencao && (
+            <button
+              type="button"
+              role="menuitem"
+              className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+              onClick={() => {
+                setFleetVehicleManutencao(vehicle.placa, false)
+                refresh(); setMenuForId(null)
+                showNotification('Manutenção removida.', 'success')
+              }}
+            >
+              Remover da manutenção
+            </button>
+          )}
+          {isAdmin && !isEmbeddedCatalogFleetVehicleId(vehicle.id) ? (
             <button
               type="button"
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
               onClick={() => {
                 removeFleetVehicle(vehicle.id)
-                refresh()
-                setMenuForId(null)
+                refresh(); setMenuForId(null)
                 showNotification('Veículo removido.', 'success')
               }}
             >
@@ -222,6 +255,8 @@ function defaultForm() {
     tipo: 'VEICULOS LEVES' as VehicleTipo,
     prefixo: '',
     responsavel: '',
+    supervisor: '',
+    coordenador: '',
     base: '',
     ano: y,
   }
@@ -244,12 +279,13 @@ export function RegistroVeiculosPage() {
   const [colFilterModeloPrefixo, setColFilterModeloPrefixo] = useState('')
   const [colFilterOrgResp, setColFilterOrgResp] = useState('')
   const [colFilterLocalBase, setColFilterLocalBase] = useState('')
-  const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus>('ALL')
+  const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus | 'MANUTENÇÃO'>('ALL')
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
   const [isChatSending, setIsChatSending] = useState(false)
   const [isChatCollapsed, setIsChatCollapsed] = useState(true)
+  const [isChatVisible, setIsChatVisible] = useState(false)
   const [chatHistory, setChatHistory] = useState<
     { role: 'user' | 'assistant'; content: string }[]
   >([
@@ -260,6 +296,23 @@ export function RegistroVeiculosPage() {
   ])
 
   const refresh = () => setVehicles(getDisplayedFleetVehicles())
+
+  const [ncNaoImpeditivos, setNcNaoImpeditivos] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!supabaseConfigured) return
+    supabase
+      .from('checklists')
+      .select('nc_count, nc_imperativos')
+      .then(({ data: rows }) => {
+        if (!rows) return
+        const total = rows.reduce((acc, r) => {
+          const naoImp = Math.max(0, (r.nc_count ?? 0) - (r.nc_imperativos ?? 0))
+          return acc + naoImp
+        }, 0)
+        setNcNaoImpeditivos(total)
+      })
+  }, [])
 
   const { user } = useAuth()
   const canRegisterVehicle = user?.role === 'admin'
@@ -273,7 +326,7 @@ export function RegistroVeiculosPage() {
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'frota.vehicles.registry' || e.key === FLEET_STATUS_BY_PLACA_STORAGE_KEY || e.key === null) {
+      if (e.key === 'frota.vehicles.registry' || e.key === FLEET_STATUS_BY_PLACA_STORAGE_KEY || e.key === FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY || e.key === null) {
         setVehicles(getDisplayedFleetVehicles())
       }
     }
@@ -323,7 +376,11 @@ export function RegistroVeiculosPage() {
       }
       if (fo && !String(v.responsavel || '').toLowerCase().includes(fo)) return false
       if (fl && !String(v.base || '').toLowerCase().includes(fl)) return false
-      if (colFilterStatus !== 'ALL' && v.status !== colFilterStatus) return false
+      if (colFilterStatus === 'MANUTENÇÃO') {
+        if (!v.emManutencao) return false
+      } else if (colFilterStatus !== 'ALL' && v.status !== colFilterStatus) {
+        return false
+      }
       return true
     })
   }, [
@@ -352,12 +409,12 @@ export function RegistroVeiculosPage() {
       colFilterStatus !== 'ALL',
   )
 
-  /** Totais da frota carregada (`getDisplayedFleetVehicles`), alinhados ao campo `status` de cada veículo. */
+  /** Totais da frota carregada (`getDisplayedFleetVehicles`). */
   const fleetStats = useMemo(
     () => ({
       total: vehicles.length,
-      operacionais: vehicles.filter((v) => v.status === 'OPERACIONAL').length,
-      manutencao: vehicles.filter((v) => v.status === 'MANUTENÇÃO').length,
+      ativos: vehicles.filter((v) => v.status === 'ATIVO').length,
+      manutencao: vehicles.filter((v) => v.emManutencao).length,
     }),
     [vehicles],
   )
@@ -385,7 +442,8 @@ export function RegistroVeiculosPage() {
       totalFrota: vehicles.length,
       porTipo,
       porStatus: {
-        operacional: fleetStats.operacionais,
+        ativo: fleetStats.ativos,
+        inativo: vehicles.length - fleetStats.ativos,
         emManutencao: fleetStats.manutencao,
       },
     })
@@ -509,6 +567,8 @@ export function RegistroVeiculosPage() {
       tipo,
       prefixo: formData.prefixo,
       responsavel: formData.responsavel,
+      supervisor: formData.supervisor,
+      coordenador: formData.coordenador,
       base: formData.base,
       ano: formData.ano,
     })
@@ -547,7 +607,11 @@ export function RegistroVeiculosPage() {
           <div className="flex flex-wrap gap-3 self-start md:self-center">
             <button
               type="button"
-              onClick={() => void handleFleetAiAnalysis()}
+              onClick={() => {
+                void handleFleetAiAnalysis()
+                setIsChatVisible(true)
+                setIsChatCollapsed(false)
+              }}
               disabled={isAiLoading || !geminiConfigured}
               title={
                 geminiConfigured
@@ -609,8 +673,8 @@ export function RegistroVeiculosPage() {
                   'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-600/25 ring-2 ring-white/30 dark:from-blue-600 dark:to-blue-800 dark:shadow-blue-950/40 dark:ring-blue-400/20',
               },
               {
-                label: 'Operacionais',
-                value: fleetStats.operacionais,
+                label: 'Ativos',
+                value: fleetStats.ativos,
                 Icon: Check,
                 card:
                   'border-emerald-200/90 bg-gradient-to-br from-white via-white to-emerald-50/90 shadow-emerald-500/[0.06] dark:border-emerald-500/25 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/40 dark:shadow-emerald-950/25',
@@ -619,8 +683,8 @@ export function RegistroVeiculosPage() {
                   'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-600/25 ring-2 ring-white/30 dark:from-emerald-600 dark:to-teal-800 dark:shadow-emerald-950/35 dark:ring-emerald-400/20',
               },
               {
-                label: 'Em manutenção',
-                value: fleetStats.manutencao,
+                label: 'MANUTENÇÃO',
+                value: ncNaoImpeditivos ?? '—',
                 Icon: AlertCircle,
                 card:
                   'border-amber-200/90 bg-gradient-to-br from-white via-white to-amber-50/90 shadow-amber-500/[0.06] dark:border-amber-500/25 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/35 dark:shadow-amber-950/25',
@@ -628,7 +692,7 @@ export function RegistroVeiculosPage() {
                 iconWrap:
                   'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-600/25 ring-2 ring-white/30 dark:from-amber-600 dark:to-orange-800 dark:shadow-orange-950/35 dark:ring-amber-400/20',
               },
-            ] as const
+            ] satisfies { label: string; value: number | string; Icon: typeof List; card: string; orb: string; iconWrap: string }[]
           ).map(({ label, value, Icon, card, orb, iconWrap }) => (
             <div
               key={label}
@@ -751,7 +815,13 @@ export function RegistroVeiculosPage() {
             return (
               <div
                 key={vehicle.id}
-                className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/10 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800"
+                className={`group relative overflow-hidden rounded-3xl border p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl ${
+                  vehicle.emManutencao
+                    ? 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-amber-200/40 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:border-amber-800'
+                    : vehicle.status === 'INATIVO'
+                    ? 'border-slate-300 bg-slate-100 hover:border-slate-400 hover:shadow-slate-200/40 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-slate-600'
+                    : 'border-slate-200 bg-white hover:border-blue-200 hover:shadow-blue-600/10 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800'
+                }`}
               >
                 <div className="flex items-start justify-between">
                   <div className={`rounded-2xl bg-slate-50 p-3 dark:bg-slate-800 ${typeInfo.color}`}>
@@ -789,14 +859,21 @@ export function RegistroVeiculosPage() {
                       </span>
                     ) : null}
                     <div
-                      className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
-                        vehicle.status === 'OPERACIONAL'
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+                        vehicle.status === 'ATIVO'
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                          : 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300'
+                          : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                       }`}
                     >
+                      {vehicle.status === 'ATIVO' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
                       {vehicle.status}
                     </div>
+                    {vehicle.emManutencao && (
+                      <div className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                        <Wrench size={11} />
+                        MANUTENÇÃO
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -822,20 +899,37 @@ export function RegistroVeiculosPage() {
                     </span>
                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{vehicle.base}</p>
                   </div>
+                  {(vehicle.coordenador && vehicle.coordenador !== 'NÃO ATRIBUÍDO') || (vehicle.supervisor && vehicle.supervisor !== 'NÃO ATRIBUÍDO') ? (
+                    <div className="col-span-2 space-y-1 border-t border-slate-100 pt-3 dark:border-slate-800">
+                      <div className="flex gap-4">
+                        {vehicle.coordenador && vehicle.coordenador !== 'NÃO ATRIBUÍDO' && (
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Coordenador</span>
+                            <p className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.coordenador}</p>
+                          </div>
+                        )}
+                        {vehicle.supervisor && vehicle.supervisor !== 'NÃO ATRIBUÍDO' && (
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Supervisor</span>
+                            <p className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.supervisor}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
-                {!isEmbeddedCatalogSource(vehicle.source) ? (
-                  <div className="absolute bottom-4 right-4">
-                    <VehicleOverflowMenu
-                      vehicle={vehicle}
-                      menuForId={menuForId}
-                      setMenuForId={setMenuForId}
-                      refresh={refresh}
-                      showNotification={showNotification}
-                      placement="up"
-                    />
-                  </div>
-                ) : null}
+                <div className="absolute bottom-4 right-4">
+                  <VehicleOverflowMenu
+                    vehicle={vehicle}
+                    menuForId={menuForId}
+                    setMenuForId={setMenuForId}
+                    refresh={refresh}
+                    showNotification={showNotification}
+                    placement="up"
+                    isAdmin={canRegisterVehicle}
+                  />
+                </div>
               </div>
             )
           })}
@@ -852,6 +946,7 @@ export function RegistroVeiculosPage() {
                 <th className="px-4 py-3">Modelo / Prefixo</th>
                 <th className="hidden px-4 py-3 md:table-cell">Órgão / Resp.</th>
                 <th className="hidden px-4 py-3 lg:table-cell">Local / Base</th>
+                <th className="hidden px-4 py-3 xl:table-cell">Coord. / Sup.</th>
                 <th className="px-4 py-3">Estado</th>
                 <th scope="col" className="w-12 px-2 py-3 pr-4 text-right">
                   <span className="sr-only">Ações</span>
@@ -928,6 +1023,9 @@ export function RegistroVeiculosPage() {
                     className={inputFilterClass}
                   />
                 </th>
+                <th className="hidden px-2 py-2 align-top xl:table-cell">
+                  <span className="sr-only">Filtrar coord./sup.</span>
+                </th>
                 <th className="px-2 py-2 align-top">
                   <label className="sr-only" htmlFor="flt-status-col">
                     Filtrar por estado
@@ -935,11 +1033,12 @@ export function RegistroVeiculosPage() {
                   <select
                     id="flt-status-col"
                     value={colFilterStatus}
-                    onChange={(e) => setColFilterStatus(e.target.value as 'ALL' | VehicleStatus)}
+                    onChange={(e) => setColFilterStatus(e.target.value as 'ALL' | VehicleStatus | 'MANUTENÇÃO')}
                     className={selectFilterClass}
                   >
                     <option value="ALL">Todos</option>
-                    <option value="OPERACIONAL">Operac.</option>
+                    <option value="ATIVO">Ativo</option>
+                    <option value="INATIVO">Inativo</option>
                     <option value="MANUTENÇÃO">Manut.</option>
                   </select>
                 </th>
@@ -960,7 +1059,7 @@ export function RegistroVeiculosPage() {
             <tbody>
               {filteredVehicles.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-14 text-center">
+                  <td colSpan={8} className="px-6 py-14 text-center">
                     <p className="text-base font-bold text-slate-600 dark:text-slate-300">Nenhum veículo com estes critérios.</p>
                     <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                       {globallyFilteredVehicles.length === 0
@@ -988,7 +1087,13 @@ export function RegistroVeiculosPage() {
                   return (
                     <tr
                       key={vehicle.id}
-                      className="border-b border-slate-100 transition-colors hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-800/40"
+                      className={`border-b transition-colors ${
+                        vehicle.emManutencao
+                          ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
+                          : vehicle.status === 'INATIVO'
+                          ? 'border-slate-200 bg-slate-100/60 hover:bg-slate-100 dark:border-slate-800/80 dark:bg-slate-900/40 dark:hover:bg-slate-800/40'
+                          : 'border-slate-100 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-800/40'
+                      }`}
                     >
                       <td className="px-4 py-3 pl-5 align-middle">
                         <div className={`inline-flex rounded-xl bg-slate-100 p-2 dark:bg-slate-800 ${typeInfo.color}`}>
@@ -1010,6 +1115,25 @@ export function RegistroVeiculosPage() {
                       </td>
                       <td className="hidden max-w-[160px] px-4 py-3 align-middle lg:table-cell">
                         <span className="truncate text-xs font-bold text-slate-700 dark:text-slate-300">{vehicle.base}</span>
+                      </td>
+                      <td className="hidden px-4 py-3 align-middle xl:table-cell">
+                        <div className="space-y-0.5">
+                          {vehicle.coordenador && vehicle.coordenador !== 'NÃO ATRIBUÍDO' && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Coord.</span>
+                              <span className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.coordenador}</span>
+                            </div>
+                          )}
+                          {vehicle.supervisor && vehicle.supervisor !== 'NÃO ATRIBUÍDO' && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Sup.</span>
+                              <span className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.supervisor}</span>
+                            </div>
+                          )}
+                          {(!vehicle.coordenador || vehicle.coordenador === 'NÃO ATRIBUÍDO') && (!vehicle.supervisor || vehicle.supervisor === 'NÃO ATRIBUÍDO') && (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -1044,29 +1168,33 @@ export function RegistroVeiculosPage() {
                             </span>
                           ) : null}
                           <span
-                            className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-                              vehicle.status === 'OPERACIONAL'
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                              vehicle.status === 'ATIVO'
                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                                : 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300'
+                                : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                             }`}
                           >
+                            {vehicle.status === 'ATIVO' ? <CheckCircle2 size={10} /> : <Ban size={10} />}
                             {vehicle.status}
                           </span>
+                          {vehicle.emManutencao && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                              <Wrench size={10} />
+                              MANUT.
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="relative px-2 py-3 pr-4 text-right align-middle">
-                        {!isEmbeddedCatalogSource(vehicle.source) ? (
-                          <VehicleOverflowMenu
-                            vehicle={vehicle}
-                            menuForId={menuForId}
-                            setMenuForId={setMenuForId}
-                            refresh={refresh}
-                            showNotification={showNotification}
-                            placement="down"
-                          />
-                        ) : (
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">—</span>
-                        )}
+                        <VehicleOverflowMenu
+                          vehicle={vehicle}
+                          menuForId={menuForId}
+                          setMenuForId={setMenuForId}
+                          refresh={refresh}
+                          showNotification={showNotification}
+                          placement="down"
+                          isAdmin={canRegisterVehicle}
+                        />
                       </td>
                     </tr>
                   )
@@ -1213,6 +1341,35 @@ export function RegistroVeiculosPage() {
                 </div>
               </div>
 
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Supervisor</label>
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      placeholder="Nome do supervisor"
+                      value={formData.supervisor}
+                      onChange={(e) => setFormData({ ...formData, supervisor: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Coordenador</label>
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      placeholder="Nome do coordenador"
+                      value={formData.coordenador}
+                      onChange={(e) => setFormData({ ...formData, coordenador: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-4 pt-6">
                 <button
                   type="button"
@@ -1234,6 +1391,7 @@ export function RegistroVeiculosPage() {
       ) : null}
       </div>
 
+      {isChatVisible && (
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] flex justify-end p-3 pb-4 md:p-4 md:pb-5">
         <div className="pointer-events-auto flex w-full max-w-[17rem] flex-col sm:max-w-xs md:max-w-sm">
           {isChatCollapsed ? (
@@ -1260,14 +1418,24 @@ export function RegistroVeiculosPage() {
                   </div>
                   <span className="truncate text-xs font-bold">FROTA Assistant ✨</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsChatCollapsed(true)}
-                  className="shrink-0 rounded-lg p-1.5 text-white/85 transition-colors hover:bg-white/15 hover:text-white"
-                  aria-label="Minimizar chat"
-                >
-                  <ChevronDown size={17} aria-hidden />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsChatCollapsed(true)}
+                    className="shrink-0 rounded-lg p-1.5 text-white/85 transition-colors hover:bg-white/15 hover:text-white"
+                    aria-label="Minimizar chat"
+                  >
+                    <ChevronDown size={17} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsChatVisible(false); setIsChatCollapsed(true) }}
+                    className="shrink-0 rounded-lg p-1.5 text-white/85 transition-colors hover:bg-white/15 hover:text-white"
+                    aria-label="Fechar assistente"
+                  >
+                    <X size={15} aria-hidden />
+                  </button>
+                </div>
               </div>
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 dark:bg-slate-950/80">
                 {chatHistory.map((msg, i) => (
@@ -1313,6 +1481,7 @@ export function RegistroVeiculosPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

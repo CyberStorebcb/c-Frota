@@ -7,12 +7,48 @@ import { SKY_FLEET_ROWS, type SkyFleetSourceRow } from '../data/skyFleet.gen'
 import { VEICULOS_LEVES_FLEET_ROWS, type VeiculosLevesFleetSourceRow } from '../data/veiculosLevesFleet.gen'
 
 const STORAGE_KEY = 'frota.vehicles.registry'
-/** Estado operacional/manutenção para placas só do catálogo (cadastro local usa o registo principal). */
+/** Estado ativo/inativo para placas só do catálogo (cadastro local usa o registo principal). */
 export const FLEET_STATUS_BY_PLACA_STORAGE_KEY = 'frota.vehicles.statusByPlaca'
+/** Flag de manutenção independente (por placa, para catálogo e locais). */
+export const FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY = 'frota.vehicles.manutencaoByPlaca'
+
+export type VehicleStatus = 'ATIVO' | 'INATIVO'
+
+export type FleetVehicle = {
+  id: string
+  placa: string
+  modelo: string
+  tipo: VehicleTipo
+  prefixo: string
+  responsavel: string
+  supervisor: string
+  coordenador: string
+  base: string
+  status: VehicleStatus
+  emManutencao: boolean
+  ano: string
+  createdAt: string
+  /** Origem: bases embebidas (SKY / Munck / Moto / Picapes / veículos leves) ou cadastro em `localStorage`. */
+  source?: 'sky' | 'munck' | 'moto' | 'picape4x4' | 'picapeleve' | 'veiculosleves' | 'local'
+}
+
+export type AddFleetVehicleInput = {
+  placa: string
+  modelo: string
+  tipo: VehicleTipo
+  prefixo: string
+  responsavel: string
+  supervisor: string
+  coordenador: string
+  base: string
+  ano: string
+}
 
 function parseStatusValue(raw: unknown): VehicleStatus {
-  const s = String(raw ?? 'OPERACIONAL').toUpperCase()
-  return s === 'MANUTENÇÃO' || s === 'MANUTENCAO' ? 'MANUTENÇÃO' : 'OPERACIONAL'
+  const s = String(raw ?? 'ATIVO').toUpperCase()
+  // Legacy: OPERACIONAL → ATIVO; MANUTENÇÃO tratado pelo emManutencao
+  if (s === 'INATIVO') return 'INATIVO'
+  return 'ATIVO'
 }
 
 function readStatusByPlaca(): Record<string, VehicleStatus> {
@@ -42,8 +78,37 @@ function writeStatusByPlaca(map: Record<string, VehicleStatus>): void {
   localStorage.setItem(FLEET_STATUS_BY_PLACA_STORAGE_KEY, JSON.stringify(map))
 }
 
+function readManutencaoByPlaca(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return {}
+    const out: Record<string, boolean> = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      const p = normalizePlaca(k)
+      if (!p) continue
+      out[p] = Boolean(v)
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function writeManutencaoByPlaca(map: Record<string, boolean>): void {
+  const keys = Object.keys(map).filter((k) => map[k])
+  const cleaned: Record<string, boolean> = {}
+  for (const k of keys) cleaned[k] = true
+  if (keys.length === 0) {
+    localStorage.removeItem(FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY)
+    return
+  }
+  localStorage.setItem(FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY, JSON.stringify(cleaned))
+}
+
 /**
- * Atualiza o estado do veículo: registo local ou overlay por placa (catálogo embebido).
+ * Atualiza o estado ativo/inativo do veículo (cadastro local ou overlay por placa do catálogo).
  */
 export function setFleetVehicleStatus(placa: string, status: VehicleStatus): void {
   const p = normalizePlaca(placa)
@@ -59,12 +124,39 @@ export function setFleetVehicleStatus(placa: string, status: VehicleStatus): voi
   }
 
   const byPlaca = readStatusByPlaca()
-  if (status === 'OPERACIONAL') {
+  if (status === 'ATIVO') {
     delete byPlaca[p]
   } else {
     byPlaca[p] = status
   }
   writeStatusByPlaca(byPlaca)
+}
+
+/**
+ * Atualiza o flag de manutenção do veículo (independente do status ativo/inativo).
+ */
+export function setFleetVehicleManutencao(placa: string, emManutencao: boolean): void {
+  const p = normalizePlaca(placa)
+  if (!p) return
+
+  // Atualiza cadastro local se existir
+  const locals = readFleetVehicles()
+  const idx = locals.findIndex((v) => v.placa === p)
+  if (idx >= 0) {
+    const next = [...locals]
+    next[idx] = { ...next[idx], emManutencao }
+    writeFleetVehicles(next)
+    return
+  }
+
+  // Overlay para catálogo
+  const byPlaca = readManutencaoByPlaca()
+  if (!emManutencao) {
+    delete byPlaca[p]
+  } else {
+    byPlaca[p] = true
+  }
+  writeManutencaoByPlaca(byPlaca)
 }
 
 /** IDs de tipo alinhados aos CSVs / UI de controlo de frota. */
@@ -78,33 +170,6 @@ export const VEHICLE_TYPE_IDS = [
 ] as const
 
 export type VehicleTipo = (typeof VEHICLE_TYPE_IDS)[number]
-
-export type VehicleStatus = 'OPERACIONAL' | 'MANUTENÇÃO'
-
-export type FleetVehicle = {
-  id: string
-  placa: string
-  modelo: string
-  tipo: VehicleTipo
-  prefixo: string
-  responsavel: string
-  base: string
-  status: VehicleStatus
-  ano: string
-  createdAt: string
-  /** Origem: bases embebidas (SKY / Munck / Moto / Picapes / veículos leves) ou cadastro em `localStorage`. */
-  source?: 'sky' | 'munck' | 'moto' | 'picape4x4' | 'picapeleve' | 'veiculosleves' | 'local'
-}
-
-export type AddFleetVehicleInput = {
-  placa: string
-  modelo: string
-  tipo: VehicleTipo
-  prefixo: string
-  responsavel: string
-  base: string
-  ano: string
-}
 
 function isVehicleTipo(s: string): s is VehicleTipo {
   return VEHICLE_TYPE_IDS.includes(s as VehicleTipo)
@@ -148,8 +213,11 @@ function skyRowToFleetVehicle(row: SkyFleetSourceRow): FleetVehicle {
     tipo: 'SKY',
     prefixo: normalizePrefixo(row.prefixo),
     responsavel: (row.processo || '—').trim().toUpperCase() || '—',
+    supervisor: 'NÃO ATRIBUÍDO',
+    coordenador: 'NÃO ATRIBUÍDO',
     base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'OPERACIONAL',
+    status: 'ATIVO',
+    emManutencao: false,
     ano: '',
     createdAt: '1970-01-01T00:00:00.000Z',
     source: 'sky',
@@ -165,8 +233,11 @@ function munckRowToFleetVehicle(row: MunckFleetSourceRow): FleetVehicle {
     tipo: 'MUNCK',
     prefixo: 'N/A',
     responsavel: (row.processo || '—').trim().toUpperCase() || '—',
+    supervisor: 'NÃO ATRIBUÍDO',
+    coordenador: 'NÃO ATRIBUÍDO',
     base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'OPERACIONAL',
+    status: 'ATIVO',
+    emManutencao: false,
     ano: '',
     createdAt: '1970-01-02T00:00:00.000Z',
     source: 'munck',
@@ -182,8 +253,11 @@ function motoRowToFleetVehicle(row: MotoFleetSourceRow): FleetVehicle {
     tipo: 'MOTO',
     prefixo: normalizePrefixo(row.prefixo),
     responsavel: (row.processo || '—').trim().toUpperCase() || '—',
+    supervisor: 'NÃO ATRIBUÍDO',
+    coordenador: 'NÃO ATRIBUÍDO',
     base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'OPERACIONAL',
+    status: 'ATIVO',
+    emManutencao: false,
     ano: '',
     createdAt: '1970-01-03T00:00:00.000Z',
     source: 'moto',
@@ -199,8 +273,11 @@ function picape4x4RowToFleetVehicle(row: Picape4x4FleetSourceRow): FleetVehicle 
     tipo: 'PICAPE 4X4',
     prefixo: normalizePrefixo(row.prefixo),
     responsavel: (row.processo || '—').trim().toUpperCase() || '—',
+    supervisor: 'NÃO ATRIBUÍDO',
+    coordenador: 'NÃO ATRIBUÍDO',
     base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'OPERACIONAL',
+    status: 'ATIVO',
+    emManutencao: false,
     ano: '',
     createdAt: '1970-01-04T00:00:00.000Z',
     source: 'picape4x4',
@@ -216,8 +293,11 @@ function picapeLeveRowToFleetVehicle(row: PicapeLeveFleetSourceRow): FleetVehicl
     tipo: 'PICAPE LEVE',
     prefixo: normalizePrefixo(row.prefixo),
     responsavel: (row.processo || '—').trim().toUpperCase() || '—',
+    supervisor: 'NÃO ATRIBUÍDO',
+    coordenador: 'NÃO ATRIBUÍDO',
     base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'OPERACIONAL',
+    status: 'ATIVO',
+    emManutencao: false,
     ano: '',
     createdAt: '1970-01-05T00:00:00.000Z',
     source: 'picapeleve',
@@ -233,8 +313,11 @@ function veiculosLevesRowToFleetVehicle(row: VeiculosLevesFleetSourceRow): Fleet
     tipo: 'VEICULOS LEVES',
     prefixo: normalizePrefixo(row.prefixo),
     responsavel: (row.processo || '—').trim().toUpperCase() || '—',
+    supervisor: 'NÃO ATRIBUÍDO',
+    coordenador: 'NÃO ATRIBUÍDO',
     base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'OPERACIONAL',
+    status: 'ATIVO',
+    emManutencao: false,
     ano: '',
     createdAt: '1970-01-06T00:00:00.000Z',
     source: 'veiculosleves',
@@ -294,6 +377,15 @@ export function getDisplayedFleetVehicles(): FleetVehicle[] {
     const cur = map.get(p)
     if (!cur) continue
     map.set(p, { ...cur, status: st })
+  }
+
+  const manutencaoByPlaca = readManutencaoByPlaca()
+  for (const [placaKey, val] of Object.entries(manutencaoByPlaca)) {
+    const p = normalizePlaca(placaKey)
+    if (!p || localPlacas.has(p)) continue
+    const cur = map.get(p)
+    if (!cur) continue
+    map.set(p, { ...cur, emManutencao: val })
   }
 
   return [...map.values()].sort((a, b) => a.placa.localeCompare(b.placa))
@@ -358,9 +450,18 @@ function parseRow(x: Record<string, unknown>): FleetVehicle | null {
 
   const status: VehicleStatus = parseStatusValue(x.status)
 
+  // Legacy: se status era MANUTENÇÃO, converter para ATIVO + emManutencao=true
+  const rawStatus = String(x.status ?? '').toUpperCase()
+  const emManutencao: boolean =
+    rawStatus === 'MANUTENÇÃO' || rawStatus === 'MANUTENCAO'
+      ? true
+      : Boolean(x.emManutencao)
+
   const prefixo = normalizePrefixo(String(x.prefixo ?? ''))
   const modelo = String(x.modelo ?? '').trim() || '—'
   const responsavel = String(x.responsavel ?? '').trim() || 'NÃO ATRIBUÍDO'
+  const supervisor = String(x.supervisor ?? '').trim() || 'NÃO ATRIBUÍDO'
+  const coordenador = String(x.coordenador ?? '').trim() || 'NÃO ATRIBUÍDO'
   const base = String(x.base ?? '').trim().toUpperCase() || 'N/A'
   const ano = String(x.ano ?? '').trim() || new Date().getFullYear().toString()
 
@@ -383,8 +484,11 @@ function parseRow(x: Record<string, unknown>): FleetVehicle | null {
     tipo,
     prefixo,
     responsavel,
+    supervisor,
+    coordenador,
     base,
     status,
+    emManutencao,
     ano,
     createdAt: typeof x.createdAt === 'string' ? x.createdAt : new Date().toISOString(),
     source: src,
@@ -448,6 +552,8 @@ export function addFleetVehicle(
 
   const prefixo = normalizePrefixo(input.prefixo)
   const responsavel = input.responsavel.trim() ? input.responsavel.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
+  const supervisor = input.supervisor.trim() ? input.supervisor.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
+  const coordenador = input.coordenador.trim() ? input.coordenador.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
   const base = input.base.trim() ? input.base.trim().toUpperCase() : 'N/A'
   const ano = input.ano.trim() || new Date().getFullYear().toString()
 
@@ -460,8 +566,11 @@ export function addFleetVehicle(
       tipo: input.tipo,
       prefixo,
       responsavel,
+      supervisor,
+      coordenador,
       base,
-      status: 'OPERACIONAL',
+      status: 'ATIVO',
+      emManutencao: false,
       ano,
       createdAt: new Date().toISOString(),
       source: 'local',

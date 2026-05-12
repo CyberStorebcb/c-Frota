@@ -22,8 +22,10 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro-especial" element={<RegistroEspecialPage />} />
       <Route path="/registro" element={<RegistroRoute />} />
-      {/* Link público para preenchimento de checklist: /checklist/sky, /checklist/munck, etc. */}
-      <Route path="/checklist/:tipo" element={<ChecklistPublicoPage />} />
+      {/* Link público único para motoristas preencherem checklists */}
+      <Route path="/checklist" element={<ChecklistPublicoPage />} />
+      {/* Links antigos por tipo agora voltam para o fluxo único */}
+      <Route path="/checklist/:tipo" element={<Navigate to="/checklist" replace />} />
 
       {/* Rotas autenticadas */}
       <Route element={<RequireAuth />}>

@@ -1,19 +1,78 @@
 import { useCallback, useRef, useState } from 'react'
-import { useParams, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Camera,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   ImagePlus,
   Paperclip,
   X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { SCHEMA_MAP } from '../data/checklistSchemas'
+import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 
 type Resposta = 'c' | 'nc' | 'na' | null
+
+function TelaEscolhaChecklist({
+  onSelecionar,
+}: {
+  onSelecionar: (tipo: string) => void
+}) {
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 py-8 dark:bg-slate-950">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900">
+            <ClipboardList size={28} />
+          </div>
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
+              Inspeção — motorista
+            </p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+              Escolha o checklist
+            </h1>
+            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              Esta página é só para preencher a inspeção. Não é preciso entrar no sistema nem fazer login.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {CHECKLIST_SCHEMAS.map((schema) => {
+            const totalItens = schema.grupos.reduce((acc, g) => acc + g.itens.length, 0)
+            return (
+              <button
+                key={schema.id}
+                type="button"
+                onClick={() => onSelecionar(schema.id)}
+                className="group flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 active:scale-[.99] dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+              >
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  <ClipboardList size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-black text-slate-900 dark:text-slate-100">{schema.nome}</div>
+                  <div className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {schema.descricao} · {totalItens} itens
+                  </div>
+                </div>
+                <ChevronRight size={18} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
+              </button>
+            )
+          })}
+        </div>
+
+        <p className="mt-6 text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+          Você não será direcionado ao painel interno da frota — apenas a este formulário.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Tela de identificação
@@ -906,12 +965,18 @@ function FormularioChecklist({
 // Página raiz
 // ---------------------------------------------------------------------------
 export function ChecklistPublicoPage() {
-  const { tipo } = useParams<{ tipo: string }>()
+  const [tipoSelecionado, setTipoSelecionado] = useState<string | null>(null)
   const [operador, setOperador]   = useState<string | null>(null)
   const [matricula, setMatricula] = useState<string | null>(null)
 
-  if (!tipo || !SCHEMA_MAP[tipo]) return <Navigate to="/" replace />
-  const schema = SCHEMA_MAP[tipo]!
+  if (!tipoSelecionado) {
+    return <TelaEscolhaChecklist onSelecionar={setTipoSelecionado} />
+  }
+
+  const schema = SCHEMA_MAP[tipoSelecionado]
+  if (!schema) {
+    return <Navigate to="/checklist" replace />
+  }
 
   if (!operador || !matricula) {
     return (

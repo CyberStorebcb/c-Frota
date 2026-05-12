@@ -729,7 +729,10 @@ export function ChecklistResultadosPage() {
 
   const [capturando, setCapturando]   = useState(false)
   const [rows, setRows]               = useState<ChecklistRow[]>([])
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(true)
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
+    try { return localStorage.getItem('frota.filtros.checklists') === 'true' }
+    catch { return false }
+  })
   const [carregando, setCarregando]   = useState(true)
   const [exportando, setExportando]   = useState(false)
   const [erro, setErro]               = useState('')
@@ -1231,7 +1234,11 @@ export function ChecklistResultadosPage() {
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
           <button
             type="button"
-            onClick={() => setFiltrosVisiveis((v) => !v)}
+            onClick={() => setFiltrosVisiveis((v) => {
+              const next = !v
+              try { localStorage.setItem('frota.filtros.checklists', String(next)) } catch { /* ignore */ }
+              return next
+            })}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
           >
             {filtrosVisiveis
@@ -1265,13 +1272,13 @@ export function ChecklistResultadosPage() {
                 <button
                   type="button"
                   onClick={() => setSomenteNc((v) => !v)}
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-extrabold transition ${
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-extrabold transition-all duration-150 active:scale-95 ${
                     somenteNc
-                      ? 'border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400'
+                      ? 'border-rose-300 bg-rose-50 text-rose-600 shadow-sm shadow-rose-200/60 hover:border-rose-400 hover:bg-rose-100 hover:shadow-rose-300/50 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/35'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-800 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
                   }`}
                 >
-                  <AlertTriangle size={14} />
+                  <AlertTriangle size={14} className={`transition-transform duration-150 ${somenteNc ? 'scale-110' : ''}`} />
                   Somente NC
                 </button>
               </div>

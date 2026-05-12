@@ -13,13 +13,14 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react'
-import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
 import {
   type EvolucaoFiltros,
   type PontoEvolucao,
   buildMonthlyChartPoints,
   buildResolvidosCsv,
   buildWeeklyChartPoints,
+  diasEntreApontamentoEResolucao,
   downloadCsv,
   filterResolvidosParaEvolucao,
   mediaDiasApontamentoResolucao,
@@ -30,9 +31,7 @@ import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilte
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
-import { EVOLUCAO_MOCK_APONTAMENTOS } from '../apontamentos/evolucaoMockApontamentos'
 
-const EVOLUCAO_PAGE_USE_MOCK_ROWS = true
 const TOOLTIP_EXEMPLOS_MAX = 5
 
 const DATA_OPTS: SelectOption[] = [
@@ -271,6 +270,187 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
   )
 }
 
+// ── Gráfico por tipo de defeito ────────────────────────────────────────────
+type DefeitoDatum = {
+  defeito: string
+  ocorrencias: number
+  prazoMedioDias: number
+}
+
+function buildDefeitoData(rows: Apontamento[]): DefeitoDatum[] {
+  const map = new Map<string, { ocorrencias: number; somaDias: number }>()
+  for (const r of rows) {
+    if (!r.resolvido || !r.dataResolvido) continue
+    const key = r.defeito?.trim() || '(sem descrição)'
+    if (!map.has(key)) map.set(key, { ocorrencias: 0, somaDias: 0 })
+    const e = map.get(key)!
+    e.ocorrencias++
+    e.somaDias += diasEntreApontamentoEResolucao(r)
+  }
+  return [...map.entries()]
+    .map(([defeito, e]) => ({
+      defeito,
+      ocorrencias: e.ocorrencias,
+      prazoMedioDias: Math.max(0, Math.round(e.somaDias / e.ocorrencias)),
+    }))
+    .sort((a, b) => b.prazoMedioDias - a.prazoMedioDias)
+    .slice(0, 20)
+}
+
+const DEFEITOS_TOP_OPTIONS = [
+  { value: 5,  label: 'Top 5' },
+  { value: 10, label: 'Top 10' },
+  { value: 20, label: 'Top 20' },
+] as const
+
+function DefeitosChart({ rows }: { rows: Apontamento[] }) {
+  const [topN, setTopN] = useState<5 | 10 | 20>(10)
+  const [busca, setBusca] = useState('')
+
+  const data = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const filtered = rows.filter((r) => {
+      if (!r.resolvido || !r.dataResolvido) return false
+      if (q && !r.defeito.toLowerCase().includes(q)) return false
+      return true
+    })
+    return buildDefeitoData(filtered)
+  }, [rows, busca])
+
+  const topRows = data.slice(0, topN)
+  const maxPrazo = Math.max(1, ...topRows.map((d) => d.prazoMedioDias))
+
+  if (topRows.length === 0) return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">Pesquisar defeito</div>
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Digite parte do defeito..."
+          className="mt-1 w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+        />
+      </div>
+      <div className="flex min-h-[120px] items-center justify-center text-sm font-semibold text-slate-400 dark:text-slate-500">
+        Nenhum defeito corrigido encontrado com a pesquisa atual.
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="w-full space-y-4">
+
+      {/* pesquisa na aba defeitos */}
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">Pesquisar defeito</div>
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Digite parte do defeito..."
+          className="mt-1 w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+        />
+      </div>
+
+      {/* cabeçalho com top-N */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          Exibindo defeitos corrigidos e o prazo médio de correção
+        </div>
+        <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
+          {DEFEITOS_TOP_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setTopN(o.value)}
+              className={[
+                'rounded-lg px-2.5 py-1 text-[10px] font-black transition',
+                topN === o.value
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  : 'text-slate-500 hover:bg-white dark:text-slate-400 dark:hover:bg-slate-800',
+              ].join(' ')}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* tabela */}
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+        <table className="w-full min-w-[520px] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-500">
+              <th className="w-8 px-3 py-2.5 text-center">#</th>
+              <th className="px-3 py-2.5">Defeito</th>
+              <th className="min-w-[220px] px-3 py-2.5">Prazo de correção</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topRows.map((d, i) => {
+              return (
+                <tr
+                  key={d.defeito}
+                  className={[
+                    'group border-b transition-colors last:border-0',
+                    i === 0 && d.prazoMedioDias > 30
+                      ? 'border-red-100 bg-red-50/40 dark:border-red-950/30 dark:bg-red-950/10'
+                      : 'border-slate-100 hover:bg-slate-50/80 dark:border-slate-800/60 dark:hover:bg-slate-800/30',
+                  ].join(' ')}
+                >
+                  {/* rank */}
+                  <td className="px-3 py-3 text-center align-middle">
+                    <span className={[
+                      'inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black',
+                      i === 0 ? 'bg-red-500 text-white' :
+                      i === 1 ? 'bg-orange-400 text-white' :
+                      i === 2 ? 'bg-amber-400 text-slate-900' :
+                      'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+                    ].join(' ')}>
+                      {i + 1}
+                    </span>
+                  </td>
+
+                  {/* defeito */}
+                  <td className="px-3 py-3 align-middle">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                      {d.defeito}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 align-middle">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 min-w-[120px] flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                        <div
+                          className={[
+                            'h-full rounded-full transition-all duration-500',
+                            d.prazoMedioDias <= 15 ? 'bg-emerald-500' : d.prazoMedioDias <= 30 ? 'bg-amber-400' : 'bg-red-500',
+                          ].join(' ')}
+                          style={{ width: `${Math.max(6, Math.round((d.prazoMedioDias / maxPrazo) * 100))}%` }}
+                        />
+                      </div>
+                      <div className="min-w-[74px] text-right">
+                        <span className="text-xs font-black tabular-nums text-slate-700 dark:text-slate-200">
+                          {d.prazoMedioDias} dias
+                        </span>
+                        <span className="ml-1 text-[10px] font-semibold text-slate-400">
+                          ({d.ocorrencias})
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-right text-[10px] font-semibold text-slate-400">
+        Ordenado por maior prazo médio de correção · {data.length} tipos encontrados
+      </p>
+    </div>
+  )
+}
+
 // ── Gauge de taxa de resolução ──────────────────────────────────────────────
 function TaxaGauge({ resolvidos, total }: { resolvidos: number; total: number }) {
   const pct = total > 0 ? Math.round((resolvidos / total) * 100) : 0
@@ -299,8 +479,7 @@ function TaxaGauge({ resolvidos, total }: { resolvidos: number; total: number })
 }
 
 export function EvolucaoPage() {
-  const { rows: rowsFromCtx } = useApontamentos()
-  const rows = EVOLUCAO_PAGE_USE_MOCK_ROWS ? EVOLUCAO_MOCK_APONTAMENTOS : rowsFromCtx
+  const { rows } = useApontamentos()
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [wrapW, setWrapW] = useState(0)
   const [agregacao, setAgregacao] = useState<'semana' | 'mes'>('semana')
@@ -309,8 +488,11 @@ export function EvolucaoPage() {
     chave: string; periodo: string; abertos: number; resolvidos: number; pendentes: number; x: number; y: number
   } | null>(null)
 
-  const [visao, setVisao] = useState<'grafico' | 'heatmap'>('grafico')
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(true)
+  const [visao, setVisao] = useState<'grafico' | 'heatmap' | 'defeitos'>('grafico')
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
+    try { return localStorage.getItem('frota.filtros.evolucao') === 'true' }
+    catch { return false }
+  })
   const [filtroProcesso, setFiltroProcesso] = useState('todos')
   const [filtroBase, setFiltroBase] = useState('todos')
   const [filtroCoord, setFiltroCoord] = useState('todos')
@@ -449,6 +631,16 @@ export function EvolucaoPage() {
     }))
   }, [chartData, linha2Data])
 
+  const defeitosRows = useMemo(() => {
+    const filtered = rows.filter((r) => {
+      if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
+      if (filtroResp !== 'todos' && r.responsavel !== filtroResp) return false
+      if (filtroPrefixo !== 'todos' && r.prefixo !== filtroPrefixo) return false
+      return true
+    })
+    return filtered
+  }, [rows, filtroCoord, filtroResp, filtroPrefixo])
+
   const limparFiltros = () => {
     setFiltroProcesso('todos'); setFiltroBase('todos'); setFiltroCoord('todos')
     setFiltroResp('todos'); setFiltroPrefixo('todos'); setFiltroData('todos')
@@ -523,7 +715,11 @@ export function EvolucaoPage() {
             </button>
             <button
               type="button"
-              onClick={() => setFiltrosVisiveis((v) => !v)}
+              onClick={() => setFiltrosVisiveis((v) => {
+                const next = !v
+                try { localStorage.setItem('frota.filtros.evolucao', String(next)) } catch { /* ignore */ }
+                return next
+              })}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
             >
               {filtrosVisiveis ? <><ChevronUp size={13} className="text-slate-400" /> Ocultar filtros</> : <><ChevronDown size={13} className="text-slate-400" /> Mostrar filtros</>}
@@ -640,10 +836,21 @@ export function EvolucaoPage() {
               >
                 Heatmap
               </button>
+              <button
+                type="button"
+                onClick={() => setVisao('defeitos')}
+                className={['rounded-lg px-3 py-1.5 text-xs font-extrabold transition',
+                  visao === 'defeitos' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800',
+                ].join(' ')}
+              >
+                Defeitos
+              </button>
             </div>
             <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
               {visao === 'grafico'
                 ? 'Resolvidos vs pendentes · linha = dias médios'
+                : visao === 'defeitos'
+                ? 'Defeito e prazo de correção · com pesquisa'
                 : 'Velocidade por período · cores = performance'}
             </span>
           </div>
@@ -670,6 +877,8 @@ export function EvolucaoPage() {
               Nenhum defeito resolvido com os filtros atuais.{' '}
               <Link to="/gerenciar" className="mt-1 font-extrabold text-brand-600 underline dark:text-brand-400">Gerenciar →</Link>
             </div>
+          ) : visao === 'defeitos' ? (
+            <DefeitosChart rows={defeitosRows} />
           ) : visao === 'grafico' ? (
             <BarLineChart data={barChartData} agregacao={agregacao} />
           ) : (

@@ -150,7 +150,7 @@ type Ctx = {
   carregando: boolean
   marcarResolvido: (
     id: string,
-    payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
+    payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null; dataResolvido?: string | null },
     usuarioEmail?: string,
   ) => Promise<void>
   buscarHistorico: (apontamentoId: string) => Promise<HistoricoRow[]>
@@ -261,11 +261,12 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
   const marcarResolvido = useCallback(async (
     id: string,
-    payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
+    payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null; dataResolvido?: string | null },
     usuarioEmail = 'desconhecido',
   ) => {
     const now = new Date()
     const hoje = localIsoDate(now)
+    const dataResolvido = payload?.dataResolvido || hoje
     const hora = localTimeHHmm(now)
 
     // Atualiza localmente de imediato
@@ -275,7 +276,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
           ? {
               ...r,
               resolvido: true,
-              dataResolvido: hoje,
+              dataResolvido,
               horaResolvido: hora,
               reparoValor:     payload?.valor ?? r.reparoValor ?? null,
               reparoDescricao: typeof payload?.descricao === 'string' ? payload.descricao : r.reparoDescricao ?? null,
@@ -299,7 +300,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         data_apontamento: row?.dataApontamento ?? hoje,
         prazo:            row?.prazo          ?? hoje,
         resolvido:        true,
-        data_resolvido:   hoje,
+        data_resolvido:   dataResolvido,
         hora_resolvido:   hora,
         reparo_valor:     payload?.valor ?? null,
         reparo_descricao: payload?.descricao ?? null,
@@ -325,7 +326,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       apontamento_id:  id,
       acao:            'resolvido',
       usuario_email:   usuarioEmail,
-      data_hora:       `${hoje}T${hora}:00`,
+      data_hora:       `${dataResolvido}T${hora}:00`,
       descricao:       payload?.descricao ?? null,
       reparo_valor:    payload?.valor ?? null,
       reparo_descricao: payload?.descricao ?? null,
