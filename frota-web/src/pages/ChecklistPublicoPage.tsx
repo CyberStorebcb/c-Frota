@@ -11,6 +11,8 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { enqueueChecklist, type OfflineChecklistFile } from '../checklists/offlineQueue'
+import { SyncStatus } from '../checklists/SyncStatus'
 import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 
@@ -69,6 +71,10 @@ function TelaEscolhaChecklist({
         <p className="mt-6 text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500">
           Você não será direcionado ao painel interno da frota — apenas a este formulário.
         </p>
+
+        <div className="mt-4">
+          <SyncStatus />
+        </div>
       </div>
     </div>
   )
@@ -205,10 +211,12 @@ function TelaConclusao({
   ncImperativos,
   ncCount,
   itensNc,
+  offline,
 }: {
   ncImperativos: number
   ncCount: number
   itensNc: { label: string; imperativo: boolean; obs: string }[]
+  offline?: boolean
 }) {
   const bloqueado = ncImperativos > 0
   const comNc = ncCount > 0
@@ -228,10 +236,12 @@ function TelaConclusao({
 
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">
-            {bloqueado ? 'Veículo impedido!' : comNc ? 'Checklist enviado' : 'Tudo Conforme!'}
+            {offline ? 'Checklist salvo no dispositivo' : bloqueado ? 'Veículo impedido!' : comNc ? 'Checklist enviado' : 'Tudo Conforme!'}
           </h1>
           <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-            {bloqueado
+            {offline
+              ? 'Assim que a internet voltar, o aplicativo tentará sincronizar automaticamente.'
+              : bloqueado
               ? `${ncImperativos} item(s) impeditivo(s) NC. O veículo está impedido de ser conduzido até a correção.`
               : comNc
                 ? `${ncCount} item(s) com NC registrado(s). A supervisão foi notificada.`
@@ -393,6 +403,7 @@ function FormularioChecklist({
     ncCount: number
     ncImperativos: number
     itensNc: { label: string; imperativo: boolean; obs: string }[]
+    offline?: boolean
   } | null>(null)
   // highlight do item atual após scroll
   const [itemDestacado, setItemDestacado] = useState<string | null>(null)
@@ -465,10 +476,68 @@ function FormularioChecklist({
     return supabase.storage.from('checklist-evidencias').getPublicUrl(path).data.publicUrl
   }
 
+  const buildChecklistPayload = (observacoesFinais: Record<string, string>, evidenciaUrls: string[]) => {
+    const respostasLimpas = Object.fromEntries(
+      Object.entries(respostas).filter((e): e is [string, 'c' | 'nc' | 'na'] => e[1] !== null),
+    )
+
+    return {
+      tipo: schema.id,
+      nome_operador: operador,
+      matricula,
+      dados_veiculo: { ...dadosVeiculo, data_inspecao: dataInspecao },
+      data_inspecao: dataInspecao,
+      respostas: respostasLimpas,
+      observacoes: observacoesFinais,
+      progresso: 100,
+      nc_count: ncCount,
+      nc_imperativos: ncImperativos,
+      problemas,
+      descricao_problema: descricaoProblema,
+      nome_supervisor: supervisor,
+      evidencia_urls: evidenciaUrls,
+    }
+  }
+
+  const buildOfflineFiles = (): OfflineChecklistFile[] => {
+    const gerais = arquivos.map((file) => ({
+      name: file.name,
+      type: file.type,
+      itemId: null,
+      file,
+    }))
+    const porItem = Object.entries(fotosItem).flatMap(([itemId, fotos]) =>
+      fotos.map((file) => ({
+        name: file.name,
+        type: file.type,
+        itemId,
+        file,
+      })),
+    )
+    return [...gerais, ...porItem]
+  }
+
   const handleEnviar = async () => {
     if (!podEnviar) return
     setEnviando(true)
     setErroEnvio('')
+
+    if (!navigator.onLine) {
+      try {
+        await enqueueChecklist(buildChecklistPayload({ ...observacoes }, []), buildOfflineFiles())
+      } catch {
+        setErroEnvio('Sem internet e não foi possível salvar offline. Verifique o armazenamento do dispositivo.')
+        setEnviando(false)
+        return
+      }
+      const itensNc = todosItens
+        .filter((it) => respostas[it.id] === 'nc')
+        .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true })
+      setConcluido(true)
+      setEnviando(false)
+      return
+    }
 
     const ts = Date.now()
     const evidenciaUrls: string[] = []
@@ -488,10 +557,6 @@ function FormularioChecklist({
       }
     }
 
-    const respostasLimpas = Object.fromEntries(
-      Object.entries(respostas).filter((e): e is [string, 'c' | 'nc' | 'na'] => e[1] !== null),
-    )
-
     const observacoesFinais = { ...observacoes }
     for (const [itemId, urls] of Object.entries(fotasUrls)) {
       if (urls.length > 0) {
@@ -503,27 +568,17 @@ function FormularioChecklist({
       }
     }
 
-    const { error } = await supabase.from('checklists').insert({
-      tipo: schema.id,
-      nome_operador: operador,
-      matricula,
-      dados_veiculo: { ...dadosVeiculo, data_inspecao: dataInspecao },
-      data_inspecao: dataInspecao,
-      respostas: respostasLimpas,
-      observacoes: observacoesFinais,
-      progresso: 100,
-      nc_count: ncCount,
-      nc_imperativos: ncImperativos,
-      problemas,
-      descricao_problema: descricaoProblema,
-      nome_supervisor: supervisor,
-      evidencia_urls: evidenciaUrls,
-    })
+    const payload = buildChecklistPayload(observacoesFinais, evidenciaUrls)
+    const { error } = await supabase.from('checklists').insert(payload)
 
     if (error) {
-      setErroEnvio('Erro ao enviar. Verifique sua conexão e tente novamente.')
-      setEnviando(false)
-      return
+      try {
+        await enqueueChecklist(buildChecklistPayload({ ...observacoes }, []), buildOfflineFiles())
+      } catch {
+        setErroEnvio('Erro ao enviar e salvar offline. Verifique o armazenamento do dispositivo.')
+        setEnviando(false)
+        return
+      }
     }
 
 
@@ -532,7 +587,7 @@ function FormularioChecklist({
       .filter((it) => respostas[it.id] === 'nc')
       .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
-    setResultadoFinal({ ncCount, ncImperativos, itensNc })
+    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error) })
     setConcluido(true)
   }
 
@@ -542,6 +597,7 @@ function FormularioChecklist({
         ncImperativos={resultadoFinal.ncImperativos}
         ncCount={resultadoFinal.ncCount}
         itensNc={resultadoFinal.itensNc}
+        offline={resultadoFinal.offline}
       />
     )
   }
@@ -584,6 +640,7 @@ function FormularioChecklist({
       </header>
 
       <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+        <SyncStatus />
 
         {/* ── Legenda C / NC / NA ──────────────────────────────────── */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">

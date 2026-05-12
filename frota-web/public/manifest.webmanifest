@@ -1,0 +1,33 @@
+{
+  "name": "Frota Checklists",
+  "short_name": "Checklists",
+  "description": "Aplicativo offline para preenchimento de checklists da frota.",
+  "start_url": "/checklist",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Preencher checklist",
+      "short_name": "Checklist",
+      "url": "/checklist",
+      "icons": [
+        {
+          "src": "/pwa-icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}
