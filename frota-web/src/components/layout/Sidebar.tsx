@@ -87,7 +87,7 @@ function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => 
   const { user } = useAuth()
   const navItems = [
     ...baseNav,
-    ...(user?.role === 'admin' ? ([{ to: '/administrador', label: 'Administrador', icon: Shield, end: false }] as const) : []),
+    ...(user?.role === 'admin' ? ([{ to: '/usuarios', label: 'Usuários', icon: Shield, end: false }] as const) : []),
   ]
 
   return (

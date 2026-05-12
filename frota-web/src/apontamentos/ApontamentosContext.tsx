@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, type HistoricoRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,9 @@ type Ctx = {
   marcarResolvido: (
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
+    usuarioEmail?: string,
   ) => Promise<void>
+  buscarHistorico: (apontamentoId: string) => Promise<HistoricoRow[]>
   hasByChecklist: (checklistId: string, ncItemId: string) => boolean
   persistError: string | null
   clearPersistError: () => void
@@ -260,6 +262,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const marcarResolvido = useCallback(async (
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null },
+    usuarioEmail = 'desconhecido',
   ) => {
     const now = new Date()
     const hoje = localIsoDate(now)
@@ -314,8 +317,29 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     if (error) {
       setPersistError('Erro ao salvar resolução: ' + error.message)
       void recarregar()
+      return
     }
+
+    // Grava no histórico
+    await supabase.from('apontamento_historico').insert({
+      apontamento_id:  id,
+      acao:            'resolvido',
+      usuario_email:   usuarioEmail,
+      data_hora:       `${hoje}T${hora}:00`,
+      descricao:       payload?.descricao ?? null,
+      reparo_valor:    payload?.valor ?? null,
+      reparo_descricao: payload?.descricao ?? null,
+    })
   }, [rows, recarregar])
+
+  const buscarHistorico = useCallback(async (apontamentoId: string): Promise<HistoricoRow[]> => {
+    const { data } = await supabase
+      .from('apontamento_historico')
+      .select('*')
+      .eq('apontamento_id', apontamentoId)
+      .order('data_hora', { ascending: false })
+    return (data ?? []) as HistoricoRow[]
+  }, [])
 
   const hasByChecklist = useCallback((checklistId: string, ncItemId: string): boolean => {
     return rows.some((r) => r.checklistId === checklistId && r.ncItemId === ncItemId && r.resolvido)
@@ -327,12 +351,13 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       checklistsRealizadosTotal,
       carregando,
       marcarResolvido,
+      buscarHistorico,
       hasByChecklist,
       persistError,
       clearPersistError,
       recarregar,
     }),
-    [rows, checklistsRealizadosTotal, carregando, marcarResolvido, hasByChecklist, persistError, clearPersistError, recarregar],
+    [rows, checklistsRealizadosTotal, carregando, marcarResolvido, buscarHistorico, hasByChecklist, persistError, clearPersistError, recarregar],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>

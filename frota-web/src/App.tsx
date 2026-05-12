@@ -3,7 +3,7 @@ import { RequireAuth } from './components/auth/RequireAuth'
 import { RequireAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
 import { ApontamentosLayout } from './layouts/ApontamentosLayout'
-import { AdministradorPage } from './pages/AdministradorPage'
+import { UsuariosPage } from './pages/AdministradorPage'
 import { ChecklistPublicoPage } from './pages/ChecklistPublicoPage'
 import { ChecklistResultadosPage } from './pages/ChecklistResultadosPage'
 import { ChecklistsPage } from './pages/ChecklistsPage'
@@ -38,10 +38,10 @@ export default function App() {
           </Route>
           <Route path="/veiculos" element={<Navigate to="/gerenciar" replace />} />
           <Route
-            path="/administrador"
+            path="/usuarios"
             element={
               <RequireAdmin>
-                <AdministradorPage />
+                <UsuariosPage />
               </RequireAdmin>
             }
           />

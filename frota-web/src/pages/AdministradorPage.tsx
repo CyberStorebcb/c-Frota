@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, RefreshCw, Search, Shield } from 'lucide-react'
+import { RefreshCw, Search, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthContext'
 
@@ -10,7 +10,7 @@ type ProfileRow = {
   created_at: string
 }
 
-export function AdministradorPage() {
+export function UsuariosPage() {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<ProfileRow[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -54,14 +54,9 @@ export function AdministradorPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900">
-          <Shield size={18} />
+          <Users size={18} />
         </div>
-        <div>
-          <div className="text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">Administrador</div>
-          <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            Sessão: <span className="font-extrabold text-slate-700 dark:text-slate-200">{currentUser?.email}</span>
-          </div>
-        </div>
+        <div className="text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">Usuários</div>
       </div>
 
       {msg && (
@@ -73,26 +68,6 @@ export function AdministradorPage() {
           {msg.text}
         </div>
       )}
-
-      {/* Card: como adicionar usuários */}
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
-        <div className="mb-2 text-sm font-extrabold text-amber-800 dark:text-amber-300">Como adicionar novos usuários</div>
-        <ol className="space-y-1 text-sm font-semibold text-amber-700 dark:text-amber-400">
-          <li>1. Acesse o painel do Supabase → <strong>Authentication → Users → Add user</strong></li>
-          <li>2. Informe o e-mail e senha do usuário e confirme</li>
-          <li>3. Clique em <strong>Atualizar</strong> abaixo para ver o usuário aqui</li>
-          <li>4. Altere o role para <strong>Admin</strong> se necessário</li>
-        </ol>
-        <a
-          href="https://supabase.com/dashboard"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-700 underline hover:text-amber-900 dark:text-amber-400"
-        >
-          <ExternalLink size={12} />
-          Abrir painel do Supabase
-        </a>
-      </div>
 
       {/* Lista de usuários */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
@@ -122,9 +97,7 @@ export function AdministradorPage() {
           <div className="py-12 text-center text-sm font-semibold text-slate-400">Carregando...</div>
         ) : filtrados.length === 0 ? (
           <div className="py-12 text-center text-sm font-semibold text-slate-400">
-            {users.length === 0
-              ? 'Nenhum usuário encontrado. Execute o SQL da função list_users_with_roles no Supabase.'
-              : 'Nenhum usuário corresponde à busca.'}
+            {users.length === 0 ? 'Nenhum usuário encontrado.' : 'Nenhum usuário corresponde à busca.'}
           </div>
         ) : (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">

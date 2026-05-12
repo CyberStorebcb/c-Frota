@@ -58,3 +58,15 @@ export type ApontamentoRow = {
   nc_fotos: string[]
   created_at: string
 }
+
+export type HistoricoRow = {
+  id: string
+  apontamento_id: string
+  acao: 'resolvido' | 'reaberto' | 'editado' | 'criado'
+  usuario_email: string
+  data_hora: string
+  descricao: string | null
+  reparo_valor: number | null
+  reparo_descricao: string | null
+  created_at: string
+}

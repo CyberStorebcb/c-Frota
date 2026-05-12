@@ -4,8 +4,10 @@ import {
   AlertTriangle,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   ClipboardList,
   History,
   Inbox,
@@ -134,6 +136,7 @@ export function ManagePage() {
 
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')
   const [vehicleId, setVehicleId] = useState<string>('todos')
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(true)
   const [query, setQuery] = useState('')
   const [processo, setProcesso] = useState('todos')
   const [base, setBase] = useState('todos')
@@ -426,46 +429,63 @@ export function ManagePage() {
         />
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-            <Select
-              label="Filtrar por veículo"
-              value={vehicleId}
-              options={vehicleOptions}
-              onChange={setVehicleId}
-            />
-            <Select label="Processo" value={processo} options={PROCESSO_FILTER_SELECT_OPTIONS} onChange={setProcesso} />
-            <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={setBase} />
-            <Select label="Coordenador" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setCoordenador} />
-            <Select label="Responsável" value={responsavel} options={respOptions} onChange={setResponsavel} />
-            <Select label="Prefixo" value={prefixo} options={prefixoOptions} onChange={setPrefixo} />
-            <Select label="Data" value={data} options={DATA_OPTS} onChange={setData} />
-            <div className="min-w-0 lg:col-span-2">
-              <div className="whitespace-nowrap text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Buscar defeito ou veículo
-              </div>
-              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Texto do defeito, prefixo ou placa..."
-                  className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
-              </div>
-            </div>
-          </div>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
           <button
             type="button"
-            onClick={limparFiltros}
-            disabled={!filtrosAtivos}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-            title="Limpar filtros"
+            onClick={() => setFiltrosVisiveis((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
           >
-            <RotateCcw size={18} aria-hidden />
-            Limpar
+            {filtrosVisiveis
+              ? <><ChevronUp size={13} className="text-slate-400" /> Ocultar filtros</>
+              : <><ChevronDown size={13} className="text-slate-400" /> Mostrar filtros</>
+            }
           </button>
+        </div>
+        <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+                <Select
+                  label="Filtrar por veículo"
+                  value={vehicleId}
+                  options={vehicleOptions}
+                  onChange={setVehicleId}
+                />
+                <Select label="Processo" value={processo} options={PROCESSO_FILTER_SELECT_OPTIONS} onChange={setProcesso} />
+                <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={setBase} />
+                <Select label="Coordenador" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setCoordenador} />
+                <Select label="Responsável" value={responsavel} options={respOptions} onChange={setResponsavel} />
+                <Select label="Prefixo" value={prefixo} options={prefixoOptions} onChange={setPrefixo} />
+                <Select label="Data" value={data} options={DATA_OPTS} onChange={setData} />
+                <div className="min-w-0 lg:col-span-2">
+                  <div className="whitespace-nowrap text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Buscar defeito ou veículo
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                    <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Texto do defeito, prefixo ou placa..."
+                      className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                    />
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={limparFiltros}
+                disabled={!filtrosAtivos}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                title="Limpar filtros"
+              >
+                <RotateCcw size={18} aria-hidden />
+                Limpar
+              </button>
+            </div>
+          </div>
         </div>
 
         {carregando && (

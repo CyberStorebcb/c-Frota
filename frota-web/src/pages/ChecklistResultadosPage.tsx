@@ -93,41 +93,145 @@ function exportarCSV(rows: ChecklistRow[]) {
 
 // Sparkline SVG — tendência semanal de NC
 function Sparkline({ semanas }: { semanas: { label: string; nc: number; total: number }[] }) {
+  const [hovered, setHovered] = useState<number | null>(null)
   if (semanas.length < 2) return null
+
   const maxNc = Math.max(...semanas.map((s) => s.nc), 1)
-  const W = 220, H = 48, pad = 4
-  const xs = semanas.map((_, i) => pad + (i / (semanas.length - 1)) * (W - pad * 2))
-  const ys = semanas.map((s) => pad + (1 - s.nc / maxNc) * (H - pad * 2))
-  const path = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i]!.toFixed(1)}`).join(' ')
-  const area = `${path} L${xs[xs.length-1]!.toFixed(1)},${H} L${xs[0]!.toFixed(1)},${H} Z`
+  const W = 1000, H = 120, padX = 24, padY = 16
+
+  const xs = semanas.map((_, i) => padX + (i / (semanas.length - 1)) * (W - padX * 2))
+  const ys = semanas.map((s) => padY + (1 - s.nc / maxNc) * (H - padY * 2))
+
+  // curva suave via bezier
+  function smoothPath(xArr: number[], yArr: number[]) {
+    let d = `M${xArr[0]!.toFixed(1)},${yArr[0]!.toFixed(1)}`
+    for (let i = 1; i < xArr.length; i++) {
+      const cpx = (xArr[i - 1]! + xArr[i]!) / 2
+      d += ` C${cpx.toFixed(1)},${yArr[i - 1]!.toFixed(1)} ${cpx.toFixed(1)},${yArr[i]!.toFixed(1)} ${xArr[i]!.toFixed(1)},${yArr[i]!.toFixed(1)}`
+    }
+    return d
+  }
+
+  const linePath = smoothPath(xs, ys)
+  const areaPath = `${linePath} L${xs[xs.length - 1]!.toFixed(1)},${H} L${xs[0]!.toFixed(1)},${H} Z`
+
+  const ultima = semanas[semanas.length - 1]
+  const penultima = semanas[semanas.length - 2]
+  const tendencia = ultima && penultima
+    ? ultima.nc > penultima.nc ? 'alta' : ultima.nc < penultima.nc ? 'queda' : 'estável'
+    : 'estável'
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-          Tendência NC — últimas {semanas.length} semanas
-        </span>
-        <span className="text-xs font-extrabold text-rose-500">
-          {semanas[semanas.length - 1]?.nc ?? 0} NC esta semana
-        </span>
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-2">
+        <div>
+          <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+            Tendência NC
+          </div>
+          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            Últimas {semanas.length} semanas
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${
+            tendencia === 'alta'
+              ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
+              : tendencia === 'queda'
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+          }`}>
+            {tendencia === 'alta' ? '↑ Em alta' : tendencia === 'queda' ? '↓ Em queda' : '→ Estável'}
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-black text-rose-500">{ultima?.nc ?? 0}</div>
+            <div className="text-[9px] font-extrabold uppercase tracking-wide text-slate-400">esta semana</div>
+          </div>
+        </div>
       </div>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="w-full overflow-visible">
-        <defs>
-          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgb(239,68,68)" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="rgb(239,68,68)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={area} fill="url(#sparkGrad)" />
-        <path d={path} fill="none" stroke="rgb(239,68,68)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-        {xs.map((x, i) => (
-          <circle key={i} cx={x} cy={ys[i]} r="3" fill="rgb(239,68,68)" />
-        ))}
-      </svg>
-      <div className="mt-1 flex justify-between">
-        {semanas.map((s, i) => (
-          <span key={i} className="text-[9px] font-semibold text-slate-400 dark:text-slate-600">{s.label}</span>
-        ))}
+
+      {/* Gráfico */}
+      <div className="relative px-2 pb-1">
+        <svg
+          viewBox={`0 0 ${W} ${H + 4}`}
+          className="w-full overflow-visible"
+          onMouseLeave={() => setHovered(null)}
+        >
+          <defs>
+            <linearGradient id="sparkGrad2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgb(239,68,68)" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="rgb(239,68,68)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          {/* linhas de grade horizontais */}
+          {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+            const y = padY + t * (H - padY * 2)
+            const val = Math.round(maxNc * (1 - t))
+            return (
+              <g key={t}>
+                <line x1={padX} y1={y} x2={W - padX} y2={y} stroke="currentColor" strokeOpacity="0.06" strokeWidth="1" className="text-slate-900 dark:text-slate-100" />
+                <text x={padX - 6} y={y + 4} textAnchor="end" fontSize="11" fill="currentColor" fillOpacity="0.3" className="text-slate-900 dark:text-slate-100 font-semibold">{val}</text>
+              </g>
+            )
+          })}
+
+          {/* área */}
+          <path d={areaPath} fill="url(#sparkGrad2)" />
+
+          {/* linha */}
+          <path d={linePath} fill="none" stroke="rgb(239,68,68)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+          {/* pontos + hover targets */}
+          {xs.map((x, i) => (
+            <g key={i}>
+              <circle
+                cx={x} cy={ys[i]} r="16"
+                fill="transparent"
+                onMouseEnter={() => setHovered(i)}
+              />
+              <circle
+                cx={x} cy={ys[i]} r={hovered === i ? 5 : 3.5}
+                fill={hovered === i ? 'white' : 'rgb(239,68,68)'}
+                stroke="rgb(239,68,68)"
+                strokeWidth="2"
+                style={{ transition: 'r 0.1s' }}
+              />
+              {/* tooltip */}
+              {hovered === i && (
+                <g>
+                  <rect
+                    x={x - 38} y={(ys[i] ?? 0) - 36}
+                    width="76" height="26"
+                    rx="5" ry="5"
+                    fill="rgb(15,23,42)"
+                    stroke="rgb(239,68,68)"
+                    strokeWidth="1"
+                    strokeOpacity="0.5"
+                  />
+                  <text x={x} y={(ys[i] ?? 0) - 19} textAnchor="middle" fontSize="12" fill="rgb(239,68,68)" fontWeight="800">
+                    {semanas[i]?.nc} NC
+                  </text>
+                  <text x={x} y={(ys[i] ?? 0) - 7} textAnchor="middle" fontSize="10" fill="rgb(148,163,184)">
+                    {semanas[i]?.label}
+                  </text>
+                </g>
+              )}
+            </g>
+          ))}
+        </svg>
+
+        {/* labels semana */}
+        <div className="flex justify-between px-4 pb-3">
+          {semanas.map((s, i) => (
+            <span
+              key={i}
+              className={`text-[10px] font-semibold transition ${hovered === i ? 'text-rose-500' : 'text-slate-400 dark:text-slate-600'}`}
+            >
+              {s.label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -609,6 +713,7 @@ export function ChecklistResultadosPage() {
   const podeGerenciar = user?.role === 'admin'
 
   const [rows, setRows]               = useState<ChecklistRow[]>([])
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(true)
   const [carregando, setCarregando]   = useState(true)
   const [exportando, setExportando]   = useState(false)
   const [erro, setErro]               = useState('')
@@ -817,7 +922,7 @@ export function ChecklistResultadosPage() {
                 <div>
                   <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{semNc}</div>
                   <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-500">
-                    Sem NC
+                    Conformes
                   </div>
                 </div>
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
@@ -833,7 +938,7 @@ export function ChecklistResultadosPage() {
                 <div>
                   <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{comNc}</div>
                   <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-amber-700 dark:text-amber-500">
-                    Com NC
+                    Sem Impedimento
                   </div>
                 </div>
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-100 dark:bg-amber-900/40">
@@ -849,7 +954,7 @@ export function ChecklistResultadosPage() {
                 <div>
                   <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{totalNc}</div>
                   <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-rose-700 dark:text-rose-500">
-                    Itens NC
+                    Com Impedimento
                   </div>
                 </div>
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-rose-100 dark:bg-rose-900/40">
@@ -868,74 +973,91 @@ export function ChecklistResultadosPage() {
       <Sparkline semanas={semanas} />
 
       {/* Filtros */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex flex-col gap-3">
-          {/* linha 1: busca + tipo + toggle NC */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <Search size={15} className="shrink-0 text-slate-400" />
-              <input
-                value={queryInput}
-                onChange={(e) => setQueryInput(e.target.value)}
-                placeholder="Operador, matrícula..."
-                className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100"
-              />
-            </div>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
+          <button
+            type="button"
+            onClick={() => setFiltrosVisiveis((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
+          >
+            {filtrosVisiveis
+              ? <><ChevronUp size={13} className="text-slate-400" /> Ocultar filtros</>
+              : <><ChevronDown size={13} className="text-slate-400" /> Mostrar filtros</>
+            }
+          </button>
+        </div>
+        <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            <div className="flex flex-col gap-3 border-t border-slate-100 px-4 pb-4 pt-3 dark:border-slate-800">
+              {/* linha 1: busca + tipo + toggle NC */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                  <Search size={15} className="shrink-0 text-slate-400" />
+                  <input
+                    value={queryInput}
+                    onChange={(e) => setQueryInput(e.target.value)}
+                    placeholder="Operador, matrícula..."
+                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100"
+                  />
+                </div>
 
-            <SelectCustom
-              value={tipoFiltro}
-              onChange={setTipoFiltro}
-              options={TIPOS.map((t) => ({ value: t.id, label: t.label }))}
-              placeholder="Todos"
-            />
+                <SelectCustom
+                  value={tipoFiltro}
+                  onChange={setTipoFiltro}
+                  options={TIPOS.map((t) => ({ value: t.id, label: t.label }))}
+                  placeholder="Todos"
+                />
 
-            <button
-              type="button"
-              onClick={() => setSomenteNc((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-extrabold transition ${
-                somenteNc
-                  ? 'border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400'
-              }`}
-            >
-              <AlertTriangle size={14} />
-              Somente NC
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => setSomenteNc((v) => !v)}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-extrabold transition ${
+                    somenteNc
+                      ? 'border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400'
+                  }`}
+                >
+                  <AlertTriangle size={14} />
+                  Somente NC
+                </button>
+              </div>
 
-          {/* linha 2: datas */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">De</span>
-              <input
-                type="date"
-                value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
-              />
-            </div>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">Até</span>
-              <input
-                type="date"
-                value={dataFim}
-                onChange={(e) => setDataFim(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
-              />
-            </div>
-            {(dataInicio || dataFim || tipoFiltro || somenteNc || queryInput) && (
-              <button
-                type="button"
-                onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro(''); setSomenteNc(false); setQueryInput(''); setQuery('') }}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
-              >
-                <X size={12} />
-                Limpar filtros
-              </button>
-            )}
-            <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              <CalendarCheck2 size={14} />
-              {totalRegistros.toLocaleString('pt-BR')} resultado{totalRegistros !== 1 ? 's' : ''}
+              {/* linha 2: datas */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">De</span>
+                  <input
+                    type="date"
+                    value={dataInicio}
+                    onChange={(e) => setDataInicio(e.target.value)}
+                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+                  />
+                </div>
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">Até</span>
+                  <input
+                    type="date"
+                    value={dataFim}
+                    onChange={(e) => setDataFim(e.target.value)}
+                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+                  />
+                </div>
+                {(dataInicio || dataFim || tipoFiltro || somenteNc || queryInput) && (
+                  <button
+                    type="button"
+                    onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro(''); setSomenteNc(false); setQueryInput(''); setQuery('') }}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
+                  >
+                    <X size={12} />
+                    Limpar filtros
+                  </button>
+                )}
+                <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  <CalendarCheck2 size={14} />
+                  {totalRegistros.toLocaleString('pt-BR')} resultado{totalRegistros !== 1 ? 's' : ''}
+                </div>
+              </div>
             </div>
           </div>
         </div>
