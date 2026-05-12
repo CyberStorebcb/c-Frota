@@ -67,13 +67,6 @@ function uniqSorted(values: string[]): SelectOption[] {
   return u.map((v) => ({ value: v, label: v }))
 }
 
-const DATA_OPTS: SelectOption[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'hoje', label: 'Hoje' },
-  { value: '7d', label: 'Últimos 7 dias' },
-  { value: '30d', label: 'Últimos 30 dias' },
-  { value: 'ano', label: 'Ano atual' },
-]
 
 const PAGE_SIZE_OPTIONS: SelectOption[] = [
   { value: '25', label: '25 por página' },
@@ -167,12 +160,18 @@ export function ManagePage() {
     return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.prefixo))]
   }, [rows])
 
-  const stats = useMemo(() => {
-    const now = Date.now()
-    const pendentes = rows.filter((r) => !r.resolvido).length
-    const resolvidos = rows.filter((r) => r.resolvido).length
-    const entrantes = rows.filter((r) => isDefeitoEntrante(r, now)).length
-    return { total: rows.length, pendentes, resolvidos, entrantes }
+  const dataOpts = useMemo<SelectOption[]>(() => {
+    const anos = [...new Set(rows.map((r) => r.dataApontamento.slice(0, 4)).filter(Boolean))]
+      .sort((a, b) => Number(b) - Number(a))
+    const anoAtual = String(new Date().getFullYear())
+    return [
+      { value: 'todos', label: 'Todos' },
+      { value: 'hoje', label: 'Hoje' },
+      { value: '7d', label: 'Últimos 7 dias' },
+      { value: '30d', label: 'Últimos 30 dias' },
+      { value: 'ano', label: `Ano atual (${anoAtual})` },
+      ...anos.map((a) => ({ value: a, label: a })),
+    ]
   }, [rows])
 
   const sortedFiltered = useMemo(() => {
@@ -194,6 +193,8 @@ export function ManagePage() {
 
       if (data === 'ano') {
         list = list.filter((r) => Number(r.dataApontamento.slice(0, 4)) === ano)
+      } else if (/^\d{4}$/.test(data)) {
+        list = list.filter((r) => r.dataApontamento.startsWith(data))
       } else {
         const dias = data === 'hoje' ? 0 : data === '7d' ? 7 : 30
         const min = nowMs - dias * 86_400_000
@@ -215,6 +216,14 @@ export function ManagePage() {
       (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),
     )
   }, [rows, visao, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query])
+
+  const stats = useMemo(() => {
+    const now = Date.now()
+    const pendentes = sortedFiltered.filter((r) => !r.resolvido).length
+    const resolvidos = sortedFiltered.filter((r) => r.resolvido).length
+    const entrantes = sortedFiltered.filter((r) => isDefeitoEntrante(r, now)).length
+    return { total: sortedFiltered.length, pendentes, resolvidos, entrantes }
+  }, [sortedFiltered])
 
   const totalFiltrados = sortedFiltered.length
   const totalPaginas = Math.max(1, Math.ceil(totalFiltrados / pageSize))
@@ -399,7 +408,7 @@ export function ManagePage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatPill
           label="Checklists realizados"
-          value={String(checklistsRealizadosTotal)}
+          value={String(filtrosAtivos ? new Set(sortedFiltered.map((r) => r.checklistId)).size : checklistsRealizadosTotal)}
           icon={<ClipboardList size={18} />}
           tone="slate"
           selected={visao === 'apontamentos'}
@@ -445,8 +454,8 @@ export function ManagePage() {
         </div>
         <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
-            <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            <div className="flex flex-col gap-3 p-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
                 <Select
                   label="Filtrar por veículo"
                   value={vehicleId}
@@ -458,8 +467,10 @@ export function ManagePage() {
                 <Select label="Coordenador" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setCoordenador} />
                 <Select label="Responsável" value={responsavel} options={respOptions} onChange={setResponsavel} />
                 <Select label="Prefixo" value={prefixo} options={prefixoOptions} onChange={setPrefixo} />
-                <Select label="Data" value={data} options={DATA_OPTS} onChange={setData} />
-                <div className="min-w-0 lg:col-span-2">
+                <Select label="Data" value={data} options={dataOpts} onChange={setData} />
+              </div>
+              <div className="flex items-end gap-3">
+                <div className="min-w-0 flex-1">
                   <div className="whitespace-nowrap text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Buscar defeito ou veículo
                   </div>
@@ -473,17 +484,17 @@ export function ManagePage() {
                     />
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={limparFiltros}
+                  disabled={!filtrosAtivos}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                  title="Limpar filtros"
+                >
+                  <RotateCcw size={18} aria-hidden />
+                  Limpar
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={limparFiltros}
-                disabled={!filtrosAtivos}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-                title="Limpar filtros"
-              >
-                <RotateCcw size={18} aria-hidden />
-                Limpar
-              </button>
             </div>
           </div>
         </div>

@@ -43,14 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Carrega sessão existente
+    // Carrega sessão existente (timeout de 8s para evitar loading infinito)
+    const timeout = setTimeout(() => setLoading(false), 8000)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(timeout)
       if (session?.user) {
         const role = await fetchRole(session.user.id, session.user.email ?? '')
         setUser(toAuthUser(session.user, role))
       }
       setLoading(false)
-    })
+    }).catch(() => { clearTimeout(timeout); setLoading(false) })
 
     // Escuta mudanças de auth (login, logout, refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

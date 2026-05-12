@@ -15,6 +15,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Image,
   RefreshCw,
   Search,
   Trash2,
@@ -23,6 +24,20 @@ import {
 import { supabase, type ChecklistRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 import { useAuth } from '../auth/AuthContext'
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
 
 function formatDateBR(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -701,7 +716,7 @@ function calcSemanas(rows: ChecklistRow[], n = 8) {
   }
   return [...map.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-n)
+    .slice(n === Infinity ? 0 : -n)
     .map(([key, val]) => ({
       label: key.slice(5).replace('-', '/'),
       ...val,
@@ -712,12 +727,15 @@ export function ChecklistResultadosPage() {
   const { user } = useAuth()
   const podeGerenciar = user?.role === 'admin'
 
+  const [capturando, setCapturando]   = useState(false)
   const [rows, setRows]               = useState<ChecklistRow[]>([])
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(true)
   const [carregando, setCarregando]   = useState(true)
   const [exportando, setExportando]   = useState(false)
   const [erro, setErro]               = useState('')
   const [totalRegistros, setTotal]    = useState(0)
+  const [totalComNc, setTotalComNc]   = useState(0)
+  const [totalSemNc, setTotalSemNc]   = useState(0)
   const [confirmDelete, setConfirmDelete] = useState<ChecklistRow | null>(null)
   const [apagando, setApagando]       = useState(false)
   const [paginaAtual, setPaginaAtual] = useState(1)
@@ -758,15 +776,27 @@ export function ChecklistResultadosPage() {
   const carregar = async (pagina: number) => {
     setCarregando(true)
     setErro('')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error, count } = await (buildQuery(pagina) as any)
-    if (error) {
-      setErro('Erro ao carregar dados do Supabase.')
-    } else {
-      setRows((data as ChecklistRow[]) ?? [])
-      setTotal(count ?? 0)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [{ data, error, count }, comNcRes, semNcRes] = await Promise.all([
+        (buildQuery(pagina) as any),
+        applyFilters(supabase.from('checklists').select('id', { count: 'exact', head: true }).gt('nc_count', 0)) as any,
+        applyFilters(supabase.from('checklists').select('id', { count: 'exact', head: true }).eq('nc_count', 0)) as any,
+      ])
+      if (error) {
+        setErro('Erro ao carregar dados do Supabase.')
+      } else {
+        setRows((data as ChecklistRow[]) ?? [])
+        setTotal(count ?? 0)
+        setTotalComNc(comNcRes.count ?? 0)
+        setTotalSemNc(semNcRes.count ?? 0)
+      }
+    } catch (e) {
+      setErro('Erro inesperado ao carregar dados.')
+      console.error(e)
+    } finally {
+      setCarregando(false)
     }
-    setCarregando(false)
   }
 
   const apagarChecklist = async (row: ChecklistRow) => {
@@ -780,15 +810,23 @@ export function ChecklistResultadosPage() {
     void carregar(paginaAtual)
   }
 
-  // Carrega dados para o sparkline (sem paginação, só últimas 8 semanas)
+  // Carrega dados para o sparkline respeitando filtros de data ativos
   const carregarSpark = async () => {
-    const oitoSemanas = new Date()
-    oitoSemanas.setDate(oitoSemanas.getDate() - 56)
-    const { data } = await supabase
+    let q = supabase
       .from('checklists')
       .select('data_inspecao,nc_count')
-      .gte('data_inspecao', oitoSemanas.toISOString().slice(0, 10))
       .order('data_inspecao', { ascending: true })
+
+    if (dataInicio || dataFim) {
+      if (dataInicio) q = q.gte('data_inspecao', dataInicio) as typeof q
+      if (dataFim)    q = q.lte('data_inspecao', dataFim) as typeof q
+    } else {
+      const oitoSemanas = new Date()
+      oitoSemanas.setDate(oitoSemanas.getDate() - 56)
+      q = q.gte('data_inspecao', oitoSemanas.toISOString().slice(0, 10)) as typeof q
+    }
+
+    const { data } = await q
     if (data) setSparkRows(data as ChecklistRow[])
   }
 
@@ -809,7 +847,7 @@ export function ChecklistResultadosPage() {
     void carregar(paginaAtual)
   }, [paginaAtual]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { void carregarSpark() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void carregarSpark() }, [dataInicio, dataFim]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const irParaPagina = (p: number) => {
     if (p < 1 || p > totalPaginas || p === paginaAtual) return
@@ -840,9 +878,214 @@ export function ChecklistResultadosPage() {
     setExportando(false)
   }
 
+  const handleCapturar = () => {
+    setCapturando(true)
+
+    const S = 2 // escala
+    const W = 900 * S
+    const cardH = 110 * S
+    const chartH = 220 * S
+    const headerH = 44 * S
+    const pad = 20 * S
+    const gap = 12 * S
+    const totalH = headerH + pad + cardH + gap + chartH + pad
+
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = totalH
+    const ctx = canvas.getContext('2d')!
+    ctx.scale(S, S)
+
+    const W1 = W / S
+    const font = (size: number, weight = '700') => `${weight} ${size}px Inter,system-ui,sans-serif`
+
+    // --- fundo ---
+    ctx.fillStyle = '#0f172a'
+    ctx.fillRect(0, 0, W1, totalH / S)
+
+    // --- header do período ---
+    ctx.fillStyle = '#1e293b'
+    roundRect(ctx, 0, 0, W1, headerH / S, 0)
+    ctx.fill()
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = font(11, '800')
+    ctx.textBaseline = 'middle'
+    const periodoLabel = dataInicio && dataFim
+      ? `Período: ${formatDateBR(dataInicio)} — ${formatDateBR(dataFim)}`
+      : dataInicio ? `A partir de: ${formatDateBR(dataInicio)}`
+      : dataFim ? `Até: ${formatDateBR(dataFim)}`
+      : 'Todos os períodos'
+    ctx.fillText(`📋  ${periodoLabel.toUpperCase()}`, pad / S, (headerH / S) / 2)
+
+    // --- 4 cards ---
+    const cardY = headerH / S + pad / S
+    const cardW = (W1 - (pad / S) * 2 - gap / S * 3) / 4
+    const cards = [
+      { label: 'CHECKLISTS', value: String(totalRegistros), sub: 'no período filtrado', bg: '#1e293b', accent: '#94a3b8', val: '#f1f5f9' },
+      { label: 'CONFORMES', value: String(totalSemNc), sub: 'todos conformes', bg: '#052e16', accent: '#4ade80', val: '#4ade80' },
+      { label: 'SEM IMPEDIMENTO', value: String(totalRegistros - totalSemNc), sub: `${totalRegistros > 0 ? Math.round(((totalRegistros - totalSemNc) / totalRegistros) * 100) : 0}% dos checklists`, bg: '#1c1400', accent: '#f59e0b', val: '#f59e0b' },
+      { label: 'COM IMPEDIMENTO', value: String(totalComNc), sub: `~${totalRegistros > 0 ? (totalComNc / totalRegistros).toFixed(1) : '0'} por checklist`, bg: '#1a0a0a', accent: '#f87171', val: '#f87171' },
+    ]
+
+    cards.forEach((card, i) => {
+      const x = pad / S + i * (cardW + gap / S)
+      roundRect(ctx, x, cardY, cardW, cardH / S, 14)
+      ctx.fillStyle = card.bg
+      ctx.fill()
+      ctx.strokeStyle = card.accent + '33'
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      ctx.fillStyle = card.val
+      ctx.font = font(28, '900')
+      ctx.textBaseline = 'top'
+      ctx.fillText(card.value, x + 14, cardY + 14)
+
+      ctx.fillStyle = card.accent
+      ctx.font = font(9, '800')
+      ctx.fillText(card.label, x + 14, cardY + 50)
+
+      ctx.fillStyle = '#64748b'
+      ctx.font = font(9, '600')
+      ctx.fillText(card.sub, x + 14, cardY + 66)
+    })
+
+    // --- gráfico sparkline ---
+    const chartY = cardY + cardH / S + gap / S
+    roundRect(ctx, pad / S, chartY, W1 - (pad / S) * 2, chartH / S, 14)
+    ctx.fillStyle = '#0f1f38'
+    ctx.fill()
+    ctx.strokeStyle = '#1e3a5f'
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // título do gráfico
+    ctx.fillStyle = '#64748b'
+    ctx.font = font(9, '800')
+    ctx.textBaseline = 'top'
+    ctx.fillText('TENDÊNCIA NC', pad / S + 14, chartY + 14)
+    ctx.fillStyle = '#475569'
+    ctx.font = font(9, '600')
+    ctx.fillText(`Últimas ${semanas.length} semanas`, pad / S + 14, chartY + 28)
+
+    if (semanas.length >= 2) {
+      const maxNc = Math.max(...semanas.map((s) => s.nc), 1)
+      const gx0 = pad / S + 44, gx1 = W1 - pad / S - 14
+      const gy0 = chartY + 50, gy1 = chartY + chartH / S - 30
+      const gW = gx1 - gx0, gH = gy1 - gy0
+
+      const xs = semanas.map((_, i) => gx0 + (i / (semanas.length - 1)) * gW)
+      const ys = semanas.map((s) => gy0 + (1 - s.nc / maxNc) * gH)
+
+      // grid lines
+      ctx.strokeStyle = 'rgba(148,163,184,0.08)'
+      ctx.lineWidth = 1
+      for (let t = 0; t <= 4; t++) {
+        const y = gy0 + (t / 4) * gH
+        const val = Math.round(maxNc * (1 - t / 4))
+        ctx.beginPath(); ctx.moveTo(gx0, y); ctx.lineTo(gx1, y); ctx.stroke()
+        ctx.fillStyle = 'rgba(148,163,184,0.4)'
+        ctx.font = font(9, '600')
+        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'right'
+        ctx.fillText(String(val), gx0 - 6, y)
+      }
+
+      // labels eixo X
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      semanas.forEach((s, i) => {
+        if (i === 0 || i === semanas.length - 1 || i === Math.floor(semanas.length / 2)) {
+          ctx.fillStyle = 'rgba(148,163,184,0.5)'
+          ctx.font = font(9, '600')
+          ctx.fillText(s.label, xs[i]!, gy1 + 8)
+        }
+      })
+
+      // área preenchida
+      const grad = ctx.createLinearGradient(0, gy0, 0, gy1)
+      grad.addColorStop(0, 'rgba(239,68,68,0.25)')
+      grad.addColorStop(1, 'rgba(239,68,68,0)')
+      ctx.beginPath()
+      ctx.moveTo(xs[0]!, ys[0]!)
+      for (let i = 1; i < xs.length; i++) {
+        const cpx = (xs[i - 1]! + xs[i]!) / 2
+        ctx.bezierCurveTo(cpx, ys[i - 1]!, cpx, ys[i]!, xs[i]!, ys[i]!)
+      }
+      ctx.lineTo(xs[xs.length - 1]!, gy1)
+      ctx.lineTo(xs[0]!, gy1)
+      ctx.closePath()
+      ctx.fillStyle = grad
+      ctx.fill()
+
+      // linha
+      ctx.beginPath()
+      ctx.moveTo(xs[0]!, ys[0]!)
+      for (let i = 1; i < xs.length; i++) {
+        const cpx = (xs[i - 1]! + xs[i]!) / 2
+        ctx.bezierCurveTo(cpx, ys[i - 1]!, cpx, ys[i]!, xs[i]!, ys[i]!)
+      }
+      ctx.strokeStyle = 'rgb(239,68,68)'
+      ctx.lineWidth = 2.5
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      ctx.stroke()
+
+      // pontos
+      xs.forEach((x, i) => {
+        if (i === 0 || i === xs.length - 1) {
+          ctx.beginPath()
+          ctx.arc(x, ys[i]!, 4, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgb(239,68,68)'
+          ctx.fill()
+        }
+      })
+
+      // badge tendência
+      const ultima = semanas[semanas.length - 1]!
+      const penultima = semanas[semanas.length - 2]!
+      const tend = ultima.nc > penultima.nc ? '↑ Em alta' : ultima.nc < penultima.nc ? '↓ Em queda' : '→ Estável'
+      const tendColor = ultima.nc > penultima.nc ? '#f87171' : ultima.nc < penultima.nc ? '#4ade80' : '#94a3b8'
+      const tendBg = ultima.nc > penultima.nc ? 'rgba(239,68,68,0.15)' : ultima.nc < penultima.nc ? 'rgba(74,222,128,0.15)' : 'rgba(148,163,184,0.15)'
+      ctx.font = font(9, '800')
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'top'
+      const badgeW = ctx.measureText(tend).width + 16
+      roundRect(ctx, gx1 - badgeW - 60, chartY + 10, badgeW, 20, 10)
+      ctx.fillStyle = tendBg
+      ctx.fill()
+      ctx.fillStyle = tendColor
+      ctx.fillText(tend, gx1 - 60 - 8, chartY + 15)
+
+      ctx.fillStyle = '#f87171'
+      ctx.font = font(18, '900')
+      ctx.textAlign = 'right'
+      ctx.fillText(String(ultima.nc), gx1, chartY + 8)
+      ctx.fillStyle = '#64748b'
+      ctx.font = font(8, '700')
+      ctx.fillText('ESTA SEMANA', gx1, chartY + 30)
+    }
+
+    // download
+    const periodo = dataInicio && dataFim
+      ? `${dataInicio}_a_${dataFim}`
+      : dataInicio ? `a_partir_de_${dataInicio}`
+      : dataFim ? `ate_${dataFim}`
+      : 'todos'
+    const link = document.createElement('a')
+    link.download = `checklists_${periodo}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+    setCapturando(false)
+  }
+
   const filtrados = rows  // filtro de texto já vai pro servidor
   const totalNc = filtrados.reduce((acc, r) => acc + r.nc_count, 0)
-  const semanas = useMemo(() => calcSemanas(sparkRows), [sparkRows])
+  const semanas = useMemo(() => {
+    // Com filtro de período usa todas as semanas; sem filtro limita a 8
+    const n = (dataInicio || dataFim) ? Infinity : 8
+    return calcSemanas(sparkRows, n)
+  }, [sparkRows, dataInicio, dataFim])
 
   return (
     <div className="space-y-5">
@@ -874,6 +1117,16 @@ export function ChecklistResultadosPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => void handleCapturar()}
+            disabled={capturando || carregando}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+            title="Baixar imagem dos cards e gráfico"
+          >
+            <Image size={16} className={capturando ? 'animate-pulse' : ''} />
+            {capturando ? 'Gerando...' : 'Capturar'}
+          </button>
+          <button
+            type="button"
             onClick={() => void handleExportar()}
             disabled={exportando || carregando}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
@@ -895,16 +1148,16 @@ export function ChecklistResultadosPage() {
 
       {/* Cards de resumo */}
       {(() => {
-        const comNc = filtrados.filter((r) => r.nc_count > 0).length
-        const semNc = filtrados.filter((r) => r.nc_count === 0).length
-        const taxaNc = filtrados.length > 0 ? Math.round((comNc / filtrados.length) * 100) : 0
+        const comNc = totalComNc
+        const semNc = totalSemNc
+        const taxaNc = totalRegistros > 0 ? Math.round((comNc / totalRegistros) * 100) : 0
         return (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {/* Total */}
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{filtrados.length}</div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{totalRegistros}</div>
                   <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Checklists
                   </div>
@@ -913,7 +1166,7 @@ export function ChecklistResultadosPage() {
                   <ClipboardList size={17} className="text-slate-500 dark:text-slate-400" />
                 </div>
               </div>
-              <div className="mt-2 text-[10px] font-semibold text-slate-400">nesta página</div>
+              <div className="mt-2 text-[10px] font-semibold text-slate-400">no período filtrado</div>
             </div>
 
             {/* Aprovados */}
