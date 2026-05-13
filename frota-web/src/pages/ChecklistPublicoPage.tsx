@@ -10,6 +10,7 @@ import {
   Paperclip,
   X,
 } from 'lucide-react'
+import { uploadChecklistEvidenceFile } from '../lib/checklistEvidenceUpload'
 import { supabase } from '../lib/supabase'
 import { useTheme } from '../theme/ThemeProvider'
 import { enqueueChecklist, type OfflineChecklistFile } from '../checklists/offlineQueue'
@@ -18,6 +19,7 @@ import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
+import { compressChecklistImageIfNeeded } from '../utils/compressChecklistImage'
 
 type Resposta = 'c' | 'nc' | 'na' | null
 
@@ -338,7 +340,7 @@ function FotosItem({
         <ImagePlus size={13} className="text-rose-400" />
         <span className="text-[11px] font-extrabold uppercase tracking-wide text-rose-500">
           Foto do problema
-          {fotos.length > 0 ? ` (${fotos.length}/${slots})` : ` — opcional, até ${slots}`}
+          {fotos.length > 0 ? ` (${fotos.length}/${slots})` : ` — opcional, até ${slots} · máx. 155 KB (ajuste automático)`}
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -376,9 +378,17 @@ function FotosItem({
               multiple
               className="hidden"
               onChange={(e) => {
-                const novos = Array.from(e.target.files ?? []).slice(0, restantes)
-                if (novos.length) onAdd(novos)
-                e.target.value = ''
+                const input = e.target
+                void (async () => {
+                  const novos = Array.from(input.files ?? []).slice(0, restantes)
+                  if (!novos.length) {
+                    input.value = ''
+                    return
+                  }
+                  const processed = await Promise.all(novos.map((f) => compressChecklistImageIfNeeded(f)))
+                  onAdd(processed)
+                  input.value = ''
+                })()
               }}
             />
             <button
@@ -485,9 +495,21 @@ function FormularioChecklist({
     setFotosItem((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), ...novos].slice(0, 3) }))
 
   const handleArquivos = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const novos = Array.from(e.target.files ?? []).slice(0, 10 - arquivos.length)
-    setArquivos((prev) => [...prev, ...novos].slice(0, 10))
-    e.target.value = ''
+    const input = e.target
+    const room = Math.max(0, 10 - arquivos.length)
+    const novos = Array.from(input.files ?? []).slice(0, room)
+    input.value = ''
+    if (!novos.length) return
+    void (async () => {
+      const processed = await Promise.all(
+        novos.map((f) =>
+          f.type.startsWith('image/') && f.type !== 'image/svg+xml'
+            ? compressChecklistImageIfNeeded(f)
+            : Promise.resolve(f),
+        ),
+      )
+      setArquivos((prev) => [...prev, ...processed].slice(0, 10))
+    })()
   }
 
   const removerArquivo = (idx: number) =>
@@ -496,11 +518,8 @@ function FormularioChecklist({
   const removeFotoItem = (id: string, idx: number) =>
     setFotosItem((prev) => ({ ...prev, [id]: (prev[id] ?? []).filter((_, i) => i !== idx) }))
 
-  const uploadFile = async (file: File, path: string): Promise<string | null> => {
-    const { error } = await supabase.storage.from('checklist-evidencias').upload(path, file, { upsert: false })
-    if (error) return null
-    return supabase.storage.from('checklist-evidencias').getPublicUrl(path).data.publicUrl
-  }
+  const uploadFile = async (file: File, path: string): Promise<string | null> =>
+    uploadChecklistEvidenceFile(file, path)
 
   const buildChecklistPayload = (observacoesFinais: Record<string, string>, evidenciaUrls: string[]) => {
     const respostasLimpas = Object.fromEntries(
@@ -944,7 +963,7 @@ function FormularioChecklist({
                 Evidência NR12
               </p>
               <p className="mt-0.5 text-xs font-semibold text-rose-100/85">
-                Anexe fotos ou PDFs da inspeção geral (opcional · máx. 10 arquivos)
+                Anexe fotos ou PDFs da inspeção geral (opcional · máx. 10 arquivos · imagens até 155 KB, ajuste automático)
               </p>
             </div>
             <div className="px-4 py-3">

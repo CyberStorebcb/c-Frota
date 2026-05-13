@@ -1,4 +1,5 @@
 import { supabase, type ChecklistInsert } from '../lib/supabase'
+import { uploadChecklistEvidenceFile } from '../lib/checklistEvidenceUpload'
 import {
   listPendingOfflineChecklists,
   removeOfflineChecklist,
@@ -7,20 +8,18 @@ import {
   type OfflineChecklistRecord,
 } from './offlineQueue'
 
-const BUCKET = 'checklist-evidencias'
-
 function safeFileName(fileName: string) {
   return fileName.replace(/\s+/g, '_').replace(/[^\w.\-]/g, '_')
 }
 
-async function uploadOfflineFile(schemaId: string, ts: number, file: OfflineChecklistFile, index: number): Promise<string | null> {
+async function uploadOfflineFile(schemaId: string, ts: number, file: OfflineChecklistFile, index: number): Promise<string> {
   const ext = file.name.split('.').pop() ?? 'jpg'
   const itemPart = file.itemId ? `item-${file.itemId}` : 'evidencia'
   const path = `${schemaId}/${ts}-${itemPart}-${index}-${safeFileName(file.name || `arquivo.${ext}`)}`
   const uploadFile = new File([file.file], file.name || `arquivo.${ext}`, { type: file.type || file.file.type })
-  const { error } = await supabase.storage.from(BUCKET).upload(path, uploadFile, { upsert: false })
-  if (error) throw error
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+  const url = await uploadChecklistEvidenceFile(uploadFile, path)
+  if (!url) throw new Error('Falha ao enviar evidência (armazenamento)')
+  return url
 }
 
 async function sendRecord(record: OfflineChecklistRecord) {
@@ -34,7 +33,6 @@ async function sendRecord(record: OfflineChecklistRecord) {
 
   for (const [index, file] of record.files.entries()) {
     const url = await uploadOfflineFile(payload.tipo, ts, file, index)
-    if (!url) continue
     payload.evidencia_urls.push(url)
     if (file.itemId) {
       const urls = itemPhotoUrls.get(file.itemId) ?? []

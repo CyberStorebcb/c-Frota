@@ -1,0 +1,15 @@
+# Copie para .dev.vars (ignorado pelo git) e preencha.
+#
+# R2_ACCOUNT_ID — está no URL S3 do bucket (Settings → General → S3 API):
+#   https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com/<nome-do-bucket>
+# Não use esse URL inteiro como R2_PUBLIC_BASE_URL (esse é só para API).
+#
+# R2_PUBLIC_BASE_URL — base pública de leitura (sem / no fim), ex. Public Development URL:
+#   https://pub-xxxx.r2.dev
+R2_ACCOUNT_ID=
+R2_BUCKET_NAME=checklist-evidencias
+R2_PUBLIC_BASE_URL=https://pub-xxxx.r2.dev
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+# Opcional — alinhar com VITE_R2_PRESIGN_API_KEY no frota-web/.env
+PRESIGN_API_KEY=

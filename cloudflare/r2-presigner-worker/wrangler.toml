@@ -1,0 +1,16 @@
+# Deploy: npm install && npx wrangler deploy
+# Segredos (produção): wrangler secret put R2_ACCOUNT_ID | R2_ACCESS_KEY_ID | R2_SECRET_ACCESS_KEY | PRESIGN_API_KEY
+# Opcional: R2_PUBLIC_BASE_URL e R2_BUCKET_NAME como secrets ou [vars] abaixo.
+
+name = "frota-r2-presigner"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Opcional: se omitir, o Wrangler usa a conta predefinida do utilizador.
+# account_id = "cole aqui o Account ID (apenas localmente; não commitar com valores reais se o repositório for público)"
+
+[vars]
+# Bucket R2 e URL pública base (domínio r2.dev, custom domain, etc.) — sem barra final.
+R2_BUCKET_NAME = "checklist-evidencias"
+# R2_PUBLIC_BASE_URL = "https://pub-xxxx.r2.dev"
