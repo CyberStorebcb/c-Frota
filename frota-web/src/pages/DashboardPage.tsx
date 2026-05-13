@@ -284,6 +284,7 @@ type Stat = {
   Icon: LucideIcon
   iconWrap: string
   cardHover: string
+  href?: string
 }
 
 export function DashboardPage() {
@@ -363,6 +364,7 @@ export function DashboardPage() {
         Icon: Truck,
         iconWrap: 'bg-purple-50 text-purple-600 group-hover:scale-110 dark:bg-purple-950/50 dark:text-purple-400',
         cardHover: 'hover:border-purple-400 dark:hover:border-purple-500',
+        href: '/veiculos/status',
       },
       {
         label: 'Checklists hoje',
@@ -511,11 +513,17 @@ export function DashboardPage() {
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:flex-row lg:gap-5 lg:p-5">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
-            {stats.map((s) => (
-              <div
+            {stats.map((s) => {
+              const Card = s.href ? Link : 'div'
+              return (
+              <Card
                 key={s.label}
-                className={`group flex items-center justify-between rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${s.cardHover}`}
+                to={s.href ?? '#'}
+                className={`group flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${s.cardHover} ${s.href ? 'cursor-pointer hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-400/40' : ''}`}
               >
+                <div className={`mb-3 shrink-0 rounded-xl p-3 transition-transform sm:rounded-2xl sm:p-3.5 ${s.iconWrap}`}>
+                  <s.Icon size={26} aria-hidden />
+                </div>
                 <div className="min-w-0">
                   <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 sm:text-[10px]">
                     {s.label}
@@ -524,11 +532,8 @@ export function DashboardPage() {
                     {s.value}
                   </h3>
                 </div>
-                <div className={`shrink-0 rounded-xl p-3 transition-transform sm:rounded-2xl sm:p-3.5 ${s.iconWrap}`}>
-                  <s.Icon size={26} aria-hidden />
-                </div>
-              </div>
-            ))}
+              </Card>
+            )})}
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-transparent dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2.5rem]">

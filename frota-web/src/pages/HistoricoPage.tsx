@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarCheck2, FileDown, History, Search, TrendingUp, Truck
 import { jsPDF } from 'jspdf'
 import { PDFDocument } from 'pdf-lib'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import { Portal } from '../components/ui/Portal'
 
 function formatDateBR(iso: string) {
@@ -430,7 +431,7 @@ export function HistoricoPage() {
     doc.setFontSize(11)
     const defectX = rightX + 54
     const defectW = boxW / 2 - 80
-    const defectLines = doc.splitTextToSize(r.defeito, defectW) as string[]
+    const defectLines = doc.splitTextToSize(formatDefeitoParaExibicao(r.defeito), defectW) as string[]
     const used = defectLines.slice(0, 2)
     doc.text(used, defectX, line1, { maxWidth: defectW })
     const defectExtra = clamp(used.length - 1, 0, 1) * 12
@@ -591,7 +592,7 @@ export function HistoricoPage() {
       doc.setTextColor(0)
     }
 
-    const fileName = `relatorio-${fileSafeName(`${r.prefixo}-${r.defeito}-${r.dataResolvido ?? ''}`) || r.id}.pdf`
+    const fileName = `relatorio-${fileSafeName(`${r.prefixo}-${formatDefeitoParaExibicao(r.defeito)}-${r.dataResolvido ?? ''}`) || r.id}.pdf`
 
     if (r.osArquivo) {
       const reportBytes = doc.output('arraybuffer') as ArrayBuffer
@@ -765,7 +766,7 @@ export function HistoricoPage() {
                         <span className="font-mono text-xs tracking-tight">{r.veiculoLabel}</span>
                       </span>
                     </td>
-                    <td className="max-w-[300px] px-4 py-3 text-xs leading-snug sm:text-sm">{r.defeito}</td>
+                    <td className="max-w-[300px] px-4 py-3 text-xs leading-snug sm:text-sm">{formatDefeitoParaExibicao(r.defeito)}</td>
                     <td className="max-w-[340px] px-4 py-3 text-xs leading-snug text-slate-700 dark:text-slate-300 sm:text-sm">
                       {r.reparoDescricao?.trim() ? (
                         r.reparoDescricao

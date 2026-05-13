@@ -11,12 +11,53 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useTheme } from '../theme/ThemeProvider'
 import { enqueueChecklist, type OfflineChecklistFile } from '../checklists/offlineQueue'
 import { SyncStatus } from '../checklists/SyncStatus'
+import { BrandLogo } from '../branding/BrandLogo'
+import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 
 type Resposta = 'c' | 'nc' | 'na' | null
+
+const CHECKLIST_PAGE_BG =
+  'bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.14),transparent_34%),linear-gradient(180deg,#fff7f9_0%,#f8fafc_34%,#eef2f7_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.24),transparent_35%),linear-gradient(180deg,#090d18_0%,#020617_58%,#01040b_100%)]'
+
+const CGB_CARD =
+  'border border-white/70 bg-white/[0.92] shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/[0.88] dark:shadow-black/30'
+
+const CGB_SECTION_HEADER =
+  'border-b border-[#7f1022]/10 bg-gradient-to-r from-[#7f1022] via-[#9f1239] to-[#101827] px-4 py-3 text-white dark:border-white/10'
+
+const CGB_FIELD_LABEL = 'text-[10px] font-extrabold uppercase tracking-widest text-[#7f1022] dark:text-rose-300'
+const CGB_PRIMARY_BUTTON =
+  'bg-gradient-to-r from-[#7f1022] via-[#9f1239] to-[#b51649] text-white shadow-lg shadow-rose-950/15'
+
+function CgbHero({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string
+  title: string
+  description: string
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-[2rem] bg-[#0b1020] p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.24)] ring-1 ring-white/10">
+      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-[#b51649]/45 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 left-8 h-40 w-40 rounded-full bg-[#7f1022]/35 blur-3xl" />
+      <div className="relative flex flex-col items-center gap-3 text-center">
+        <CollapsedNavMark size="lg" className="ring-2 ring-white/15" />
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-rose-200">{eyebrow}</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight">{title}</h1>
+          <p className="mx-auto mt-2 max-w-sm text-sm font-semibold leading-relaxed text-slate-300">{description}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function TelaEscolhaChecklist({
   onSelecionar,
@@ -24,26 +65,15 @@ function TelaEscolhaChecklist({
   onSelecionar: (tipo: string) => void
 }) {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 py-8 dark:bg-slate-950">
+    <div className={`flex min-h-dvh flex-col items-center justify-center px-4 py-8 ${CHECKLIST_PAGE_BG}`}>
       <div className="w-full max-w-md">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900">
-            <ClipboardList size={28} />
-          </div>
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-              Inspeção — motorista
-            </p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-              Escolha o checklist
-            </h1>
-            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              Esta página é só para preencher a inspeção. Não é preciso entrar no sistema nem fazer login.
-            </p>
-          </div>
-        </div>
+        <CgbHero
+          eyebrow="CGB — inspeção motorista"
+          title="Escolha o checklist"
+          description="Preencha a inspeção do veículo sem entrar no painel interno. O formulário funciona online e offline."
+        />
 
-        <div className="space-y-3">
+        <div className="mt-5 space-y-3">
           {CHECKLIST_SCHEMAS.map((schema) => {
             const totalItens = schema.grupos.reduce((acc, g) => acc + g.itens.length, 0)
             return (
@@ -51,9 +81,9 @@ function TelaEscolhaChecklist({
                 key={schema.id}
                 type="button"
                 onClick={() => onSelecionar(schema.id)}
-                className="group flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 active:scale-[.99] dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+                className={`group flex w-full items-center gap-3 rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:border-[#b51649]/35 hover:shadow-[0_16px_35px_rgba(127,16,34,0.12)] active:scale-[.99] ${CGB_CARD}`}
               >
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#7f1022]/10 text-[#7f1022] ring-1 ring-[#7f1022]/10 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/10">
                   <ClipboardList size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -62,13 +92,13 @@ function TelaEscolhaChecklist({
                     {schema.descricao} · {totalItens} itens
                   </div>
                 </div>
-                <ChevronRight size={18} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
+                <ChevronRight size={18} className="shrink-0 text-[#b51649]/45 transition group-hover:translate-x-0.5 group-hover:text-[#b51649]" />
               </button>
             )
           })}
         </div>
 
-        <p className="mt-6 text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        <p className="mt-6 text-center text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           Você não será direcionado ao painel interno da frota — apenas a este formulário.
         </p>
 
@@ -111,27 +141,20 @@ function TelaIdentificacao({
   const totalItens = schema.grupos.reduce((acc, g) => acc + g.itens.length, 0)
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 py-8 dark:bg-slate-950">
+    <div className={`flex min-h-dvh flex-col items-center justify-center px-4 py-8 ${CHECKLIST_PAGE_BG}`}>
       <div className="w-full max-w-sm">
 
         {/* Cabeçalho */}
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900">
-            <ClipboardList size={28} />
-          </div>
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">{schema.nome}</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-              Identificação
-            </h1>
-            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              Informe seus dados antes de iniciar
-            </p>
-          </div>
+        <div className="mb-5">
+          <CgbHero
+            eyebrow={schema.nome}
+            title="Identificação"
+            description="Informe os dados do motorista antes de iniciar a inspeção CGB."
+          />
         </div>
 
         {/* Resumo do checklist */}
-        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div className={`mb-4 overflow-hidden rounded-2xl ${CGB_CARD}`}>
           <div className="grid divide-x divide-slate-100 dark:divide-slate-800" style={{ gridTemplateColumns: `repeat(${schema.grupos.length + 1}, 1fr)` }}>
             {schema.grupos.map((g, i) => (
               <div key={g.id} className="flex flex-col items-center px-2 py-3 text-center">
@@ -141,9 +164,9 @@ function TelaIdentificacao({
                 </span>
               </div>
             ))}
-            <div className="flex flex-col items-center bg-slate-50 px-2 py-3 text-center dark:bg-slate-900/40">
-              <span className="text-xl font-black text-slate-900 dark:text-slate-100">{totalItens}</span>
-              <span className="mt-0.5 text-[10px] font-extrabold uppercase leading-tight text-slate-400 dark:text-slate-500">
+            <div className="flex flex-col items-center bg-[#7f1022]/[0.08] px-2 py-3 text-center dark:bg-rose-500/10">
+              <span className="text-xl font-black text-[#7f1022] dark:text-rose-300">{totalItens}</span>
+              <span className="mt-0.5 text-[10px] font-extrabold uppercase leading-tight text-[#7f1022]/60 dark:text-rose-200/70">
                 Total
               </span>
             </div>
@@ -159,10 +182,10 @@ function TelaIdentificacao({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3" noValidate>
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
             {/* Nome */}
             <div className={`border-b px-4 py-3 ${erros.nome ? 'border-rose-200 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-900/10' : 'border-slate-100 dark:border-slate-800'}`}>
-              <label className={`text-[10px] font-extrabold uppercase tracking-widest ${erros.nome ? 'text-rose-500' : 'text-slate-400'}`}>
+              <label className={erros.nome ? 'text-[10px] font-extrabold uppercase tracking-widest text-rose-500' : CGB_FIELD_LABEL}>
                 Nome completo *
               </label>
               <input
@@ -177,7 +200,7 @@ function TelaIdentificacao({
             </div>
             {/* Matrícula */}
             <div className={`px-4 py-3 ${erros.matricula ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`}>
-              <label className={`text-[10px] font-extrabold uppercase tracking-widest ${erros.matricula ? 'text-rose-500' : 'text-slate-400'}`}>
+              <label className={erros.matricula ? 'text-[10px] font-extrabold uppercase tracking-widest text-rose-500' : CGB_FIELD_LABEL}>
                 Matrícula *
               </label>
               <input
@@ -194,7 +217,7 @@ function TelaIdentificacao({
 
           <button
             type="submit"
-            className="w-full rounded-2xl bg-slate-900 py-4 text-base font-extrabold text-white transition active:scale-[.98] dark:bg-slate-100 dark:text-slate-900"
+            className={`w-full rounded-2xl py-4 text-base font-extrabold transition active:scale-[.98] ${CGB_PRIMARY_BUTTON}`}
           >
             Iniciar Checklist →
           </button>
@@ -218,12 +241,15 @@ function TelaConclusao({
   itensNc: { label: string; imperativo: boolean; obs: string }[]
   offline?: boolean
 }) {
+  const { theme } = useTheme()
+  const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
   const bloqueado = ncImperativos > 0
   const comNc = ncCount > 0
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-start bg-slate-50 px-4 py-10 dark:bg-slate-950">
       <div className="flex w-full max-w-sm flex-col items-center gap-5 text-center">
+        <BrandLogo tone={footerTone} variant="horizontal" className="!max-h-9 opacity-90" />
 
         {/* Ícone de status */}
         <div className={`grid h-20 w-20 place-items-center rounded-full ${
@@ -603,37 +629,35 @@ function FormularioChecklist({
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
+    <div className={`min-h-dvh ${CHECKLIST_PAGE_BG}`} style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
 
       {/* ── Header fixo ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1020]/95 px-4 py-3 text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900">
-            <ClipboardList size={16} />
-          </div>
+          <CollapsedNavMark size="md" className="ring-1 ring-white/15" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-black text-slate-900 dark:text-slate-100">{schema.nome}</div>
+            <div className="truncate text-sm font-black text-white">{schema.nome}</div>
             <div className="mt-1 flex items-center gap-2">
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.12]">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
                     ncImperativos > 0 ? 'bg-rose-500' :
                     tudo100        ? 'bg-emerald-500' :
-                    'bg-blue-500'
+                    'bg-[#c81e55]'
                   }`}
                   style={{ width: `${progresso}%` }}
                 />
               </div>
-              <span className="shrink-0 text-[11px] font-extrabold tabular-nums text-slate-500">
+              <span className="shrink-0 text-[11px] font-extrabold tabular-nums text-slate-300">
                 {respondidos}/{totalItens}
               </span>
-              <span className="shrink-0 text-[11px] font-black tabular-nums text-slate-700 dark:text-slate-300">
+              <span className="shrink-0 text-[11px] font-black tabular-nums text-white">
                 {progresso}%
               </span>
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-xs font-extrabold text-slate-700 dark:text-slate-300">{operador}</div>
+            <div className="text-xs font-extrabold text-white">{operador}</div>
             <div className="text-[10px] font-semibold text-slate-400">Mat. {matricula}</div>
           </div>
         </div>
@@ -643,9 +667,9 @@ function FormularioChecklist({
         <SyncStatus />
 
         {/* ── Legenda C / NC / NA ──────────────────────────────────── */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/60">
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Como responder</p>
+        <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
+          <div className={CGB_SECTION_HEADER}>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-rose-100">Como responder</p>
           </div>
           <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800">
             {[
@@ -672,16 +696,16 @@ function FormularioChecklist({
         </div>
 
         {/* ── Dados do Veículo ─────────────────────────────────────── */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+        <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
+          <div className={CGB_SECTION_HEADER}>
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
               Dados do Veículo
             </p>
-            <p className="mt-0.5 text-xs font-semibold text-slate-400">Preencha antes de iniciar a inspeção</p>
+            <p className="mt-0.5 text-xs font-semibold text-rose-100/85">Preencha antes de iniciar a inspeção</p>
           </div>
           <div className="grid grid-cols-2 gap-px bg-slate-100 dark:bg-slate-800">
             <div className="flex flex-col gap-0.5 bg-white px-4 py-3 dark:bg-slate-950">
-              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Data *</label>
+              <label className={CGB_FIELD_LABEL}>Data *</label>
               <input
                 type="date"
                 value={dataInspecao}
@@ -696,7 +720,7 @@ function FormularioChecklist({
                   campo.id === 'localidade' ? 'col-span-2' : ''
                 }`}
               >
-                <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                <label className={CGB_FIELD_LABEL}>
                   {campo.label}{campo.obrigatorio ? ' *' : ''}
                 </label>
                 {campo.tipo === 'select' && campo.opcoes && campo.opcoes.length > 0 ? (
@@ -732,9 +756,9 @@ function FormularioChecklist({
 
         {/* ── Supervisor ───────────────────────────────────────────── */}
         {schema.temSupervisor && (
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+          <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
+            <div className={CGB_SECTION_HEADER}>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
                 Supervisor Responsável
               </p>
             </div>
@@ -757,28 +781,28 @@ function FormularioChecklist({
           return (
             <div
               key={grupo.id}
-              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+              className={`overflow-hidden rounded-2xl ${CGB_CARD}`}
             >
               {/* Cabeçalho do grupo */}
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              <div className="flex items-center justify-between border-b border-[#7f1022]/10 bg-gradient-to-r from-white to-rose-50/80 px-4 py-3 dark:border-white/10 dark:from-slate-950 dark:to-rose-950/20">
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#7f1022] dark:text-rose-200">
                   {grupo.titulo}
                 </p>
                 <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
                   grupoCompleto
                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    : 'bg-[#7f1022]/10 text-[#7f1022] dark:bg-rose-500/10 dark:text-rose-200'
                 }`}>
                   {grupoCompleto ? '✓ ' : ''}{respondidosGrupo}/{grupo.itens.length}
                 </span>
               </div>
 
               {/* Rótulos das colunas */}
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-4 py-1.5 dark:border-slate-800 dark:bg-slate-900/30">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">#  Item</span>
+              <div className="flex items-center justify-between border-b border-slate-100 bg-white/70 px-4 py-1.5 dark:border-slate-800 dark:bg-slate-900/30">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#7f1022]/50 dark:text-rose-200/50">#  Item</span>
                 <div className="flex gap-2">
                   {['C', 'NC', 'NA'].map((l) => (
-                    <span key={l} className="w-14 text-center text-[10px] font-extrabold uppercase tracking-widest text-slate-400 sm:w-16">
+                    <span key={l} className="w-14 text-center text-[10px] font-extrabold uppercase tracking-widest text-[#7f1022]/50 sm:w-16 dark:text-rose-200/50">
                       {l}
                     </span>
                   ))}
@@ -794,9 +818,9 @@ function FormularioChecklist({
                 const destacado = itemDestacado === item.id
 
                 const bgClass =
-                  destacado   ? 'bg-blue-50 dark:bg-blue-900/20' :
+                  destacado   ? 'bg-rose-50 dark:bg-rose-900/20' :
                   resp === 'nc' ? 'bg-rose-50/70 dark:bg-rose-900/15' :
-                  resp === 'c'  ? 'bg-emerald-50/50 dark:bg-emerald-900/8' :
+                  resp === 'c'  ? 'bg-emerald-50/50 dark:bg-emerald-900/[0.08]' :
                   resp === 'na' ? 'bg-slate-50/80 dark:bg-slate-900/20' :
                   ''
 
@@ -827,7 +851,7 @@ function FormularioChecklist({
                         {[
                           { valor: 'c'  as const, label: 'C',  activeClass: 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-200 shadow-sm' },
                           { valor: 'nc' as const, label: 'NC', activeClass: 'bg-rose-500 border-rose-500 text-white shadow-rose-200 shadow-sm' },
-                          { valor: 'na' as const, label: 'NA', activeClass: 'bg-slate-400 border-slate-400 text-white' },
+                          { valor: 'na' as const, label: 'NA', activeClass: 'bg-[#7f1022] border-[#7f1022] text-white shadow-sm' },
                         ].map(({ valor, label, activeClass }) => (
                           <button
                             key={valor}
@@ -836,7 +860,7 @@ function FormularioChecklist({
                             className={`flex h-11 w-14 items-center justify-center rounded-xl border-2 text-xs font-extrabold transition-all active:scale-95 sm:w-16 ${
                               resp === valor
                                 ? activeClass
-                                : 'border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500'
+                                : 'border-slate-200 bg-white/70 text-slate-400 hover:border-[#b51649]/40 hover:text-[#7f1022] dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-500 dark:hover:border-rose-400/40 dark:hover:text-rose-200'
                             }`}
                           >
                             {label}
@@ -876,12 +900,12 @@ function FormularioChecklist({
 
         {/* ── Problemas Verificados ────────────────────────────────── */}
         {schema.temProblemas && (
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+          <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
+            <div className={CGB_SECTION_HEADER}>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
                 Problemas Adicionais
               </p>
-              <p className="mt-0.5 text-xs font-semibold text-slate-400 dark:text-slate-500">
+              <p className="mt-0.5 text-xs font-semibold text-rose-100/85">
                 Registre qualquer problema não coberto pelos itens acima (freios, motor, câmbio, pneus, etc.)
               </p>
             </div>
@@ -914,12 +938,12 @@ function FormularioChecklist({
 
         {/* ── Evidência NR12 ───────────────────────────────────────── */}
         {schema.temEvidencia && (
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+          <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
+            <div className={CGB_SECTION_HEADER}>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
                 Evidência NR12
               </p>
-              <p className="mt-0.5 text-xs font-semibold text-slate-400 dark:text-slate-500">
+              <p className="mt-0.5 text-xs font-semibold text-rose-100/85">
                 Anexe fotos ou PDFs da inspeção geral (opcional · máx. 10 arquivos)
               </p>
             </div>
@@ -948,7 +972,7 @@ function FormularioChecklist({
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#7f1022]/20 bg-[#7f1022]/[0.08] px-4 py-2.5 text-sm font-extrabold text-[#7f1022] transition hover:bg-[#7f1022]/[0.12] dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200"
                   >
                     <Paperclip size={15} />
                     Adicionar arquivo
@@ -979,7 +1003,7 @@ function FormularioChecklist({
       </div>
 
       {/* ── Barra de envio fixa ──────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white px-4 pt-3 dark:border-slate-800 dark:bg-slate-950" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-[#0b1020]/95 px-4 pt-3 text-white shadow-[0_-18px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-slate-950/95" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div className="min-w-0">
             {erroEnvio ? (
@@ -995,7 +1019,7 @@ function FormularioChecklist({
             ) : tudo100 ? (
               <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Preencha os dados obrigatórios</p>
             ) : (
-              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <p className="text-sm font-semibold text-slate-300">
                 Faltam {totalItens - respondidos} item(s)
               </p>
             )}
@@ -1007,7 +1031,7 @@ function FormularioChecklist({
             className={`h-12 shrink-0 rounded-xl px-6 text-sm font-extrabold text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
               ncImperativos > 0
                 ? 'bg-rose-600 dark:bg-rose-700'
-                : 'bg-slate-900 dark:bg-slate-100 dark:text-slate-900'
+                : CGB_PRIMARY_BUTTON
             }`}
           >
             {enviando ? 'Enviando…' : ncImperativos > 0 ? 'Enviar e Reportar' : 'Enviar Checklist'}

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import type { Apontamento } from '../apontamentos/ApontamentosContext'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import { useAuth } from '../auth/AuthContext'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
@@ -105,7 +106,7 @@ function StatPill({
       type={onClick ? 'button' : undefined}
       onClick={onClick}
       className={[
-        'flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-soft text-left',
+        'flex flex-col items-center gap-2 rounded-2xl border px-4 py-3 text-center shadow-soft',
         onClick ? 'transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0' : '',
         selected ? 'ring-2 ring-brand-500/60' : 'ring-0',
         toneClass,
@@ -284,7 +285,6 @@ export function ManagePage() {
   const [resolveImgs, setResolveImgs] = useState<string[]>([])
   const [resolveOsFile, setResolveOsFile] = useState<{ name: string; data: string } | null>(null)
   const [salvando, setSalvando] = useState(false)
-  const [resolvendoMetade, setResolvendoMetade] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const osFileRef = useRef<HTMLInputElement | null>(null)
 
@@ -366,51 +366,6 @@ export function ManagePage() {
     closeResolveModal()
   }
 
-  const resolverMetadePendencias = async () => {
-    if (!canMarkResolved || resolvendoMetade) return
-    const pendentes = rows
-      .filter((r) => !r.resolvido)
-      .sort((a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime())
-    const quantidade = Math.ceil(pendentes.length / 2)
-    if (quantidade <= 0) return
-
-    setResolvendoMetade(true)
-    try {
-      const selecionados = pendentes.slice(0, quantidade)
-      const hoje = new Date()
-      const toIso = (d: Date) => {
-        const y = d.getFullYear()
-        const m = String(d.getMonth() + 1).padStart(2, '0')
-        const day = String(d.getDate()).padStart(2, '0')
-        return `${y}-${m}-${day}`
-      }
-
-      for (const [idx, r] of selecionados.entries()) {
-        const dataApontamento = new Date(r.dataApontamento + 'T12:00:00')
-        const maxDiasDesdeApontamento = Math.max(
-          1,
-          Math.floor((hoje.getTime() - dataApontamento.getTime()) / 86_400_000),
-        )
-        const diasAteResolver = Math.min(
-          maxDiasDesdeApontamento,
-          2 + ((idx * 7) % 45),
-        )
-        const dataResolucao = new Date(dataApontamento)
-        dataResolucao.setDate(dataResolucao.getDate() + diasAteResolver)
-
-        await marcarResolvido(r.id, {
-          valor: null,
-          dataResolvido: toIso(dataResolucao),
-          descricao: 'Resolução automática para gerar base dos gráficos de evolução.',
-          imagens: [],
-          osArquivo: null,
-        }, user?.email)
-      }
-    } finally {
-      setResolvendoMetade(false)
-    }
-  }
-
   useEffect(() => {
     if (!canMarkResolved && resolveOpen) {
       setResolveOpen(false)
@@ -437,22 +392,11 @@ export function ManagePage() {
               Gerenciar
             </div>
             <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-              Apontamentos de defeitos — ordenados por data (mais antigos no topo)
+              Controle de defeitos e relatórios da frota.
             </div>
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-          {canMarkResolved && (
-            <button
-              type="button"
-              onClick={resolverMetadePendencias}
-              disabled={resolvendoMetade || rows.every((r) => r.resolvido)}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-extrabold text-emerald-700 shadow-soft hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50 sm:flex-initial"
-            >
-              <Check size={18} />
-              {resolvendoMetade ? 'Resolvendo...' : 'Resolver 50% pendências'}
-            </button>
-          )}
           <Link
             to="/gerenciar/evolucao"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
@@ -578,16 +522,16 @@ export function ManagePage() {
           ref={tabelaRef}
           className={`mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}
         >
-          <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
+          <table className="min-w-[1040px] w-full border-collapse text-center text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
-                <th className="px-4 py-3">Veículo</th>
-                <th className="px-4 py-3">Processo</th>
-                <th className="px-4 py-3">Base</th>
-                <th className="px-4 py-3">Coordenador</th>
-                <th className="px-4 py-3">Defeito</th>
-                <th className="px-4 py-3">Data de apontamento</th>
-                <th className="px-4 py-3">Prazo</th>
+                <th className="px-4 py-3 text-center">Veículo</th>
+                <th className="px-4 py-3 text-center">Processo</th>
+                <th className="px-4 py-3 text-center">Base</th>
+                <th className="px-4 py-3 text-center">Coordenador</th>
+                <th className="px-4 py-3 text-center">Defeito</th>
+                <th className="px-4 py-3 text-center">Data de apontamento</th>
+                <th className="px-4 py-3 text-center">Prazo</th>
                 <th className="px-4 py-3 text-center">Resolvido ou não</th>
               </tr>
             </thead>
@@ -606,42 +550,46 @@ export function ManagePage() {
                       key={r.id}
                       className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40"
                     >
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-2">
+                      <td className="align-middle px-4 py-3">
+                        <span className="inline-flex flex-col items-center gap-1.5">
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
                             <Truck size={14} />
                           </span>
                           <span className="font-mono text-xs tracking-tight">{r.veiculoLabel}</span>
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
-                        {r.checklistId
-                          ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"><ClipboardList size={10} />Checklist NC</span>
-                          : r.processo}
+                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs text-slate-600 dark:text-slate-300">
+                        <div className="flex justify-center">
+                          {r.checklistId
+                            ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"><ClipboardList size={10} />Checklist NC</span>
+                            : r.processo}
+                        </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs text-slate-600 dark:text-slate-300">
                         {r.base}
                       </td>
-                      <td className="max-w-[140px] truncate px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
-                        {r.coordenador}
+                      <td className="max-w-[140px] px-4 py-3 align-middle text-xs text-slate-600 dark:text-slate-300">
+                        <span className="mx-auto block max-w-full truncate">{r.coordenador}</span>
                       </td>
-                      <td className="max-w-[220px] px-4 py-3 text-xs leading-snug sm:text-sm">
-                        {r.defeito}
+                      <td className="max-w-[220px] px-4 py-3 align-middle text-xs leading-snug sm:text-sm">
+                        {formatDefeitoParaExibicao(r.defeito)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
+                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
                         {formatDateBR(r.dataApontamento)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
-                        <span className={atrasado ? 'font-black text-rose-600 dark:text-rose-400' : ''}>
-                          {r.prazo ? formatDateBR(r.prazo) : '—'}
-                        </span>
-                        {atrasado ? (
-                          <span className="ml-2 text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400">
-                            Atrasado
+                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className={atrasado ? 'font-black text-rose-600 dark:text-rose-400' : ''}>
+                            {r.prazo ? formatDateBR(r.prazo) : '—'}
                           </span>
-                        ) : null}
+                          {atrasado ? (
+                            <span className="text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400">
+                              Atrasado
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 align-middle">
                         <div className="flex items-center justify-center gap-2">
                           {r.resolvido ? (
                             <span
@@ -666,7 +614,7 @@ export function ManagePage() {
                                   onClick={() => openResolveModal(r)}
                                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
                                   title="Marcar como resolvido"
-                                  aria-label={`Marcar defeito ${r.defeito.slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
+                                  aria-label={`Marcar defeito ${formatDefeitoParaExibicao(r.defeito).slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
                                 >
                                   <Check size={18} strokeWidth={3} aria-hidden />
                                 </button>
@@ -770,7 +718,7 @@ export function ManagePage() {
                   <div className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                     {currentResolve ? (
                       <>
-                        <span className="font-extrabold">{currentResolve.prefixo}</span> — {currentResolve.defeito}
+                        <span className="font-extrabold">{currentResolve.prefixo}</span> — {formatDefeitoParaExibicao(currentResolve.defeito)}
                       </>
                     ) : (
                       'Informe o valor e anexe evidências.'

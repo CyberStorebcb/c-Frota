@@ -38,7 +38,11 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
           onClose={closeSidebar}
         />
         <div className="min-w-0 flex-1">
-          <Topbar onMenuClick={toggleSidebar} onToggleSidebar={toggleCollapsed} />
+          <Topbar
+            sidebarCollapsed={sidebarCollapsed}
+            onMenuClick={toggleSidebar}
+            onToggleSidebar={toggleCollapsed}
+          />
           <main
             className="flex h-[calc(100%-56px)] min-h-0 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
             onClick={() => {

@@ -106,7 +106,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     veiculoId:       `placa-${placa.toLowerCase() || 'desconhecido'}`,
     veiculoLabel:    prefixo && placa ? `${prefixo} · ${placa}` : placa || cl.nome_operador,
     prefixo,
-    defeito:         `[Checklist NC] ${label}`,
+    defeito:         label,
     dataApontamento: cl.data_inspecao,
     prazo,
     resolvido:       res?.resolvido       ?? false,

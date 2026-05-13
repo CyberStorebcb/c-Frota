@@ -42,20 +42,8 @@ import {
   type VehicleStatus,
   type VehicleTipo,
 } from '../frota/vehicleRegistry'
+import { isVehicleOperacionalAtivo } from '../frota/vehicleOperationalStatus'
 import { renderFormattedText } from '../utils/renderFormattedAiText'
-
-function isEmbeddedCatalogSource(
-  source: FleetVehicle['source'] | undefined
-): source is 'sky' | 'munck' | 'moto' | 'picape4x4' | 'picapeleve' | 'veiculosleves' {
-  return (
-    source === 'sky' ||
-    source === 'munck' ||
-    source === 'moto' ||
-    source === 'picape4x4' ||
-    source === 'picapeleve' ||
-    source === 'veiculosleves'
-  )
-}
 
 const TYPE_FILTER_IDLE =
   'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
@@ -114,6 +102,38 @@ const VEHICLE_TYPES: {
     color: 'text-indigo-500',
     pillActive:
       'bg-indigo-100 text-indigo-900 ring-2 ring-indigo-500/30 dark:bg-indigo-950/60 dark:text-indigo-200 dark:ring-indigo-400/40',
+  },
+  {
+    id: 'CARRETA',
+    label: 'Carreta',
+    icon: Truck,
+    color: 'text-cyan-500',
+    pillActive:
+      'bg-cyan-100 text-cyan-900 ring-2 ring-cyan-500/30 dark:bg-cyan-950/60 dark:text-cyan-200 dark:ring-cyan-400/40',
+  },
+  {
+    id: 'CAMINHÃO',
+    label: 'Caminhão',
+    icon: Truck,
+    color: 'text-blue-600',
+    pillActive:
+      'bg-blue-100 text-blue-900 ring-2 ring-blue-500/30 dark:bg-blue-950/60 dark:text-blue-200 dark:ring-blue-400/40',
+  },
+  {
+    id: 'OFICINA',
+    label: 'Oficina',
+    icon: Wrench,
+    color: 'text-rose-500',
+    pillActive:
+      'bg-rose-100 text-rose-900 ring-2 ring-rose-500/30 dark:bg-rose-950/60 dark:text-rose-200 dark:ring-rose-400/40',
+  },
+  {
+    id: 'MOTOPODA',
+    label: 'Motopoda',
+    icon: Wrench,
+    color: 'text-lime-600',
+    pillActive:
+      'bg-lime-100 text-lime-900 ring-2 ring-lime-500/30 dark:bg-lime-950/60 dark:text-lime-200 dark:ring-lime-400/40',
   },
 ]
 
@@ -413,7 +433,7 @@ export function RegistroVeiculosPage() {
   const fleetStats = useMemo(
     () => ({
       total: vehicles.length,
-      ativos: vehicles.filter((v) => v.status === 'ATIVO').length,
+      ativos: vehicles.filter((v) => v.status === 'ATIVO' && isVehicleOperacionalAtivo(v.prefixo)).length,
       manutencao: vehicles.filter((v) => v.emManutencao).length,
     }),
     [vehicles],
@@ -443,7 +463,7 @@ export function RegistroVeiculosPage() {
       porTipo,
       porStatus: {
         ativo: fleetStats.ativos,
-        inativo: vehicles.length - fleetStats.ativos,
+        inativo: vehicles.filter((v) => v.status === 'INATIVO').length,
         emManutencao: fleetStats.manutencao,
       },
     })
@@ -475,9 +495,10 @@ export function RegistroVeiculosPage() {
   const geminiConfigured = isGeminiConfigured()
 
   const inputFilterClass =
-    'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-900 outline-none placeholder:font-semibold placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500'
+    'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-[11px] font-bold text-slate-900 outline-none placeholder:font-semibold placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500'
   const selectFilterClass =
     'w-full min-w-0 rounded-lg border border-slate-200 bg-white px-1.5 py-1.5 text-[10px] font-black uppercase tracking-tight text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white'
+  const selectFilterCenterClass = `${selectFilterClass} text-center`
 
   const handleOpenModal = () => {
     if (!canRegisterVehicle) return
@@ -702,13 +723,13 @@ export function RegistroVeiculosPage() {
                 className={`pointer-events-none absolute -right-10 -top-10 size-40 rounded-full blur-3xl transition-opacity duration-300 group-hover:opacity-90 ${orb}`}
                 aria-hidden
               />
-              <div className="relative flex items-center gap-5">
+              <div className="relative flex items-center justify-center gap-2.5">
                 <div
                   className={`flex size-14 shrink-0 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105 ${iconWrap}`}
                 >
                   <Icon size={26} strokeWidth={2.25} aria-hidden />
                 </div>
-                <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="min-w-0 space-y-0.5 text-left">
                   <span className="block text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                     {label}
                   </span>
@@ -719,8 +740,79 @@ export function RegistroVeiculosPage() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center">
-          <div className="group relative min-w-0 flex-1">
+        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <div
+              className="flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:pb-0 sm:flex-1"
+              role="toolbar"
+              aria-label="Filtrar por tipo de veículo"
+            >
+              <button
+                type="button"
+                onClick={() => setFilterType('ALL')}
+                title={`${vehicles.length} ${vehicles.length === 1 ? 'veículo' : 'veículos'} na frota (todos os tipos)`}
+                className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+                  filterType === 'ALL'
+                    ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                    : `${TYPE_FILTER_IDLE}`
+                }`}
+              >
+                Todos
+              </button>
+              {VEHICLE_TYPES.map((type) => {
+                const Icon = type.icon
+                const active = filterType === type.id
+                const n = countByTipo.get(type.id) ?? 0
+                const title = `${n} ${n === 1 ? 'veículo' : 'veículos'} — ${type.label}`
+                return (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => setFilterType(type.id)}
+                    title={title}
+                    aria-label={title}
+                    className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+                      active ? type.pillActive : TYPE_FILTER_IDLE
+                    }`}
+                  >
+                    <Icon size={14} strokeWidth={2.5} aria-hidden />
+                    {type.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div
+              className="flex shrink-0 justify-center gap-1 self-center rounded-xl bg-slate-100 p-1 dark:bg-slate-800 sm:self-auto"
+              role="group"
+              aria-label="Modo de exibição"
+            >
+              <button
+                type="button"
+                onClick={() => setLayout('list')}
+                aria-pressed={layoutMode === 'list'}
+                title="Lista"
+                className={`rounded-lg p-2 transition-all ${
+                  layoutMode === 'list' ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400' : 'text-slate-500'
+                }`}
+              >
+                <List size={18} strokeWidth={2.5} aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayout('grid')}
+                aria-pressed={layoutMode === 'grid'}
+                title="Grelha"
+                className={`rounded-lg p-2 transition-all ${
+                  layoutMode === 'grid' ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400' : 'text-slate-500'
+                }`}
+              >
+                <LayoutGrid size={18} strokeWidth={2.5} aria-hidden />
+              </button>
+            </div>
+          </div>
+
+          <div className="group relative w-full min-w-0">
             <Search
               className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-500"
               aria-hidden
@@ -732,75 +824,6 @@ export function RegistroVeiculosPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-2xl border border-slate-100 bg-slate-50 py-3 pl-12 pr-4 text-sm font-semibold text-slate-900 outline-none transition-all focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-white"
             />
-          </div>
-
-          <div
-            className="flex w-full items-center gap-2 overflow-x-auto pb-1 lg:w-auto lg:max-w-[55%] lg:pb-0 xl:max-w-none"
-            role="toolbar"
-            aria-label="Filtrar por tipo de veículo"
-          >
-            <button
-              type="button"
-              onClick={() => setFilterType('ALL')}
-              title={`${vehicles.length} ${vehicles.length === 1 ? 'veículo' : 'veículos'} na frota (todos os tipos)`}
-              className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                filterType === 'ALL'
-                  ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
-                  : `${TYPE_FILTER_IDLE}`
-              }`}
-            >
-              Todos
-            </button>
-            {VEHICLE_TYPES.map((type) => {
-              const Icon = type.icon
-              const active = filterType === type.id
-              const n = countByTipo.get(type.id) ?? 0
-              const title = `${n} ${n === 1 ? 'veículo' : 'veículos'} — ${type.label}`
-              return (
-                <button
-                  key={type.id}
-                  type="button"
-                  onClick={() => setFilterType(type.id)}
-                  title={title}
-                  aria-label={title}
-                  className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                    active ? type.pillActive : TYPE_FILTER_IDLE
-                  }`}
-                >
-                  <Icon size={14} strokeWidth={2.5} aria-hidden />
-                  {type.label}
-                </button>
-              )
-            })}
-          </div>
-
-          <div
-            className="flex shrink-0 justify-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800"
-            role="group"
-            aria-label="Modo de exibição"
-          >
-            <button
-              type="button"
-              onClick={() => setLayout('list')}
-              aria-pressed={layoutMode === 'list'}
-              title="Lista"
-              className={`rounded-lg p-2 transition-all ${
-                layoutMode === 'list' ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400' : 'text-slate-500'
-              }`}
-            >
-              <List size={18} strokeWidth={2.5} aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => setLayout('grid')}
-              aria-pressed={layoutMode === 'grid'}
-              title="Grelha"
-              className={`rounded-lg p-2 transition-all ${
-                layoutMode === 'grid' ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400' : 'text-slate-500'
-              }`}
-            >
-              <LayoutGrid size={18} strokeWidth={2.5} aria-hidden />
-            </button>
           </div>
         </div>
 
@@ -828,34 +851,9 @@ export function RegistroVeiculosPage() {
                     <Icon size={24} />
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    {vehicle.source === 'sky' ? (
-                      <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                        SKY
-                      </span>
-                    ) : null}
-                    {vehicle.source === 'munck' ? (
-                      <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                        MUNCK
-                      </span>
-                    ) : null}
-                    {vehicle.source === 'moto' ? (
-                      <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-orange-800 dark:bg-orange-950 dark:text-orange-300">
-                        MOTO
-                      </span>
-                    ) : null}
-                    {vehicle.source === 'picape4x4' ? (
-                      <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-teal-800 dark:bg-teal-950 dark:text-teal-300">
-                        4X4
-                      </span>
-                    ) : null}
-                    {vehicle.source === 'picapeleve' ? (
-                      <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-800 dark:bg-slate-700 dark:text-slate-200">
-                        LEVE
-                      </span>
-                    ) : null}
-                    {vehicle.source === 'veiculosleves' ? (
-                      <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                        VL
+                    {vehicle.source === 'total' ? (
+                      <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                        BASE
                       </span>
                     ) : null}
                     <div
@@ -888,15 +886,11 @@ export function RegistroVeiculosPage() {
 
                 <div className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 dark:border-slate-800">
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      {isEmbeddedCatalogSource(vehicle.source) ? 'Processo' : 'Responsável'}
-                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Responsável</span>
                     <p className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.responsavel}</p>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      {isEmbeddedCatalogSource(vehicle.source) ? 'Localidade' : 'Base'}
-                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Base</span>
                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{vehicle.base}</p>
                   </div>
                   {(vehicle.coordenador && vehicle.coordenador !== 'NÃO ATRIBUÍDO') || (vehicle.supervisor && vehicle.supervisor !== 'NÃO ATRIBUÍDO') ? (
@@ -938,10 +932,10 @@ export function RegistroVeiculosPage() {
 
       {layoutMode === 'list' ? (
         <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[720px] border-collapse text-center text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-                <th className="px-4 py-3 pl-5">Tipo</th>
+                <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3">Placa</th>
                 <th className="px-4 py-3">Modelo / Prefixo</th>
                 <th className="hidden px-4 py-3 md:table-cell">Órgão / Resp.</th>
@@ -953,7 +947,7 @@ export function RegistroVeiculosPage() {
                 </th>
               </tr>
               <tr className="border-b border-slate-200 bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/90">
-                <th className="px-2 py-2 pl-4 align-top">
+                <th className="px-2 py-2 align-top">
                   <label className="sr-only" htmlFor="flt-tipo-col">
                     Filtrar por tipo
                   </label>
@@ -961,7 +955,7 @@ export function RegistroVeiculosPage() {
                     id="flt-tipo-col"
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value as 'ALL' | VehicleTipo)}
-                    className={selectFilterClass}
+                    className={selectFilterCenterClass}
                   >
                     <option value="ALL">Todos</option>
                     {VEHICLE_TYPES.map((t) => (
@@ -1034,7 +1028,7 @@ export function RegistroVeiculosPage() {
                     id="flt-status-col"
                     value={colFilterStatus}
                     onChange={(e) => setColFilterStatus(e.target.value as 'ALL' | VehicleStatus | 'MANUTENÇÃO')}
-                    className={selectFilterClass}
+                    className={selectFilterCenterClass}
                   >
                     <option value="ALL">Todos</option>
                     <option value="ATIVO">Ativo</option>
@@ -1095,39 +1089,41 @@ export function RegistroVeiculosPage() {
                           : 'border-slate-100 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-800/40'
                       }`}
                     >
-                      <td className="px-4 py-3 pl-5 align-middle">
-                        <div className={`inline-flex rounded-xl bg-slate-100 p-2 dark:bg-slate-800 ${typeInfo.color}`}>
-                          <Icon size={20} />
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex justify-center">
+                          <div className={`inline-flex rounded-xl bg-slate-100 p-2 dark:bg-slate-800 ${typeInfo.color}`}>
+                            <Icon size={20} />
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <span className="font-mono text-sm font-black uppercase text-slate-900 dark:text-white">{vehicle.placa}</span>
                       </td>
                       <td className="max-w-[220px] px-4 py-3 align-middle">
-                        <div className="truncate text-xs font-bold uppercase text-slate-600 dark:text-slate-300">
+                        <div className="mx-auto max-w-full truncate text-xs font-bold uppercase text-slate-600 dark:text-slate-300">
                           {vehicle.modelo} • {vehicle.prefixo}
                         </div>
                       </td>
                       <td className="hidden max-w-[160px] px-4 py-3 align-middle md:table-cell">
-                        <span className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">
+                        <span className="mx-auto block max-w-full truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">
                           {vehicle.responsavel}
                         </span>
                       </td>
                       <td className="hidden max-w-[160px] px-4 py-3 align-middle lg:table-cell">
-                        <span className="truncate text-xs font-bold text-slate-700 dark:text-slate-300">{vehicle.base}</span>
+                        <span className="mx-auto block max-w-full truncate text-xs font-bold text-slate-700 dark:text-slate-300">{vehicle.base}</span>
                       </td>
                       <td className="hidden px-4 py-3 align-middle xl:table-cell">
-                        <div className="space-y-0.5">
+                        <div className="flex flex-col items-center gap-1 text-center">
                           {vehicle.coordenador && vehicle.coordenador !== 'NÃO ATRIBUÍDO' && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex flex-col items-center gap-0.5">
                               <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Coord.</span>
-                              <span className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.coordenador}</span>
+                              <span className="max-w-[160px] truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.coordenador}</span>
                             </div>
                           )}
                           {vehicle.supervisor && vehicle.supervisor !== 'NÃO ATRIBUÍDO' && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex flex-col items-center gap-0.5">
                               <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Sup.</span>
-                              <span className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.supervisor}</span>
+                              <span className="max-w-[160px] truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.supervisor}</span>
                             </div>
                           )}
                           {(!vehicle.coordenador || vehicle.coordenador === 'NÃO ATRIBUÍDO') && (!vehicle.supervisor || vehicle.supervisor === 'NÃO ATRIBUÍDO') && (
@@ -1136,35 +1132,10 @@ export function RegistroVeiculosPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {vehicle.source === 'sky' ? (
-                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                              SKY
-                            </span>
-                          ) : null}
-                          {vehicle.source === 'munck' ? (
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                              MUNCK
-                            </span>
-                          ) : null}
-                          {vehicle.source === 'moto' ? (
-                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-orange-800 dark:bg-orange-950 dark:text-orange-300">
-                              MOTO
-                            </span>
-                          ) : null}
-                          {vehicle.source === 'picape4x4' ? (
-                            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-teal-800 dark:bg-teal-950 dark:text-teal-300">
-                              4X4
-                            </span>
-                          ) : null}
-                          {vehicle.source === 'picapeleve' ? (
-                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-800 dark:bg-slate-700 dark:text-slate-200">
-                              LEVE
-                            </span>
-                          ) : null}
-                          {vehicle.source === 'veiculosleves' ? (
-                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                              VL
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          {vehicle.source === 'total' ? (
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                              BASE
                             </span>
                           ) : null}
                           <span

@@ -10,9 +10,11 @@ import { ChecklistsPage } from './pages/ChecklistsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { EvolucaoPage } from './pages/EvolucaoPage'
 import { HistoricoPage } from './pages/HistoricoPage'
+import { PrivacyPage, TermsPage } from './pages/LegalPages'
 import { LoginPage } from './pages/LoginPage'
 import { ManagePage } from './pages/ManagePage'
 import { RegistroEspecialPage } from './pages/RegistroEspecialPage'
+import { VeiculosStatusPage } from './pages/VeiculosStatusPage'
 import { RegistroRoute } from './routes/RegistroRoute'
 
 export default function App() {
@@ -20,6 +22,8 @@ export default function App() {
     <Routes>
       {/* Rotas públicas */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/termos" element={<TermsPage />} />
+      <Route path="/privacidade" element={<PrivacyPage />} />
       <Route path="/registro-especial" element={<RegistroEspecialPage />} />
       <Route path="/registro" element={<RegistroRoute />} />
       {/* Link público único para motoristas preencherem checklists */}
@@ -38,6 +42,7 @@ export default function App() {
             <Route path="checklists" element={<ChecklistsPage />} />
             <Route path="checklists/resultados" element={<ChecklistResultadosPage />} />
           </Route>
+          <Route path="/veiculos/status" element={<VeiculosStatusPage />} />
           <Route path="/veiculos" element={<Navigate to="/gerenciar" replace />} />
           <Route
             path="/usuarios"

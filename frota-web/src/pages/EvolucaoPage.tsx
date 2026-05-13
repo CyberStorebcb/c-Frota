@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
+import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import {
   type EvolucaoFiltros,
   type PontoEvolucao,
@@ -281,7 +282,7 @@ function buildDefeitoData(rows: Apontamento[]): DefeitoDatum[] {
   const map = new Map<string, { ocorrencias: number; somaDias: number }>()
   for (const r of rows) {
     if (!r.resolvido || !r.dataResolvido) continue
-    const key = r.defeito?.trim() || '(sem descrição)'
+    const key = formatDefeitoParaExibicao(r.defeito?.trim() || '') || '(sem descrição)'
     if (!map.has(key)) map.set(key, { ocorrencias: 0, somaDias: 0 })
     const e = map.get(key)!
     e.ocorrencias++
@@ -311,7 +312,7 @@ function DefeitosChart({ rows }: { rows: Apontamento[] }) {
     const q = busca.trim().toLowerCase()
     const filtered = rows.filter((r) => {
       if (!r.resolvido || !r.dataResolvido) return false
-      if (q && !r.defeito.toLowerCase().includes(q)) return false
+      if (q && !formatDefeitoParaExibicao(r.defeito).toLowerCase().includes(q)) return false
       return true
     })
     return buildDefeitoData(filtered)

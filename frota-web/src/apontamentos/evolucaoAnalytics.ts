@@ -2,6 +2,7 @@ import { matchesBaseFilter } from '../data/baseFilterOptions'
 import { matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { matchesProcessoFilter } from '../data/processoFilterOptions'
 import type { Apontamento } from './ApontamentosContext'
+import { formatDefeitoParaExibicao } from './defeitoExibicao'
 
 export type EvolucaoFiltros = {
   processo: string
@@ -129,7 +130,7 @@ export function buildWeeklyChartPoints(
       itens.length > 0
         ? Math.round((dias.reduce((s, x) => s + x, 0) / dias.length) * 10) / 10
         : null
-    const exemplos = itens.map((r) => `${r.prefixo} — ${r.defeito}`)
+    const exemplos = itens.map((r) => `${r.prefixo} — ${formatDefeitoParaExibicao(r.defeito)}`)
     return { periodo: formatWeekLabel(chave), chave, resolvidos: itens.length, diasMedios, exemplos }
   })
 }
@@ -190,7 +191,7 @@ export function buildMonthlyChartPoints(
       itens.length > 0
         ? Math.round((dias.reduce((s, x) => s + x, 0) / dias.length) * 10) / 10
         : null
-    const exemplos = itens.map((r) => `${r.prefixo} — ${r.defeito}`)
+    const exemplos = itens.map((r) => `${r.prefixo} — ${formatDefeitoParaExibicao(r.defeito)}`)
     return { periodo: formatMonthLabel(chave), chave, resolvidos: itens.length, diasMedios, exemplos }
   })
 }
@@ -231,7 +232,7 @@ export function buildResolvidosCsv(rows: Apontamento[]): string {
       r.id,
       r.prefixo,
       r.veiculoLabel,
-      r.defeito,
+      formatDefeitoParaExibicao(r.defeito),
       r.processo,
       r.base,
       r.coordenador,

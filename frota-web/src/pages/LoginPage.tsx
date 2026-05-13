@@ -1,7 +1,9 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Loader2, Lock, LogIn, Mail, MessageSquare, Moon, Sparkles, Sun, Zap } from 'lucide-react'
+import { useEffect, useId, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, Loader2, Lock, LogIn, Mail, MessageSquare, Moon, Sparkles, Sun } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { BrandLogo } from '../branding/BrandLogo'
+import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import { useTheme } from '../theme/ThemeProvider'
 import { renderFormattedText } from '../utils/renderFormattedAiText'
@@ -9,10 +11,6 @@ import { renderFormattedText } from '../utils/renderFormattedAiText'
 const FLUX_VB_H = 800
 const FLUX_VB_W = 60
 const FLUX_PERIOD = 80
-
-function renderAiResponseRich(text: string): ReactNode {
-  return renderFormattedText(text)
-}
 
 function buildFluxRailPath(totalH: number): string {
   const cx = 30
@@ -191,7 +189,7 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
 
   return (
     <div
-      className={`relative flex min-h-dvh w-full flex-col overflow-hidden transition-colors duration-500 sm:flex-row ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
+      className={`relative flex min-h-dvh w-full flex-col overflow-y-auto transition-colors duration-500 sm:h-dvh sm:min-h-0 sm:flex-row sm:overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
     >
       <button
         type="button"
@@ -211,119 +209,80 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
         aria-hidden
       >
         <span className="rotate-[-16deg] whitespace-nowrap text-[min(20vw,10rem)] font-black tracking-[0.32em] text-slate-900/[0.06] sm:text-[min(16vw,8rem)] dark:text-white/[0.08]">
-          ItaloFontes
+          CGB
         </span>
       </div>
 
-      <div className="relative z-10 hidden w-full shrink-0 overflow-hidden bg-[#0B1120] sm:block sm:w-1/3 lg:w-[400px]">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B1120] via-[#0a1628] to-[#050a14]" />
+      <div className="relative z-10 hidden h-full w-full shrink-0 overflow-hidden bg-[#0B1120] sm:block sm:w-[42%] lg:w-[440px] xl:w-[500px] 2xl:w-[520px]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_18%,rgba(181,22,73,0.38),transparent_28%),radial-gradient(circle_at_22%_48%,rgba(30,64,175,0.32),transparent_34%),linear-gradient(180deg,#0b1020_0%,#07101f_48%,#030712_100%)]" />
+        <div className="pointer-events-none absolute -right-28 top-20 h-72 w-72 rotate-45 rounded-[3rem] border border-rose-400/20 bg-[#b51649]/15 shadow-[0_0_90px_rgba(181,22,73,0.22)]" />
+        <div className="pointer-events-none absolute -left-24 bottom-16 h-64 w-64 rotate-45 rounded-[3rem] border border-rose-300/10 bg-[#7f1022]/20 blur-[1px]" />
         <LoginFluxVisual reduced={reducedMotion} />
 
-        <div className="relative z-10 flex h-full min-h-dvh flex-col justify-between p-8 text-white sm:min-h-0 sm:p-10 lg:p-12">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 shadow-lg shadow-blue-600/35 ring-1 ring-white/15">
-              <Zap
-                className="relative z-10 text-fuchsia-200 drop-shadow-[0_0_10px_rgba(232,121,249,0.75)]"
-                size={24}
-                strokeWidth={2.5}
-                aria-hidden
-              />
+        <div className="relative z-10 flex h-full min-h-0 flex-col justify-between p-6 text-white sm:p-7 lg:p-9 xl:p-10 2xl:p-12">
+          <div className="inline-flex w-fit items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 shadow-[0_16px_45px_rgba(0,0,0,0.28)] backdrop-blur-xl xl:gap-4 xl:px-5 xl:py-4">
+            <CollapsedNavMark size="md" className="ring-2 ring-white/15 xl:h-12 xl:w-12" />
+            <div>
+              <BrandLogo tone="on-dark" variant="horizontal" className="!h-10 !max-h-10 !max-w-[220px] xl:!h-12 xl:!max-h-12 xl:!max-w-[260px]" />
+              <div className="mt-1.5 h-0.5 w-32 rounded-full bg-gradient-to-r from-[#b51649] via-rose-400 to-sky-400 xl:mt-2 xl:h-1 xl:w-36" />
             </div>
-            <span className="text-2xl font-black tracking-tighter text-white">
-              Frota <span className="text-sky-400">Web</span>
-            </span>
           </div>
 
-          <div className="space-y-6 py-8">
-            <h2 className="text-balance text-4xl font-black leading-[1.08] tracking-tight sm:text-5xl">
+          <div className="space-y-4 py-4 lg:space-y-5 lg:py-5 xl:space-y-6 2xl:space-y-7 2xl:py-8">
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-300/20 bg-rose-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.24em] text-rose-100">
+              <span className="h-2 w-2 rounded-full bg-[#b51649] shadow-[0_0_14px_rgba(244,63,94,0.75)]" />
+              Portal da frota CGB
+            </div>
+            <h2 className="text-balance text-4xl font-black leading-[1.02] tracking-tight lg:text-5xl 2xl:text-6xl">
               <span className="text-white">Sua frota sob</span>
               <br />
-              <span className="bg-gradient-to-r from-sky-400 via-cyan-300 to-cyan-400 bg-clip-text text-transparent">controle</span>
+              <span className="bg-gradient-to-r from-[#fb7185] via-[#f43f5e] to-[#b51649] bg-clip-text text-transparent">controle</span>
               <br />
-              <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 bg-clip-text text-transparent">total.</span>
+              <span className="bg-gradient-to-r from-sky-300 via-cyan-300 to-white bg-clip-text text-transparent">total.</span>
             </h2>
+            <p className="max-w-sm text-xs font-semibold leading-relaxed text-slate-300 lg:text-sm">
+              Checklists, apontamentos e acompanhamento operacional com controle total.
+            </p>
 
-            <div className="relative mt-6 overflow-hidden rounded-2xl border border-sky-400/25 shadow-[0_8px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/5">
-              {/* Listras diagonais + gradiente (visíveis através do vidro) */}
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  backgroundImage: [
-                    'repeating-linear-gradient(-36deg, rgba(56, 189, 248, 0.22) 0 12px, rgba(59, 130, 246, 0.1) 12px 26px, transparent 26px 40px)',
-                    'linear-gradient(155deg, rgba(37, 99, 235, 0.45) 0%, rgba(14, 116, 144, 0.2) 45%, rgba(15, 23, 42, 0.75) 100%)',
-                  ].join(','),
-                }}
-                aria-hidden
-              />
-              <div className="relative border-t border-white/10 bg-[#0B1120]/55 p-4 backdrop-blur-xl">
-                <div className="mb-3 flex items-center gap-2 text-sky-400">
-                  <Sparkles size={16} className="shrink-0 text-sky-300" strokeWidth={2.25} />
-                  <span className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-400">Assistente técnico</span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={aiQuestion}
-                    onChange={(e) => setAiQuestion(e.target.value)}
-                    placeholder="Ex.: checklist antes de viagem longa"
-                    className="w-full rounded-xl border border-sky-500/50 bg-black/40 py-2.5 pl-3 pr-10 text-xs font-medium text-white outline-none transition-all placeholder:text-slate-500 focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20"
-                    onKeyDown={(e) => e.key === 'Enter' && void askAiAssistant()}
-                    disabled={isAiLoading || !geminiReady}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void askAiAssistant()}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sky-400 hover:text-sky-300 disabled:opacity-50"
-                    disabled={isAiLoading || !geminiReady}
-                    aria-label="Enviar pergunta"
-                  >
-                    {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} strokeWidth={2} />}
-                  </button>
-                </div>
-                {!geminiReady ? (
-                  <p className="mt-3 text-[11px] leading-relaxed text-slate-300/90">
-                    <span>O assistente não está disponível neste ambiente.</span>
-                    {import.meta.env.DEV ? (
-                      <span className="mt-2 block border-t border-white/10 pt-2 text-[10px] italic text-slate-500">
-                        Desenvolvimento: defina{' '}
-                        <code className="rounded bg-black/30 px-1 font-mono not-italic text-slate-400">VITE_GEMINI_API_KEY</code> no ficheiro{' '}
-                        <code className="rounded bg-black/30 px-1 font-mono not-italic text-slate-400">.env</code>
-                        (opcionalmente <code className="rounded bg-black/30 px-1 font-mono not-italic text-slate-400">VITE_GEMINI_MODEL</code>).
-                      </span>
-                    ) : null}
-                  </p>
-                ) : null}
-                {geminiReady && aiResponse ? (
-                  <div className="mt-3 max-h-40 overflow-y-auto text-[11px] leading-relaxed text-slate-200/95">
-                    {renderAiResponseRich(aiResponse)}
-                  </div>
-                ) : null}
+            <div className="grid grid-cols-2 gap-2 text-[11px] font-extrabold text-slate-200 xl:gap-3 xl:text-xs">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2.5 backdrop-blur xl:py-3">
+                <span className="block text-[9px] uppercase tracking-widest text-rose-200 xl:text-[10px]">Operação</span>
+                Frota conectada
               </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2.5 backdrop-blur xl:py-3">
+                <span className="block text-[9px] uppercase tracking-widest text-rose-200 xl:text-[10px]">Checklists</span>
+                Online e offline
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-xs font-bold leading-relaxed text-slate-300 backdrop-blur">
+              <div className="mb-1 flex items-center gap-2 text-rose-100">
+                <Sparkles size={15} />
+                <span className="text-[10px] font-black uppercase tracking-[0.22em]">Assistente técnico CGB</span>
+              </div>
+              Use o assistente no painel de acesso para consultar checklists, manutenção e operação da frota.
             </div>
           </div>
 
-          <div className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-600">Inteligência de transportes</div>
+          <div className="flex items-center justify-between gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 xl:text-[11px]">
+            <span>CGB — gestão de frota</span>
+            <span className="h-px flex-1 bg-gradient-to-r from-[#b51649] to-transparent" />
+          </div>
         </div>
       </div>
 
       <div
-        className={`relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-8 pb-20 transition-colors duration-500 sm:px-8 sm:pb-16 ${isDark ? 'bg-slate-950' : 'bg-white'}`}
+        className={`relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-8 pb-20 transition-colors duration-500 sm:h-full sm:min-h-0 sm:px-8 sm:py-8 sm:pb-10 lg:py-10 xl:pb-12 ${isDark ? 'bg-slate-950' : 'bg-white'}`}
       >
-        <div className="mb-6 flex w-full max-w-[380px] shrink-0 items-center sm:hidden">
-          <div className="flex items-center gap-2">
-            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 shadow-md shadow-blue-600/30 ring-1 ring-white/10">
-              <Zap className="text-fuchsia-200 drop-shadow-[0_0_8px_rgba(232,121,249,0.65)]" size={20} strokeWidth={2.5} aria-hidden />
-            </div>
-            <span className={`text-lg font-black tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              Frota <span className="text-sky-500">Web</span>
-            </span>
-          </div>
+        <div className="mb-8 flex w-full max-w-[380px] shrink-0 items-center justify-center rounded-3xl border border-slate-200 bg-white/80 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:hidden">
+          <CollapsedNavMark size="md" className="mr-3" />
+          <BrandLogo tone={isDark ? 'on-dark' : 'on-light'} variant="horizontal" className="!max-h-10" />
         </div>
 
         <div className="w-full max-w-[380px]">
-          <header className="mb-10 text-center sm:mb-12 sm:text-left">
-            <h1 className={`text-3xl font-black tracking-tight sm:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>Acessar</h1>
-            <p className="mt-2 text-sm font-bold text-slate-500 sm:mt-3 sm:text-base">Gestão e apontamentos da frota</p>
+          <header className="mb-8 text-center sm:mb-8 sm:text-left xl:mb-10">
+            <h1 className={`text-3xl font-black tracking-tight lg:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>Acessar</h1>
+            <p className="mt-2 text-sm font-bold text-slate-500 lg:mt-3 lg:text-base">Portal CGB de gestão e apontamentos da frota</p>
           </header>
 
           {fromRegistroEspecial ? (
@@ -335,14 +294,14 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
             </div>
           ) : null}
 
-          <form onSubmit={(e) => void onSubmit(e)} className="space-y-5 sm:space-y-6">
+          <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 xl:space-y-5">
             <div className="group space-y-2">
-              <label htmlFor="login-email" className="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-blue-500">
+              <label htmlFor="login-email" className="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-[#b51649]">
                 E-mail corporativo
               </label>
               <div className="relative">
                 <Mail
-                  className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-500"
+                  className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#b51649]"
                   aria-hidden
                 />
                 <input
@@ -354,7 +313,7 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={pending}
-                  className={`w-full rounded-2xl border py-4 pl-12 pr-4 text-sm font-bold outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-60 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
+                  className={`w-full rounded-2xl border py-3.5 pl-12 pr-4 text-sm font-bold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 xl:py-4 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
                   placeholder="voce@empresa.com.br"
                 />
               </div>
@@ -362,16 +321,16 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
 
             <div className="group space-y-2">
               <div className="ml-1 flex items-center justify-between">
-                <label htmlFor="login-password" className="text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-blue-500">
+                <label htmlFor="login-password" className="text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-[#b51649]">
                   Senha
                 </label>
-                <button type="button" className="text-[11px] font-black text-blue-600 hover:underline dark:text-blue-400">
+                <button type="button" className="text-[11px] font-black text-[#b51649] hover:underline dark:text-rose-300">
                   Recuperar
                 </button>
               </div>
               <div className="relative">
                 <Lock
-                  className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-500"
+                  className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#b51649]"
                   aria-hidden
                 />
                 <input
@@ -383,7 +342,7 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={pending}
-                  className={`w-full rounded-2xl border py-4 pl-12 pr-12 text-sm font-bold outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-60 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
+                  className={`w-full rounded-2xl border py-3.5 pl-12 pr-12 text-sm font-bold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 xl:py-4 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
                   placeholder="••••••••"
                 />
                 <button
@@ -408,7 +367,7 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
             <button
               type="submit"
               disabled={pending}
-              className="group relative flex min-h-[56px] w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-slate-900 py-4 text-base font-black text-white shadow-xl transition-all hover:bg-blue-600 active:scale-[0.98] disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-blue-500 dark:hover:text-white"
+              className="group relative flex min-h-[52px] w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#7f1022] via-[#9f1239] to-[#b51649] py-3.5 text-base font-black text-white shadow-xl shadow-rose-950/15 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 xl:min-h-[56px] xl:py-4"
             >
               {pending ? (
                 <Loader2 className="animate-spin" size={24} />
@@ -420,14 +379,86 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
               )}
             </button>
           </form>
+
+          <section className={`mt-5 overflow-hidden rounded-3xl border shadow-xl ${
+            isDark
+              ? 'border-slate-800 bg-slate-900/80 shadow-black/20'
+              : 'border-slate-200 bg-white shadow-slate-200/70'
+          }`}>
+            <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-[#b51649] dark:text-rose-300" />
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-[0.18em] text-[#7f1022] dark:text-rose-200">
+                    Assistente técnico CGB
+                  </h2>
+                  <p className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    Tire dúvidas antes de entrar no sistema.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 p-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={aiQuestion}
+                  onChange={(e) => setAiQuestion(e.target.value)}
+                  placeholder="Ex.: O que checar antes da viagem?"
+                  className={`w-full rounded-2xl border py-3 pl-4 pr-11 text-sm font-semibold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 ${
+                    isDark
+                      ? 'border-slate-800 bg-slate-950 text-white placeholder:text-slate-500'
+                      : 'border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400'
+                  }`}
+                  onKeyDown={(e) => e.key === 'Enter' && void askAiAssistant()}
+                  disabled={isAiLoading || !geminiReady}
+                />
+                <button
+                  type="button"
+                  onClick={() => void askAiAssistant()}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#b51649] transition hover:text-[#7f1022] disabled:opacity-50 dark:text-rose-300 dark:hover:text-rose-200"
+                  disabled={isAiLoading || !geminiReady}
+                  aria-label="Enviar pergunta"
+                >
+                  {isAiLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageSquare size={18} strokeWidth={2} />}
+                </button>
+              </div>
+
+              {!geminiReady ? (
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-300">
+                  O assistente não está disponível neste ambiente.
+                  {import.meta.env.DEV ? (
+                    <span className="mt-1 block text-[11px] text-amber-600/90 dark:text-amber-300/80">
+                      Defina <code className="font-mono">VITE_GEMINI_API_KEY</code> no arquivo <code className="font-mono">.env</code>.
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+
+              <div className={`max-h-[240px] overflow-y-auto rounded-2xl border p-3 text-xs font-semibold leading-relaxed [scrollbar-color:#b51649_rgba(148,163,184,.25)] [scrollbar-width:thin] ${
+                isDark
+                  ? 'border-slate-800 bg-slate-950 text-slate-100'
+                  : 'border-slate-200 bg-slate-50 text-slate-700'
+              }`}>
+                {geminiReady && aiResponse
+                  ? renderFormattedText(aiResponse)
+                  : 'Pergunte algo sobre checklist, manutenção preventiva ou operação da frota.'}
+              </div>
+            </div>
+          </section>
         </div>
       </div>
 
       <footer
-        className="pointer-events-none fixed bottom-0 left-0 right-0 z-[30] px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2 text-center text-[10px] font-semibold leading-snug text-slate-500/95 dark:text-slate-500"
+        className="fixed bottom-0 left-0 right-0 z-[30] px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2 text-center text-[10px] font-semibold leading-snug text-slate-500/95 dark:text-slate-500"
         role="contentinfo"
       >
-        © {new Date().getFullYear()} ItaloFontes · Todos os direitos reservados.
+        <span>© {new Date().getFullYear()} Italo Bruno da Silva Fontes · Todos os direitos reservados.</span>
+        <span className="mx-2 text-slate-400">·</span>
+        <Link to="/termos" className="pointer-events-auto text-[#9f1239] hover:underline dark:text-rose-300">Termos</Link>
+        <span className="mx-1 text-slate-400">/</span>
+        <Link to="/privacidade" className="pointer-events-auto text-[#9f1239] hover:underline dark:text-rose-300">Privacidade</Link>
       </footer>
     </div>
   )

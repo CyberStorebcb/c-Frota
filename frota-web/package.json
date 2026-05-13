@@ -15,7 +15,10 @@
     "gen:picape4x4": "node scripts/generate-picape4x4-fleet.mjs",
     "gen:picapeleve": "node scripts/generate-picape-leve-fleet.mjs",
     "gen:veiculosleves": "node scripts/generate-veiculos-leves-fleet.mjs",
-    "gen:catalogos": "npm run gen:sky && npm run gen:munck && npm run gen:moto && npm run gen:picape4x4 && npm run gen:picapeleve && npm run gen:veiculosleves"
+    "gen:totalveiculos": "node scripts/generate-total-vehicles-fleet.mjs",
+    "gen:ativo-placas": "node scripts/gen-fleet-ativo-placas.mjs",
+    "gen:desmobilizado-placas": "node scripts/gen-fleet-desmobilizado-placas.mjs",
+    "gen:catalogos": "npm run gen:totalveiculos"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.6",

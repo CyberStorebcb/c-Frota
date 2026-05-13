@@ -1,10 +1,7 @@
 import { isAccessArea, type AccessArea } from '../access/accessAreas'
-import { MOTO_FLEET_ROWS, type MotoFleetSourceRow } from '../data/motoFleet.gen'
-import { MUNCK_FLEET_ROWS, type MunckFleetSourceRow } from '../data/munckFleet.gen'
-import { PICAPE_4X4_FLEET_ROWS, type Picape4x4FleetSourceRow } from '../data/picape4x4Fleet.gen'
-import { PICAPE_LEVE_FLEET_ROWS, type PicapeLeveFleetSourceRow } from '../data/picapeLeveFleet.gen'
-import { SKY_FLEET_ROWS, type SkyFleetSourceRow } from '../data/skyFleet.gen'
-import { VEICULOS_LEVES_FLEET_ROWS, type VeiculosLevesFleetSourceRow } from '../data/veiculosLevesFleet.gen'
+import { TOTAL_VEHICLE_ROWS, type TotalVehicleSourceRow } from '../data/totalVehiclesFleet.gen'
+import { FLEET_CATALOG_ATIVO_PLACAS } from './fleetCatalogAtivoPlacas'
+import { FLEET_CATALOG_DESMOBILIZADO_PLACAS } from './fleetCatalogDesmobilizadoPlacas'
 
 const STORAGE_KEY = 'frota.vehicles.registry'
 /** Estado ativo/inativo para placas só do catálogo (cadastro local usa o registo principal). */
@@ -28,8 +25,8 @@ export type FleetVehicle = {
   emManutencao: boolean
   ano: string
   createdAt: string
-  /** Origem: bases embebidas (SKY / Munck / Moto / Picapes / veículos leves) ou cadastro em `localStorage`. */
-  source?: 'sky' | 'munck' | 'moto' | 'picape4x4' | 'picapeleve' | 'veiculosleves' | 'local'
+  /** Origem: planilha total embebida ou cadastro em `localStorage`. */
+  source?: 'total' | 'local'
 }
 
 export type AddFleetVehicleInput = {
@@ -167,6 +164,10 @@ export const VEHICLE_TYPE_IDS = [
   'PICAPE 4X4',
   'PICAPE LEVE',
   'VEICULOS LEVES',
+  'CARRETA',
+  'CAMINHÃO',
+  'OFICINA',
+  'MOTOPODA',
 ] as const
 
 export type VehicleTipo = (typeof VEHICLE_TYPE_IDS)[number]
@@ -204,164 +205,45 @@ function newVehicleId(): string {
     : `veh-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function skyRowToFleetVehicle(row: SkyFleetSourceRow): FleetVehicle {
+function normalizeVehicleTipo(raw: string): VehicleTipo {
+  const tipo = raw.trim().toUpperCase()
+  if (tipo === 'SKY CS' || tipo === 'SKY CD') return 'SKY'
+  if (tipo === 'VEICULO LEVE' || tipo === 'VEÍCULO LEVE') return 'VEICULOS LEVES'
+  return isVehicleTipo(tipo) ? tipo : 'VEICULOS LEVES'
+}
+
+function totalRowToFleetVehicle(row: TotalVehicleSourceRow): FleetVehicle {
   const placa = normalizePlaca(row.placa)
+  const desmob = FLEET_CATALOG_DESMOBILIZADO_PLACAS.has(placa)
+  const prefixo = desmob ? 'DESMOBILIZADO' : normalizePrefixo(row.prefixo)
+  const status: VehicleStatus =
+    desmob ? 'INATIVO' : FLEET_CATALOG_ATIVO_PLACAS.has(placa) ? 'ATIVO' : 'INATIVO'
   return {
-    id: `sky-${placa}`,
+    id: `total-${placa}`,
     placa,
     modelo: (row.modelo || '—').trim().toUpperCase() || '—',
-    tipo: 'SKY',
-    prefixo: normalizePrefixo(row.prefixo),
-    responsavel: (row.processo || '—').trim().toUpperCase() || '—',
-    supervisor: 'NÃO ATRIBUÍDO',
-    coordenador: 'NÃO ATRIBUÍDO',
-    base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'ATIVO',
+    tipo: normalizeVehicleTipo(row.tipo),
+    prefixo,
+    responsavel: (row.responsavel || row.processo || '—').trim().toUpperCase() || '—',
+    supervisor: (row.gerencia || 'NÃO ATRIBUÍDO').trim().toUpperCase() || 'NÃO ATRIBUÍDO',
+    coordenador: (row.setor || 'NÃO ATRIBUÍDO').trim().toUpperCase() || 'NÃO ATRIBUÍDO',
+    base: (row.base || 'N/A').trim().toUpperCase() || 'N/A',
+    status,
     emManutencao: false,
-    ano: '',
+    ano: (row.ano || '').trim(),
     createdAt: '1970-01-01T00:00:00.000Z',
-    source: 'sky',
+    source: 'total',
   }
 }
 
-function munckRowToFleetVehicle(row: MunckFleetSourceRow): FleetVehicle {
-  const placa = normalizePlaca(row.placa)
-  return {
-    id: `munck-${placa}`,
-    placa,
-    modelo: (row.modelo || '—').trim().toUpperCase() || '—',
-    tipo: 'MUNCK',
-    prefixo: 'N/A',
-    responsavel: (row.processo || '—').trim().toUpperCase() || '—',
-    supervisor: 'NÃO ATRIBUÍDO',
-    coordenador: 'NÃO ATRIBUÍDO',
-    base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'ATIVO',
-    emManutencao: false,
-    ano: '',
-    createdAt: '1970-01-02T00:00:00.000Z',
-    source: 'munck',
-  }
-}
-
-function motoRowToFleetVehicle(row: MotoFleetSourceRow): FleetVehicle {
-  const placa = normalizePlaca(row.placa)
-  return {
-    id: `moto-${placa}`,
-    placa,
-    modelo: (row.modelo || '—').trim().toUpperCase() || '—',
-    tipo: 'MOTO',
-    prefixo: normalizePrefixo(row.prefixo),
-    responsavel: (row.processo || '—').trim().toUpperCase() || '—',
-    supervisor: 'NÃO ATRIBUÍDO',
-    coordenador: 'NÃO ATRIBUÍDO',
-    base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'ATIVO',
-    emManutencao: false,
-    ano: '',
-    createdAt: '1970-01-03T00:00:00.000Z',
-    source: 'moto',
-  }
-}
-
-function picape4x4RowToFleetVehicle(row: Picape4x4FleetSourceRow): FleetVehicle {
-  const placa = normalizePlaca(row.placa)
-  return {
-    id: `picape4x4-${placa}`,
-    placa,
-    modelo: (row.modelo || '—').trim().toUpperCase() || '—',
-    tipo: 'PICAPE 4X4',
-    prefixo: normalizePrefixo(row.prefixo),
-    responsavel: (row.processo || '—').trim().toUpperCase() || '—',
-    supervisor: 'NÃO ATRIBUÍDO',
-    coordenador: 'NÃO ATRIBUÍDO',
-    base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'ATIVO',
-    emManutencao: false,
-    ano: '',
-    createdAt: '1970-01-04T00:00:00.000Z',
-    source: 'picape4x4',
-  }
-}
-
-function picapeLeveRowToFleetVehicle(row: PicapeLeveFleetSourceRow): FleetVehicle {
-  const placa = normalizePlaca(row.placa)
-  return {
-    id: `picapeleve-${placa}`,
-    placa,
-    modelo: (row.modelo || '—').trim().toUpperCase() || '—',
-    tipo: 'PICAPE LEVE',
-    prefixo: normalizePrefixo(row.prefixo),
-    responsavel: (row.processo || '—').trim().toUpperCase() || '—',
-    supervisor: 'NÃO ATRIBUÍDO',
-    coordenador: 'NÃO ATRIBUÍDO',
-    base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'ATIVO',
-    emManutencao: false,
-    ano: '',
-    createdAt: '1970-01-05T00:00:00.000Z',
-    source: 'picapeleve',
-  }
-}
-
-function veiculosLevesRowToFleetVehicle(row: VeiculosLevesFleetSourceRow): FleetVehicle {
-  const placa = normalizePlaca(row.placa)
-  return {
-    id: `veiculosleves-${placa}`,
-    placa,
-    modelo: (row.modelo || '—').trim().toUpperCase() || '—',
-    tipo: 'VEICULOS LEVES',
-    prefixo: normalizePrefixo(row.prefixo),
-    responsavel: (row.processo || '—').trim().toUpperCase() || '—',
-    supervisor: 'NÃO ATRIBUÍDO',
-    coordenador: 'NÃO ATRIBUÍDO',
-    base: (row.localidade || 'N/A').trim() || 'N/A',
-    status: 'ATIVO',
-    emManutencao: false,
-    ano: '',
-    createdAt: '1970-01-06T00:00:00.000Z',
-    source: 'veiculosleves',
-  }
-}
-
-/** Bases embebidas (ficheiros deduplicados) fundidas com `localStorage` (cadastro local prevalece na mesma placa). */
+/** Base total embebida da planilha fundida com `localStorage` (cadastro local prevalece na mesma placa). */
 export function getDisplayedFleetVehicles(): FleetVehicle[] {
   const map = new Map<string, FleetVehicle>()
 
-  for (const row of SKY_FLEET_ROWS) {
+  for (const row of TOTAL_VEHICLE_ROWS) {
     const p = normalizePlaca(row.placa)
     if (!p) continue
-    map.set(p, skyRowToFleetVehicle(row))
-  }
-
-  for (const row of MUNCK_FLEET_ROWS) {
-    const p = normalizePlaca(row.placa)
-    if (!p) continue
-    map.set(p, munckRowToFleetVehicle(row))
-  }
-
-  for (const row of MOTO_FLEET_ROWS) {
-    const p = normalizePlaca(row.placa)
-    if (!p) continue
-    map.set(p, motoRowToFleetVehicle(row))
-  }
-
-  for (const row of PICAPE_4X4_FLEET_ROWS) {
-    const p = normalizePlaca(row.placa)
-    if (!p) continue
-    map.set(p, picape4x4RowToFleetVehicle(row))
-  }
-
-  for (const row of PICAPE_LEVE_FLEET_ROWS) {
-    const p = normalizePlaca(row.placa)
-    if (!p) continue
-    map.set(p, picapeLeveRowToFleetVehicle(row))
-  }
-
-  for (const row of VEICULOS_LEVES_FLEET_ROWS) {
-    const p = normalizePlaca(row.placa)
-    if (!p) continue
-    map.set(p, veiculosLevesRowToFleetVehicle(row))
+    map.set(p, totalRowToFleetVehicle(row))
   }
 
   const locals = readFleetVehicles()
@@ -391,53 +273,13 @@ export function getDisplayedFleetVehicles(): FleetVehicle[] {
   return [...map.values()].sort((a, b) => a.placa.localeCompare(b.placa))
 }
 
-function placaExistsInSkyCatalog(placa: string): boolean {
+function placaExistsInTotalCatalog(placa: string): boolean {
   const p = normalizePlaca(placa)
-  return SKY_FLEET_ROWS.some((r) => normalizePlaca(r.placa) === p)
+  return TOTAL_VEHICLE_ROWS.some((r) => normalizePlaca(r.placa) === p)
 }
 
-function placaExistsInMunckCatalog(placa: string): boolean {
-  const p = normalizePlaca(placa)
-  return MUNCK_FLEET_ROWS.some((r) => normalizePlaca(r.placa) === p)
-}
-
-function placaExistsInMotoCatalog(placa: string): boolean {
-  const p = normalizePlaca(placa)
-  return MOTO_FLEET_ROWS.some((r) => normalizePlaca(r.placa) === p)
-}
-
-function placaExistsInPicape4x4Catalog(placa: string): boolean {
-  const p = normalizePlaca(placa)
-  return PICAPE_4X4_FLEET_ROWS.some((r) => normalizePlaca(r.placa) === p)
-}
-
-function placaExistsInPicapeLeveCatalog(placa: string): boolean {
-  const p = normalizePlaca(placa)
-  return PICAPE_LEVE_FLEET_ROWS.some((r) => normalizePlaca(r.placa) === p)
-}
-
-function placaExistsInVeiculosLevesCatalog(placa: string): boolean {
-  const p = normalizePlaca(placa)
-  return VEICULOS_LEVES_FLEET_ROWS.some((r) => normalizePlaca(r.placa) === p)
-}
-
-/** Quantidade de placas distintas na base SKY embebida (sky.txt deduplicado). */
-export const SKY_CATALOG_UNIQUE_COUNT = SKY_FLEET_ROWS.length
-
-/** Quantidade de placas distintas na base Munck embebida (MUNCK.txt deduplicado). */
-export const MUNCK_CATALOG_UNIQUE_COUNT = MUNCK_FLEET_ROWS.length
-
-/** Quantidade de placas distintas na base Moto embebida (Moto.txt deduplicado). */
-export const MOTO_CATALOG_UNIQUE_COUNT = MOTO_FLEET_ROWS.length
-
-/** Quantidade de placas distintas na base Picape 4x4 embebida (PICAPE 4X4.txt deduplicado). */
-export const PICAPE_4X4_CATALOG_UNIQUE_COUNT = PICAPE_4X4_FLEET_ROWS.length
-
-/** Quantidade de placas distintas na base Picape leve embebida (PICAPE LEVE.txt deduplicado). */
-export const PICAPE_LEVE_CATALOG_UNIQUE_COUNT = PICAPE_LEVE_FLEET_ROWS.length
-
-/** Quantidade de placas distintas na base Veículos leves embebida (VEICULOS LEVES.txt deduplicado). */
-export const VEICULOS_LEVES_CATALOG_UNIQUE_COUNT = VEICULOS_LEVES_FLEET_ROWS.length
+/** Quantidade de placas distintas na base total embebida (TOTAL DE VEICULOS.xlsx deduplicado). */
+export const TOTAL_VEHICLE_CATALOG_UNIQUE_COUNT = TOTAL_VEHICLE_ROWS.length
 
 function parseRow(x: Record<string, unknown>): FleetVehicle | null {
   const placa = normalizePlaca(String(x.placa ?? ''))
@@ -468,12 +310,7 @@ function parseRow(x: Record<string, unknown>): FleetVehicle | null {
   const rawSource = x.source
   const src: FleetVehicle['source'] | undefined =
     rawSource === 'local' ||
-    rawSource === 'sky' ||
-    rawSource === 'munck' ||
-    rawSource === 'moto' ||
-    rawSource === 'picape4x4' ||
-    rawSource === 'picapeleve' ||
-    rawSource === 'veiculosleves'
+    rawSource === 'total'
       ? rawSource
       : undefined
 
@@ -531,23 +368,8 @@ export function addFleetVehicle(
     return { ok: false, message: 'Já existe um veículo com esta placa.' }
   }
 
-  if (placaExistsInSkyCatalog(pl)) {
-    return { ok: false, message: 'Esta placa já consta na base SKY.' }
-  }
-  if (placaExistsInMunckCatalog(pl)) {
-    return { ok: false, message: 'Esta placa já consta na base Munck.' }
-  }
-  if (placaExistsInMotoCatalog(pl)) {
-    return { ok: false, message: 'Esta placa já consta na base Moto.' }
-  }
-  if (placaExistsInPicape4x4Catalog(pl)) {
-    return { ok: false, message: 'Esta placa já consta na base Picape 4x4.' }
-  }
-  if (placaExistsInPicapeLeveCatalog(pl)) {
-    return { ok: false, message: 'Esta placa já consta na base Picape leve.' }
-  }
-  if (placaExistsInVeiculosLevesCatalog(pl)) {
-    return { ok: false, message: 'Esta placa já consta na base Veículos leves.' }
+  if (placaExistsInTotalCatalog(pl)) {
+    return { ok: false, message: 'Esta placa já consta na base total de veículos.' }
   }
 
   const prefixo = normalizePrefixo(input.prefixo)
@@ -581,14 +403,7 @@ export function addFleetVehicle(
 
 /** Veículo gerado a partir dos ficheiros embebidos (não removível pelo menu). */
 export function isEmbeddedCatalogFleetVehicleId(id: string): boolean {
-  return (
-    id.startsWith('sky-') ||
-    id.startsWith('munck-') ||
-    id.startsWith('moto-') ||
-    id.startsWith('picape4x4-') ||
-    id.startsWith('picapeleve-') ||
-    id.startsWith('veiculosleves-')
-  )
+  return id.startsWith('total-')
 }
 
 export function removeFleetVehicle(id: string): void {

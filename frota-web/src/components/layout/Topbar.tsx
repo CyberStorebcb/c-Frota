@@ -1,10 +1,13 @@
 import { Search, Bell, Menu, PanelLeft, Moon, Sun } from 'lucide-react'
+import { CollapsedNavMark } from '../../branding/CollapsedNavMark'
 import { useTheme } from '../../theme/ThemeProvider'
 
 export function Topbar({
+  sidebarCollapsed,
   onMenuClick,
   onToggleSidebar,
 }: {
+  sidebarCollapsed: boolean
   onMenuClick: () => void
   onToggleSidebar: () => void
 }) {
@@ -28,6 +31,18 @@ export function Topbar({
         >
           <PanelLeft size={18} />
         </button>
+
+        {sidebarCollapsed ? (
+          <div className="hidden shrink-0 items-center gap-2 md:flex">
+            <CollapsedNavMark size="sm" />
+            <div className="leading-tight">
+              <div className="text-sm font-black tracking-tight text-slate-900 dark:text-white">
+                CGB <span className="font-extrabold text-[#b51649]">Frota</span>
+              </div>
+              <div className="h-0.5 w-16 rounded-full bg-[#b51649]" />
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 w-full max-w-xl dark:border-slate-800 dark:bg-slate-900/40">
           <Search size={16} className="text-slate-400 dark:text-slate-500" />
