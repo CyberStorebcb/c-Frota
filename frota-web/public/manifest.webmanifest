@@ -11,7 +11,7 @@
   "icons": [
     {
       "src": "/branding/app-icon.png",
-      "sizes": "159x210",
+      "sizes": "250x372",
       "type": "image/png",
       "purpose": "any"
     }
@@ -24,7 +24,7 @@
       "icons": [
         {
           "src": "/branding/app-icon.png",
-          "sizes": "159x210",
+          "sizes": "250x372",
           "type": "image/png"
         }
       ]
