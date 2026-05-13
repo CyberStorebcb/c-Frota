@@ -1,4 +1,4 @@
-const CACHE_NAME = 'frota-checklists-v5'
+const CACHE_NAME = 'frota-checklists-v6'
 const APP_SHELL = [
   '/',
   '/checklist',
