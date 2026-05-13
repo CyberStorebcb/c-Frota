@@ -14,3 +14,6 @@ compatibility_flags = ["nodejs_compat"]
 # Bucket R2 e URL pública base (domínio r2.dev, custom domain, etc.) — sem barra final.
 R2_BUCKET_NAME = "checklist-evidencias"
 # R2_PUBLIC_BASE_URL = "https://pub-xxxx.r2.dev"
+
+# CORS do bucket (origins do browser): editar `r2-bucket-cors.json` e aplicar:
+#   npx wrangler r2 bucket cors set checklist-evidencias --file r2-bucket-cors.json --force
