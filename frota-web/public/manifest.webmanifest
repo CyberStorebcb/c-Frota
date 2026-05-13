@@ -6,20 +6,14 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0b1020",
-  "theme_color": "#0b1020",
+  "background_color": "#2b2421",
+  "theme_color": "#2b2421",
   "icons": [
     {
-      "src": "/branding/favicon.svg",
-      "sizes": "32x32",
-      "type": "image/svg+xml",
+      "src": "/branding/app-icon.png",
+      "sizes": "159x210",
+      "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/branding/app-icon.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
     }
   ],
   "shortcuts": [
@@ -29,9 +23,9 @@
       "url": "/checklist",
       "icons": [
         {
-          "src": "/branding/app-icon.svg",
-          "sizes": "512x512",
-          "type": "image/svg+xml"
+          "src": "/branding/app-icon.png",
+          "sizes": "159x210",
+          "type": "image/png"
         }
       ]
     }

@@ -1,11 +1,10 @@
-const CACHE_NAME = 'frota-checklists-v3'
+const CACHE_NAME = 'frota-checklists-v4'
 const APP_SHELL = [
   '/',
   '/checklist',
   '/manifest.webmanifest',
-  '/branding/app-icon.svg',
-  '/branding/favicon.svg',
-  '/branding/pwa-icon.svg',
+  '/branding/app-icon.png',
+  '/branding/favicon.png',
   '/branding/cgb-logo-on-light.svg',
   '/branding/cgb-logo-on-dark.svg',
   '/branding/cgb-sidebar-mark.png',
