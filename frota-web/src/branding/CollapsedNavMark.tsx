@@ -12,7 +12,7 @@ type CollapsedNavMarkProps = {
   size?: keyof typeof sizeClass
 }
 
-/** Símbolo compacto da CGB para sidebar/topbar, usando o favicon oficial. */
+/** Marca compacta (ícone checklist CGB) para sidebar/topbar. */
 export function CollapsedNavMark({ className = '', size = 'lg' }: CollapsedNavMarkProps) {
   const [failed, setFailed] = useState(false)
   const boxClass = sizeClass[size]
