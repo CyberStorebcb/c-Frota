@@ -5,6 +5,7 @@ function normalizePlacaCatalogo(s: string): string {
   return s.trim().toUpperCase()
 }
 
+/** Cartões e total — cada placa em uma categoria; ATIVOS = operação ativa sem os prefixos Reserva/Transporte (estes têm cartão próprio). */
 export const VEHICLE_OPERATIONAL_STATUS_LABELS = [
   'ATIVOS',
   'DESMOBILIZADO',
@@ -48,12 +49,19 @@ export function getVehicleOperationalStatusRows() {
   }))
 }
 
-export function getVehicleOperationalStatusSummary() {
-  const rows = getVehicleOperationalStatusRows()
+export type VehicleOperationalStatusRow = ReturnType<typeof getVehicleOperationalStatusRows>[number]
+
+export function getVehicleOperationalStatusSummary(rowsParam?: VehicleOperationalStatusRow[]) {
+  const rows = rowsParam ?? getVehicleOperationalStatusRows()
   return VEHICLE_OPERATIONAL_STATUS_LABELS.map((label) => {
     const vehicles =
       label === 'ATIVOS'
-        ? rows.filter((row) => !NOT_ACTIVE_OPERATIONAL_STATUS_SET.has(row.statusOperacional))
+        ? rows.filter(
+            (row) =>
+              !NOT_ACTIVE_OPERATIONAL_STATUS_SET.has(row.statusOperacional) &&
+              row.statusOperacional !== 'RESERVA' &&
+              row.statusOperacional !== 'TRANSPORTE',
+          )
         : rows.filter((row) => row.statusOperacional === label)
 
     return {

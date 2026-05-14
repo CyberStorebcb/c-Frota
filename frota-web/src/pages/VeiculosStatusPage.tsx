@@ -1,6 +1,7 @@
 import { ArrowLeft, ClipboardList, Truck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
+  getVehicleOperationalStatusRows,
   getVehicleOperationalStatusSummary,
   VEHICLE_OPERATIONAL_STATUS_LABELS,
   type VehicleOperationalStatus,
@@ -10,7 +11,7 @@ const STATUS_STYLE: Record<VehicleOperationalStatus, { card: string; badge: stri
   ATIVOS: {
     card: 'border-emerald-300/70 bg-emerald-50/70 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100',
     badge: 'bg-emerald-600 text-white',
-    description: 'Veículos em operação, incluindo reservas e transportes.',
+    description: 'Veículos em operação com prefixo ativo (cartões Reserva e Transporte completam o conjunto ativo).',
   },
   DESMOBILIZADO: {
     card: 'border-rose-300/70 bg-rose-50/70 text-rose-950 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100',
@@ -45,8 +46,10 @@ const STATUS_STYLE: Record<VehicleOperationalStatus, { card: string; badge: stri
 }
 
 export function VeiculosStatusPage() {
-  const summary = getVehicleOperationalStatusSummary()
-  const totalClassificados = summary.reduce((acc, item) => acc + item.count, 0)
+  const statusRows = getVehicleOperationalStatusRows()
+  const summary = getVehicleOperationalStatusSummary(statusRows)
+  /** Placas na base (ex.: 412); independente da soma visual dos cartões. */
+  const totalFrota = statusRows.length
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
@@ -70,7 +73,7 @@ export function VeiculosStatusPage() {
               </div>
               <div className="rounded-3xl border border-white/15 bg-white/10 px-6 py-4 text-center backdrop-blur sm:min-w-[11rem]">
                 <p className="text-[10px] font-black uppercase tracking-widest text-rose-100">Total nas categorias</p>
-                <p className="mt-1 text-4xl font-black tabular-nums">{totalClassificados}</p>
+                <p className="mt-1 text-4xl font-black tabular-nums">{totalFrota}</p>
               </div>
             </div>
           </div>
@@ -103,7 +106,7 @@ export function VeiculosStatusPage() {
             <div>
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Detalhamento</h2>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Contagem direta dos grupos operacionais, incluindo ativos, reservas e transportes.
+                Cada placa em uma categoria; ATIVOS + Reserva + Transporte cobrem o conjunto operacionalmente ativo.
               </p>
             </div>
           </div>
