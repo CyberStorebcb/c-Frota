@@ -348,13 +348,16 @@ export function DashboardPage() {
     const scale = BASE_SCALE[baseEfetiva] ?? 1
     const checklistsTotal = Math.round(kpi.checklistsBase * scale)
     const checklistsValue = String(checklistsTotal)
-    const veiculosTotal =
+    const veiculosPorBase =
       baseEfetiva === 'todos'
-        ? vehicles.length
-        : vehicles.filter((v) => v.base.toLowerCase().includes(baseEfetiva)).length
-    const pctAdesao = veiculosTotal > 0
-      ? Math.min(100, Math.round((checklistsTotal / veiculosTotal) * 100))
-      : 0
+        ? vehicles
+        : vehicles.filter((v) => v.base.toLowerCase().includes(baseEfetiva))
+    const veiculosTotal = veiculosPorBase.length
+    const veiculosAtivos = veiculosPorBase.filter((v) => v.status === 'ATIVO').length
+    const pctAdesao =
+      veiculosAtivos > 0
+        ? Math.round((checklistsTotal / veiculosAtivos) * 100)
+        : 0
     const mediaPorVeiculo = `${pctAdesao}%`
 
     return [
@@ -519,7 +522,7 @@ export function DashboardPage() {
               <Card
                 key={s.label}
                 to={s.href ?? '#'}
-                className={`group flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${s.cardHover} ${s.href ? 'cursor-pointer hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-400/40' : ''}`}
+                className={`group flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${s.cardHover} ${s.href ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40' : ''}`}
               >
                 <div className={`mb-3 shrink-0 rounded-xl p-3 transition-transform sm:rounded-2xl sm:p-3.5 ${s.iconWrap}`}>
                   <s.Icon size={26} aria-hidden />

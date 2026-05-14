@@ -178,10 +178,9 @@ export function ManagePage() {
     ]
   }, [rows])
 
-  const sortedFiltered = useMemo(() => {
+  /** Filtros da página (veículo, data, busca, etc.) sem recorte por visão Pendentes/Resolvidos — usado nos KPIs e como base da tabela. */
+  const rowsMatchingFiltros = useMemo(() => {
     let list = rows
-    if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
-    if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
     if (vehicleId !== 'todos') list = list.filter((r) => r.veiculoId === vehicleId)
     if (processo !== 'todos') list = list.filter((r) => matchesProcessoFilter(r.processo, processo))
     if (base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, base))
@@ -199,8 +198,12 @@ export function ManagePage() {
         list = list.filter((r) => Number(r.dataApontamento.slice(0, 4)) === ano)
       } else if (/^\d{4}$/.test(data)) {
         list = list.filter((r) => r.dataApontamento.startsWith(data))
+      } else if (data === 'hoje') {
+        const inicioHoje = new Date()
+        inicioHoje.setHours(0, 0, 0, 0)
+        list = list.filter((r) => new Date(r.dataApontamento + 'T00:00:00').getTime() >= inicioHoje.getTime())
       } else {
-        const dias = data === 'hoje' ? 0 : data === '7d' ? 7 : 30
+        const dias = data === '7d' ? 7 : 30
         const min = nowMs - dias * 86_400_000
         list = list.filter((r) => new Date(r.dataApontamento + 'T00:00:00').getTime() >= min)
       }
@@ -219,15 +222,22 @@ export function ManagePage() {
     return [...list].sort(
       (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),
     )
-  }, [rows, visao, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query])
+  }, [rows, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query])
+
+  const sortedFiltered = useMemo(() => {
+    let list = rowsMatchingFiltros
+    if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
+    if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
+    return list
+  }, [rowsMatchingFiltros, visao])
 
   const stats = useMemo(() => {
     const now = Date.now()
-    const pendentes = sortedFiltered.filter((r) => !r.resolvido).length
-    const resolvidos = sortedFiltered.filter((r) => r.resolvido).length
-    const entrantes = sortedFiltered.filter((r) => isDefeitoEntrante(r, now)).length
-    return { total: sortedFiltered.length, pendentes, resolvidos, entrantes }
-  }, [sortedFiltered])
+    const pendentes = rowsMatchingFiltros.filter((r) => !r.resolvido).length
+    const resolvidos = rowsMatchingFiltros.filter((r) => r.resolvido).length
+    const entrantes = rowsMatchingFiltros.filter((r) => isDefeitoEntrante(r, now)).length
+    return { total: rowsMatchingFiltros.length, pendentes, resolvidos, entrantes }
+  }, [rowsMatchingFiltros])
 
   const totalFiltrados = sortedFiltered.length
   const totalPaginas = Math.max(1, Math.ceil(totalFiltrados / pageSize))
@@ -417,7 +427,7 @@ export function ManagePage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatPill
           label="Checklists realizados"
-          value={String(filtrosAtivos ? new Set(sortedFiltered.map((r) => r.checklistId)).size : checklistsRealizadosTotal)}
+          value={String(filtrosAtivos ? new Set(rowsMatchingFiltros.map((r) => r.checklistId)).size : checklistsRealizadosTotal)}
           icon={<ClipboardList size={18} />}
           tone="slate"
           selected={visao === 'apontamentos'}

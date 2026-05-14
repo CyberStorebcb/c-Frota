@@ -70,9 +70,9 @@ function TelaEscolhaChecklist({
     <div className={`flex min-h-dvh flex-col items-center justify-center px-4 py-8 ${CHECKLIST_PAGE_BG}`}>
       <div className="w-full max-w-md">
         <CgbHero
-          eyebrow="CGB — inspeção motorista"
+          eyebrow="CGB — inspeção frota"
           title="Escolha o checklist"
-          description="Preencha a inspeção do veículo sem entrar no painel interno. O formulário funciona online e offline."
+          description="Preencha com atenção para garantir a qualidade da inspeção. O envio funcionará online e offline."
         />
 
         <div className="mt-5 space-y-3">
@@ -101,7 +101,7 @@ function TelaEscolhaChecklist({
         </div>
 
         <p className="mt-6 text-center text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-          Você não será direcionado ao painel interno da frota — apenas a este formulário.
+        Atenção ao preenchimento, pois os formulários serão avaliados e validados.
         </p>
 
         <div className="mt-4">
