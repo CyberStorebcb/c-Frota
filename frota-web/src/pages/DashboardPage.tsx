@@ -269,7 +269,7 @@ export function DashboardPage() {
       })
   }, [periodo])
 
-  const { rows, checklistsRealizadosTotal } = useApontamentos()
+  const { rows } = useApontamentos()
 
   const baseEfetiva =
     filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
