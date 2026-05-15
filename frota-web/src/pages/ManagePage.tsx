@@ -737,16 +737,17 @@ export function ManagePage() {
             }}
             aria-label="Fechar"
           />
-          <div className="fixed inset-0 z-[9999] grid place-items-center p-4">
-            <div
-              className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950"
-              onPointerDown={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Finalizar reparo"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
+          <div className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain">
+            <div className="flex min-h-[100dvh] justify-center p-4 py-6 sm:items-center sm:py-8">
+              <div
+                className="my-auto flex w-full max-w-xl max-h-[min(100dvh-1.5rem,52rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950"
+                onPointerDown={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Finalizar reparo"
+              >
+              <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 pb-3 pt-4 dark:border-slate-800">
+                <div className="min-w-0 pr-2">
                   <div className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
                     Marcar como resolvido
                   </div>
@@ -763,13 +764,14 @@ export function ManagePage() {
                 <button
                   type="button"
                   onClick={closeResolveModal}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
                   aria-label="Fechar"
                 >
                   <X size={18} />
                 </button>
               </div>
 
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
               {/* Fotos da NC de origem (quando apontamento vem de checklist) */}
               {currentResolve?.ncFotos && currentResolve.ncFotos.length > 0 && (
                 <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
@@ -931,8 +933,9 @@ export function ManagePage() {
                   </div>
                 </div>
               </div>
+              </div>
 
-              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeResolveModal}
@@ -953,6 +956,7 @@ export function ManagePage() {
                 </button>
               </div>
             </div>
+          </div>
           </div>
         </Portal>
       ) : null}
