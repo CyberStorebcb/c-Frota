@@ -4,6 +4,12 @@ const DB_NAME = 'frota-checklists-offline'
 const DB_VERSION = 1
 const STORE_NAME = 'pending-checklists'
 
+/** Número máximo de tentativas antes de abandonar o checklist. */
+export const MAX_RETRY_ATTEMPTS = 5
+
+/** Checklists sincronizados há mais de X dias são removidos automaticamente. */
+const SYNCED_CLEANUP_DAYS = 30
+
 export type OfflineChecklistFile = {
   name: string
   type: string
@@ -109,7 +115,9 @@ export async function listOfflineChecklists(): Promise<OfflineChecklistRecord[]>
 
 export async function listPendingOfflineChecklists(): Promise<OfflineChecklistRecord[]> {
   const records = await listOfflineChecklists()
-  return records.filter((r) => r.status === 'pending' || r.status === 'error')
+  return records.filter(
+    (r) => (r.status === 'pending' || r.status === 'error') && r.attempts < MAX_RETRY_ATTEMPTS,
+  )
 }
 
 export async function updateOfflineChecklist(record: OfflineChecklistRecord) {
@@ -134,9 +142,25 @@ export async function getOfflineQueueSummary(): Promise<SyncSummary> {
     (acc, record) => {
       if (record.status === 'pending') acc.pending++
       if (record.status === 'syncing') acc.syncing++
-      if (record.status === 'error') acc.error++
+      if (record.status === 'error' && record.attempts < MAX_RETRY_ATTEMPTS) acc.error++
       return acc
     },
     { pending: 0, syncing: 0, error: 0 },
   )
+}
+
+/**
+ * Remove registros já sincronizados com mais de SYNCED_CLEANUP_DAYS dias,
+ * e registros com erro que esgotaram todas as tentativas.
+ * Chamado automaticamente pelo syncOfflineChecklists após cada sync.
+ */
+export async function cleanupOfflineQueue(): Promise<void> {
+  const records = await listOfflineChecklists()
+  const cutoff = Date.now() - SYNCED_CLEANUP_DAYS * 86_400_000
+  const toRemove = records.filter(
+    (r) =>
+      (r.status === 'synced' && new Date(r.updatedAt).getTime() < cutoff) ||
+      (r.status === 'error' && r.attempts >= MAX_RETRY_ATTEMPTS),
+  )
+  await Promise.all(toRemove.map((r) => removeOfflineChecklist(r.localId)))
 }

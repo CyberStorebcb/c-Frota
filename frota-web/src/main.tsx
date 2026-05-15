@@ -6,18 +6,23 @@ import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
 import { OfflineSyncProvider } from './checklists/OfflineSyncProvider'
 import { ThemeProvider } from './theme/ThemeProvider'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <OfflineSyncProvider>
-            <App />
-          </OfflineSyncProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <OfflineSyncProvider>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </OfflineSyncProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )
 

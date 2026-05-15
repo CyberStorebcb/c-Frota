@@ -1,0 +1,2 @@
+[functions.notify-checklist-nc]
+verify_jwt = false

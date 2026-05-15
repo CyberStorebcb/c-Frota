@@ -169,6 +169,8 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const [persistError, setPersistError] = useState<string | null>(null)
   const clearPersistError = useCallback(() => setPersistError(null), [])
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptsRef = useRef(0)
 
   const recarregar = useCallback(async () => {
     setCarregando(true)
@@ -245,18 +247,45 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void recarregar()
 
-    const ch = supabase
-      .channel('apontamentos-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, () => {
-        void recarregar()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklists' }, () => {
-        void recarregar()
-      })
-      .subscribe()
+    const MAX_BACKOFF_MS = 30_000
 
-    channelRef.current = ch
-    return () => { void supabase.removeChannel(ch) }
+    const subscribe = () => {
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current)
+      }
+
+      const ch = supabase
+        .channel('apontamentos-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, () => {
+          void recarregar()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'checklists' }, () => {
+          void recarregar()
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            reconnectAttemptsRef.current = 0
+          }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            const attempts = ++reconnectAttemptsRef.current
+            const delay = Math.min(1_000 * 2 ** attempts, MAX_BACKOFF_MS)
+            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
+            reconnectTimerRef.current = setTimeout(() => {
+              void recarregar()
+              subscribe()
+            }, delay)
+          }
+        })
+
+      channelRef.current = ch
+    }
+
+    subscribe()
+
+    return () => {
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
+      if (channelRef.current) void supabase.removeChannel(channelRef.current)
+    }
   }, [recarregar])
 
   const marcarResolvido = useCallback(async (

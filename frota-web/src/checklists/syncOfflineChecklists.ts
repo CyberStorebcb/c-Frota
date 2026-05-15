@@ -1,6 +1,7 @@
 import { supabase, type ChecklistInsert } from '../lib/supabase'
 import { uploadChecklistEvidenceFile } from '../lib/checklistEvidenceUpload'
 import {
+  cleanupOfflineQueue,
   listPendingOfflineChecklists,
   removeOfflineChecklist,
   updateOfflineChecklist,
@@ -78,6 +79,8 @@ export function syncOfflineChecklists() {
         })
       }
     }
+    // Remove registros expirados e que esgotaram tentativas
+    await cleanupOfflineQueue()
   })().finally(() => {
     syncingPromise = null
   })

@@ -10,7 +10,13 @@ if (!supabaseConfigured) {
   console.warn('[supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não configurados.')
 }
 
-export const supabase = createClient(url, key)
+export const supabase = createClient(url, key, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+})
 
 export type ChecklistRow = {
   id: string

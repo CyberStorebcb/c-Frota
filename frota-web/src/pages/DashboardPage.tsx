@@ -39,48 +39,10 @@ import {
   getDisplayedFleetVehicles,
 } from '../frota/vehicleRegistry'
 import { useTheme } from '../theme/ThemeProvider'
+import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { supabase } from '../lib/supabase'
 
 type ChartRow = { name: string; realizados: number; naoRealizados: number }
-
-const CHART_DATA_BY_PERIOD: Record<string, ChartRow[]> = {
-  '7d': [
-    { name: 'Seg', realizados: 110, naoRealizados: 15 },
-    { name: 'Ter', realizados: 125, naoRealizados: 10 },
-    { name: 'Qua', realizados: 95,  naoRealizados: 30 },
-    { name: 'Qui', realizados: 140, naoRealizados: 5  },
-    { name: 'Sex', realizados: 130, naoRealizados: 12 },
-    { name: 'Sab', realizados: 45,  naoRealizados: 8  },
-  ],
-  '30d': [
-    { name: 'Sem 1', realizados: 520, naoRealizados: 60 },
-    { name: 'Sem 2', realizados: 490, naoRealizados: 85 },
-    { name: 'Sem 3', realizados: 610, naoRealizados: 42 },
-    { name: 'Sem 4', realizados: 580, naoRealizados: 55 },
-  ],
-  'hoje': [
-    { name: 'Manhã', realizados: 52, naoRealizados: 6 },
-    { name: 'Tarde', realizados: 68, naoRealizados: 4 },
-    { name: 'Noite', realizados: 32, naoRealizados: 2 },
-  ],
-}
-
-const BASE_SCALE: Record<string, number> = {
-  todos: 1,
-  pdt:   0.38,
-  bcb:   0.35,
-  sti:   0.27,
-  bdc:   1,
-  desmob: 1,
-  itm:   1,
-  pds:   1,
-}
-
-const KPIS_BY_PERIOD: Record<string, { checklistsBase: number; conformidade: string }> = {
-  '7d':   { checklistsBase: 152, conformidade: '94%' },
-  '30d':  { checklistsBase: 621, conformidade: '91%' },
-  'hoje': { checklistsBase: 28,  conformidade: '96%' },
-}
-
 
 const CHART_COLORS = {
   realizados: '#1E40AF',
@@ -129,66 +91,29 @@ function AdesaoTooltipBody({
   )
 }
 
-const pendenciasMock = [
-  {
-    plate: 'ROU6H57',
-    unit: 'PDT',
-    status: 'Atrasado',
-    processo: 'frota',
-    base: 'pdt',
-    coordenador: 'ana',
-    responsavel: 'a',
-    prefixo: '0101',
-  },
-  {
-    plate: 'SNQ1J22',
-    unit: 'BCB',
-    status: 'Pendente',
-    processo: 'transporte',
-    base: 'bcb',
-    coordenador: 'bruno',
-    responsavel: 'b',
-    prefixo: '0102',
-  },
-  {
-    plate: 'RZR1F70',
-    unit: 'STI',
-    status: 'Atrasado',
-    processo: 'goman',
-    base: 'sti',
-    coordenador: 'ana',
-    responsavel: 'a',
-    prefixo: '0101',
-  },
-  {
-    plate: 'ROU7A90',
-    unit: 'BCB',
-    status: 'Atrasado',
-    processo: 'gstc',
-    base: 'bcb',
-    coordenador: 'bruno',
-    responsavel: 'a',
-    prefixo: '0102',
-  },
-] as const
-
 const PERIODO_OPTIONS = [
+  { label: 'Hoje', value: 'hoje' },
   { label: 'Últimos 7 dias', value: '7d' },
   { label: 'Últimos 30 dias', value: '30d' },
-  { label: 'Hoje', value: 'hoje' },
 ] as const
 
-const RESPONSAVEL_OPTIONS = [
-  { label: 'Todos', value: 'todos' },
-  { label: 'Equipe A', value: 'a' },
-  { label: 'Equipe B', value: 'b' },
-] as const
+function periodoParaInicio(periodo: string): Date {
+  const d = new Date()
+  if (periodo === 'hoje') { d.setHours(0, 0, 0, 0); return d }
+  if (periodo === '7d')  { d.setDate(d.getDate() - 6); d.setHours(0, 0, 0, 0); return d }
+  d.setDate(d.getDate() - 29); d.setHours(0, 0, 0, 0); return d
+}
 
-const PREFIXO_OPTIONS = [
-  { label: 'Todos', value: 'todos' },
-  { label: '0101', value: '0101' },
-  { label: '0102', value: '0102' },
-] as const
+function fmtLabel(periodo: string, dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  if (periodo === 'hoje') {
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  }
+  if (periodo === '7d') {
+    return d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
+  }
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 function GomanLogo({
   mode = 'full',
@@ -309,56 +234,91 @@ export function DashboardPage() {
   const [filtroProcesso, setFiltroProcesso] = useState<string>('todos')
   const [filtroBase, setFiltroBase] = useState<string>('todos')
   const [filtroCoordenador, setFiltroCoordenador] = useState<string>('todos')
-  const [filtroResponsavel, setFiltroResponsavel] = useState<string>('todos')
-  const [filtroPrefixo, setFiltroPrefixo] = useState<string>('todos')
   const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(() => {
     try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
     catch { return false }
   })
 
+  // Dados de checklists realizados por dia (para o gráfico)
+  const [checklistsPorDia, setChecklistsPorDia] = useState<{ data: string; realizados: number; comNc: number }[]>([])
+
+  useEffect(() => {
+    const inicio = periodoParaInicio(periodo)
+    const inicioIso = inicio.toISOString().slice(0, 10)
+
+    supabase
+      .from('checklists')
+      .select('data_inspecao, nc_count')
+      .eq('progresso', 100)
+      .gte('data_inspecao', inicioIso)
+      .order('data_inspecao', { ascending: true })
+      .then(({ data }) => {
+        if (!data) return
+        const map = new Map<string, { realizados: number; comNc: number }>()
+        for (const row of data) {
+          const dia = (row.data_inspecao as string).slice(0, 10)
+          const prev = map.get(dia) ?? { realizados: 0, comNc: 0 }
+          map.set(dia, {
+            realizados: prev.realizados + 1,
+            comNc: prev.comNc + ((row.nc_count as number) > 0 ? 1 : 0),
+          })
+        }
+        setChecklistsPorDia(
+          Array.from(map.entries()).map(([data, v]) => ({ data, ...v }))
+        )
+      })
+  }, [periodo])
+
+  const { rows, checklistsRealizadosTotal } = useApontamentos()
+
   const baseEfetiva =
     filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
 
+  // Apontamentos filtrados (pendentes = não resolvidos)
   const pendenciasFiltradas = useMemo(() => {
-    return pendenciasMock.filter((row) => {
-      if (filtroProcesso !== 'todos' && !matchesProcessoFilter(row.processo, filtroProcesso)) return false
-      if (baseEfetiva !== 'todos' && !matchesBaseFilter(row.base, baseEfetiva)) return false
-      if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(row.coordenador, filtroCoordenador)) return false
-      if (filtroResponsavel !== 'todos' && row.responsavel !== filtroResponsavel) return false
-      if (filtroPrefixo !== 'todos' && row.prefixo !== filtroPrefixo) return false
+    return rows.filter((r) => {
+      if (r.resolvido) return false
+      if (filtroProcesso !== 'todos' && !matchesProcessoFilter(r.processo, filtroProcesso)) return false
+      if (baseEfetiva !== 'todos' && !matchesBaseFilter(r.base, baseEfetiva)) return false
+      if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
       return true
     })
-  }, [filtroProcesso, baseEfetiva, filtroCoordenador, filtroResponsavel, filtroPrefixo])
+  }, [rows, filtroProcesso, baseEfetiva, filtroCoordenador])
 
-  const pendentesCount = pendenciasFiltradas.length
-
+  // Gráfico: realizados vs com NC no período
   const chartData = useMemo<ChartRow[]>(() => {
-    const base = CHART_DATA_BY_PERIOD[periodo] ?? CHART_DATA_BY_PERIOD['7d']!
-    const scale = BASE_SCALE[baseEfetiva] ?? 1
-    if (scale === 1) return base
-    return base.map((r) => ({
-      ...r,
-      realizados: Math.round(r.realizados * scale),
-      naoRealizados: Math.max(1, Math.round(r.naoRealizados * scale)),
+    return checklistsPorDia.map((d) => ({
+      name: fmtLabel(periodo, d.data),
+      realizados: d.realizados,
+      naoRealizados: d.comNc,
     }))
-  }, [periodo, baseEfetiva])
+  }, [checklistsPorDia, periodo])
 
+  // KPIs
   const stats = useMemo<Stat[]>(() => {
-    const kpi = KPIS_BY_PERIOD[periodo] ?? KPIS_BY_PERIOD['7d']!
-    const scale = BASE_SCALE[baseEfetiva] ?? 1
-    const checklistsTotal = Math.round(kpi.checklistsBase * scale)
-    const checklistsValue = String(checklistsTotal)
-    const veiculosPorBase =
-      baseEfetiva === 'todos'
-        ? vehicles
-        : vehicles.filter((v) => v.base.toLowerCase().includes(baseEfetiva))
+    const inicio = periodoParaInicio(periodo)
+    const inicioMs = inicio.getTime()
+
+    const checklistsNoPeriodo = checklistsPorDia.reduce((s, d) => s + d.realizados, 0)
+    const comNcNoPeriodo = checklistsPorDia.reduce((s, d) => s + d.comNc, 0)
+    const conformidade = checklistsNoPeriodo > 0
+      ? `${Math.round(((checklistsNoPeriodo - comNcNoPeriodo) / checklistsNoPeriodo) * 100)}%`
+      : '—'
+
+    const veiculosPorBase = baseEfetiva === 'todos'
+      ? vehicles
+      : vehicles.filter((v) => v.base.toLowerCase().includes(baseEfetiva))
     const veiculosTotal = veiculosPorBase.length
     const veiculosAtivos = veiculosPorBase.filter((v) => v.status === 'ATIVO').length
-    const pctAdesao =
-      veiculosAtivos > 0
-        ? Math.round((checklistsTotal / veiculosAtivos) * 100)
-        : 0
-    const mediaPorVeiculo = `${pctAdesao}%`
+
+    const aderencia = veiculosAtivos > 0 && checklistsNoPeriodo > 0
+      ? `${Math.min(999, Math.round((checklistsNoPeriodo / veiculosAtivos) * 100))}%`
+      : '—'
+
+    // Pendentes no período e filtro atual
+    const pendentesNoPeriodo = pendenciasFiltradas.filter(
+      (r) => new Date(r.dataApontamento + 'T00:00:00').getTime() >= inicioMs
+    ).length
 
     return [
       {
@@ -370,35 +330,37 @@ export function DashboardPage() {
         href: '/veiculos/status',
       },
       {
-        label: 'Checklists hoje',
-        value: checklistsValue,
+        label: 'Checklists realizados',
+        value: String(checklistsNoPeriodo),
         Icon: ClipboardCheck,
         iconWrap: 'bg-blue-50 text-blue-600 group-hover:scale-110 dark:bg-blue-950/50 dark:text-blue-400',
         cardHover: 'hover:border-blue-400 dark:hover:border-blue-500',
+        href: '/gerenciar/checklists',
       },
       {
         label: 'Conformidade',
-        value: kpi.conformidade,
+        value: conformidade,
         Icon: CheckCircle2,
         iconWrap: 'bg-emerald-50 text-emerald-600 group-hover:scale-110 dark:bg-emerald-950/50 dark:text-emerald-400',
         cardHover: 'hover:border-emerald-400 dark:hover:border-emerald-500',
       },
       {
         label: 'Pendentes',
-        value: String(pendentesCount),
+        value: String(pendentesNoPeriodo),
         Icon: ClipboardX,
         iconWrap: 'bg-orange-50 text-orange-600 group-hover:scale-110 dark:bg-orange-950/50 dark:text-orange-400',
         cardHover: 'hover:border-orange-400 dark:hover:border-orange-500',
+        href: '/gerenciar',
       },
       {
         label: 'Aderência da Frota',
-        value: mediaPorVeiculo,
+        value: aderencia,
         Icon: Gauge,
         iconWrap: 'bg-sky-50 text-sky-600 group-hover:scale-110 dark:bg-sky-950/50 dark:text-sky-400',
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [pendentesCount, periodo, baseEfetiva, vehicles])
+  }, [checklistsPorDia, pendenciasFiltradas, periodo, baseEfetiva, vehicles])
 
   const chartUi = useMemo(
     () => ({
@@ -407,7 +369,6 @@ export function DashboardPage() {
     }),
     [isDark],
   )
-
 
   return (
     <div className="-mx-3 -my-3 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent text-slate-900 dark:text-slate-100 sm:-mx-4 sm:-my-4 lg:-mx-8 lg:-my-6 lg:overflow-hidden">
@@ -472,7 +433,7 @@ export function DashboardPage() {
         >
           <div className="overflow-hidden">
             <div className="border-t border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 lg:gap-4">
                 <Select
                   label="Processo"
                   value={filtroProcesso}
@@ -494,18 +455,6 @@ export function DashboardPage() {
                   value={filtroCoordenador}
                   onChange={setFiltroCoordenador}
                   options={COORDENADOR_FILTER_SELECT_OPTIONS}
-                />
-                <Select
-                  label="Responsável"
-                  value={filtroResponsavel}
-                  onChange={setFiltroResponsavel}
-                  options={[...RESPONSAVEL_OPTIONS]}
-                />
-                <Select
-                  label="Prefixo"
-                  value={filtroPrefixo}
-                  onChange={setFiltroPrefixo}
-                  options={[...PREFIXO_OPTIONS]}
                 />
               </div>
             </div>
@@ -550,7 +499,7 @@ export function DashboardPage() {
                     Adesão aos checklists
                   </h2>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 sm:text-[10px]">
-                    Realizados vs. não realizados
+                    Realizados vs. com NC
                   </p>
                 </div>
               </div>
@@ -582,6 +531,11 @@ export function DashboardPage() {
             </div>
 
             <div className="flex h-[min(52vh,480px)] min-h-[260px] min-w-0 flex-1 flex-col p-3 sm:min-h-[300px] sm:p-4 lg:h-[min(56vh,560px)] lg:p-5">
+              {chartData.length === 0 ? (
+                <div className="flex flex-1 items-center justify-center text-sm font-semibold text-slate-400 dark:text-slate-600">
+                  Nenhum checklist registrado neste período.
+                </div>
+              ) : (
               <ResponsiveContainer
                 width="100%"
                 height="100%"
@@ -638,28 +592,18 @@ export function DashboardPage() {
                       animationDuration={720}
                       animationEasing="ease-out"
                       animationBegin={0}
-                      activeBar={{
-                        fill: CHART_COLORS.realizados,
-                        stroke: '#93c5fd',
-                        strokeWidth: 2,
-                        opacity: 0.98,
-                      }}
+                      activeBar={{ fill: CHART_COLORS.realizados, stroke: '#93c5fd', strokeWidth: 2, opacity: 0.98 }}
                     />
                     <Bar
                       dataKey="naoRealizados"
-                      name="Não realizados"
+                      name="Com NC"
                       fill={CHART_COLORS.naoRealizados}
                       radius={[12, 12, 0, 0]}
                       barSize={40}
                       animationDuration={720}
                       animationEasing="ease-out"
                       animationBegin={90}
-                      activeBar={{
-                        fill: CHART_COLORS.naoRealizados,
-                        stroke: '#fdba74',
-                        strokeWidth: 2,
-                        opacity: 0.98,
-                      }}
+                      activeBar={{ fill: CHART_COLORS.naoRealizados, stroke: '#fdba74', strokeWidth: 2, opacity: 0.98 }}
                     />
                   </BarChart>
                 ) : (
@@ -725,7 +669,7 @@ export function DashboardPage() {
                     <Area
                       type="monotone"
                       dataKey="naoRealizados"
-                      name="Não realizados"
+                      name="Com NC"
                       stroke={CHART_COLORS.naoRealizados}
                       strokeWidth={2.5}
                       fill={`url(#colorNao-${areaGradId})`}
@@ -739,10 +683,10 @@ export function DashboardPage() {
                   </AreaChart>
                 )}
               </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
-
       </div>
 
       <style>{`

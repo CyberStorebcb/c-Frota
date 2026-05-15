@@ -75,15 +75,6 @@ const CAMPOS_COMUNS: CampoExtra[] = [
     ],
   },
   {
-    id: 'processo',
-    label: 'PROCESSO',
-    tipo: 'select',
-    obrigatorio: true,
-    opcoes: [
-      // Ex: 'GOMAN - ADM'
-    ],
-  },
-  {
     id: 'localidade',
     label: 'LOCALIDADE',
     tipo: 'text',

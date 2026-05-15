@@ -14,7 +14,7 @@ export function SyncStatus() {
     }
     const handleOnline = () => {
       setOnline(true)
-      void syncOfflineChecklists().then(refresh)
+      void syncOfflineChecklists().then(refresh).catch(refresh)
     }
     const handleOffline = () => setOnline(false)
 

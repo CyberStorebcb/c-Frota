@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -7,6 +7,8 @@ import {
   ChevronRight,
   ClipboardList,
   ImagePlus,
+  Loader2,
+  MapPin,
   Paperclip,
   X,
 } from 'lucide-react'
@@ -19,7 +21,9 @@ import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
+import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
 import { compressChecklistImageIfNeeded } from '../utils/compressChecklistImage'
+import { buildWhatsappLink, getSupervisorWhatsapp, isSupervisorReconhecido, SUPERVISOR_WHATSAPP } from '../data/supervisorContatos'
 
 type Resposta = 'c' | 'nc' | 'na' | null
 
@@ -129,7 +133,9 @@ function TelaIdentificacao({
   const validar = () => {
     const e: typeof erros = {}
     if (!nome.trim()) e.nome = 'Informe seu nome completo.'
-    if (!matricula.trim()) e.matricula = 'Informe sua matrícula.'
+    const m = matricula.trim()
+    if (!m) e.matricula = 'Informe sua matrícula.'
+    else if (!/^\d{1,5}$/.test(m)) e.matricula = 'Matrícula: use apenas números (até 5 dígitos).'
     return e
   }
 
@@ -207,10 +213,15 @@ function TelaIdentificacao({
               </label>
               <input
                 value={matricula}
-                onChange={(e) => { setMatricula(e.target.value); setErros((prev) => ({ ...prev, matricula: undefined })) }}
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 5)
+                  setMatricula(onlyDigits)
+                  setErros((prev) => ({ ...prev, matricula: undefined }))
+                }}
                 placeholder="Ex: 00123"
                 inputMode="numeric"
                 autoComplete="off"
+                maxLength={5}
                 className="mt-0.5 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
               />
               {erros.matricula && <p className="mt-1 text-xs font-semibold text-rose-500">{erros.matricula}</p>}
@@ -237,16 +248,34 @@ function TelaConclusao({
   ncCount,
   itensNc,
   offline,
+  nomeSupervisor,
+  veiculo,
+  operador,
 }: {
   ncImperativos: number
   ncCount: number
   itensNc: { label: string; imperativo: boolean; obs: string }[]
   offline?: boolean
+  nomeSupervisor: string
+  veiculo: string
+  operador: string
 }) {
   const { theme } = useTheme()
   const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
   const bloqueado = ncImperativos > 0
   const comNc = ncCount > 0
+
+  const whatsappLink = comNc && nomeSupervisor
+    ? buildWhatsappLink({
+        numero: getSupervisorWhatsapp(nomeSupervisor) ?? '',
+        nomeSupervisor,
+        operador,
+        veiculo,
+        ncCount,
+        ncImperativos,
+        itensNc,
+      })
+    : null
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-start bg-slate-50 px-4 py-10 dark:bg-slate-950">
@@ -272,7 +301,7 @@ function TelaConclusao({
               : bloqueado
               ? `${ncImperativos} item(s) impeditivo(s) NC. O veículo está impedido de ser conduzido até a correção.`
               : comNc
-                ? `${ncCount} item(s) com NC registrado(s). A supervisão foi notificada.`
+                ? `${ncCount} item(s) com NC registrado(s). Avise o supervisor.`
                 : 'Todos os itens estão Conformes. Bom trabalho!'}
           </p>
         </div>
@@ -283,6 +312,41 @@ function TelaConclusao({
             <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
               ⚠ VEÍCULO IMPEDIDO — NÃO CONDUZA ATÉ QUE OS ITENS IMPEDITIVOS SEJAM CORRIGIDOS E VERIFICADOS PELO SUPERVISOR.
             </p>
+          </div>
+        )}
+
+        {/* Alerta WhatsApp para supervisor */}
+        {comNc && whatsappLink && (
+          <div className={`w-full rounded-2xl border px-4 py-4 text-left ${
+            bloqueado
+              ? 'border-rose-300 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-900/20'
+              : 'border-amber-300 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-900/20'
+          }`}>
+            <p className={`mb-3 text-xs font-extrabold uppercase tracking-wide ${
+              bloqueado ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'
+            }`}>
+              {bloqueado ? '🚫 Aviso urgente ao supervisor' : '⚠ Avise o supervisor'}
+            </p>
+            <p className="mb-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {bloqueado
+                ? 'Itens impeditivos foram encontrados. Notifique o supervisor imediatamente antes de qualquer movimentação do veículo.'
+                : 'Foram encontrados itens não conformes. Clique abaixo para notificar o supervisor via WhatsApp.'}
+            </p>
+            <a
+              href={whatsappLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold text-white shadow-md transition active:scale-95 ${
+                bloqueado
+                  ? 'bg-rose-600 shadow-rose-200 hover:bg-rose-700 dark:shadow-rose-900/40'
+                  : 'bg-[#25D366] shadow-green-200 hover:bg-[#1ebe5d] dark:shadow-green-900/40'
+              }`}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+              Alertar {nomeSupervisor} no WhatsApp
+            </a>
           </div>
         )}
 
@@ -356,6 +420,7 @@ function FotosItem({
                 alt={`Foto ${idx + 1}`}
                 className="h-full w-full object-cover"
                 onLoad={() => URL.revokeObjectURL(url)}
+                onError={() => URL.revokeObjectURL(url)}
               />
               <button
                 type="button"
@@ -408,6 +473,101 @@ function FotosItem({
   )
 }
 
+function normalizePlacaChecklistInput(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+// ---------------------------------------------------------------------------
+// Autocomplete de supervisor
+// ---------------------------------------------------------------------------
+const SUPERVISORES = Object.keys(SUPERVISOR_WHATSAPP)
+  .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  .map((nome) => ({ label: nome }))
+
+function SupervisorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const reconhecido = value.trim().length > 0 && isSupervisorReconhecido(value)
+
+  const sugestoes = value.trim().length === 0
+    ? SUPERVISORES
+    : SUPERVISORES.filter((s) =>
+        s.label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(
+          value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+        )
+      )
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
+      <div className={CGB_SECTION_HEADER}>
+        <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
+          Supervisor Responsável
+        </p>
+      </div>
+      <div className="relative px-4 py-3">
+        <div className="flex items-center gap-2">
+          <input
+            value={value}
+            onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            placeholder="Digite para buscar o supervisor..."
+            autoComplete="off"
+            className="min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+          />
+          {reconhecido && (
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+              <CheckCircle2 size={12} />
+              Reconhecido
+            </span>
+          )}
+        </div>
+
+        {/* Badge de confirmação abaixo do input */}
+        {reconhecido && (
+          <div className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/50 dark:bg-emerald-900/20">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+            <p className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300">
+              WhatsApp reconhecido — alerta será enviado automaticamente se houver NC.
+            </p>
+          </div>
+        )}
+
+        {open && sugestoes.length > 0 && (
+          <div className="absolute left-0 right-0 top-full z-50 mx-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            {sugestoes.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  onChange(s.label)
+                  setOpen(false)
+                }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:text-slate-200 dark:hover:bg-rose-900/30 dark:hover:text-rose-300"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[11px] font-extrabold text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
+                  {s.label.charAt(0)}
+                </span>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Formulário principal
 // ---------------------------------------------------------------------------
@@ -427,6 +587,8 @@ function FormularioChecklist({
   const [observacoes, setObservacoes]     = useState<Record<string, string>>({})
   const [fotosItem, setFotosItem]         = useState<Record<string, File[]>>({})
   const [dadosVeiculo, setDadosVeiculo]   = useState<Record<string, string>>({})
+  const [localidadeGeoLoading, setLocalidadeGeoLoading] = useState(false)
+  const [localidadeGeoErro, setLocalidadeGeoErro] = useState('')
   const [dataInspecao, setDataInspecao]   = useState(() => new Date().toISOString().split('T')[0] ?? '')
   const [problemas, setProblemas]         = useState('')
   const [descricaoProblema, setDescricaoProblema] = useState('')
@@ -440,12 +602,104 @@ function FormularioChecklist({
     ncImperativos: number
     itensNc: { label: string; imperativo: boolean; obs: string }[]
     offline?: boolean
+    nomeSupervisor: string
+    veiculo: string
   } | null>(null)
   // highlight do item atual após scroll
   const [itemDestacado, setItemDestacado] = useState<string | null>(null)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const scrollTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const [fleetTick, setFleetTick] = useState(0)
+  const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
+  const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
+
+  useEffect(() => {
+    const bump = () => setFleetTick((t) => t + 1)
+    const onStorage = (e: StorageEvent) => {
+      if (
+        e.key === 'frota.vehicles.registry' ||
+        e.key === 'frota.vehicles.statusByPlaca' ||
+        e.key === 'frota.vehicles.manutencaoByPlaca' ||
+        e.key === null
+      ) {
+        bump()
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('focus', bump)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', bump)
+      scrollTimers.current.forEach(clearTimeout)
+      scrollTimers.current = []
+    }
+  }, [])
+
+  const fleetByPlaca = useMemo(() => {
+    void fleetTick
+    const map = new Map<string, ReturnType<typeof getDisplayedFleetVehicles>[number]>()
+    for (const v of getDisplayedFleetVehicles()) {
+      map.set(v.placa, v)
+    }
+    return map
+  }, [fleetTick])
+
+  const placasOrdenadas = useMemo(
+    () => [...fleetByPlaca.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [fleetByPlaca],
+  )
+
+  const placasSugeridas = useMemo(() => {
+    const q = normalizePlacaChecklistInput(dadosVeiculo.placa ?? '')
+    const limite = 20
+    if (!q) return placasOrdenadas.slice(0, limite)
+    const matches = placasOrdenadas.filter((p) => p.includes(q))
+    return matches.slice(0, limite)
+  }, [placasOrdenadas, dadosVeiculo.placa])
+
+  useEffect(() => {
+    setPlacaHighlightIdx((i) => {
+      if (placasSugeridas.length === 0) return 0
+      return Math.min(i, placasSugeridas.length - 1)
+    })
+  }, [placasSugeridas])
+
+  const selecionarPlacaSugestao = useCallback(
+    (placaEscolhida: string) => {
+      const raw = normalizePlacaChecklistInput(placaEscolhida)
+      const v = fleetByPlaca.get(raw)
+      setDadosVeiculo((p) => ({
+        ...p,
+        placa: raw,
+        marca_modelo: v ? v.modelo : '',
+      }))
+      setPlacaSuggestOpen(false)
+    },
+    [fleetByPlaca],
+  )
+
+  const onPlacaChange = useCallback(
+    (rawInput: string) => {
+      const raw = normalizePlacaChecklistInput(rawInput)
+      const v = fleetByPlaca.get(raw)
+      setDadosVeiculo((p) => ({
+        ...p,
+        placa: raw,
+        ...(v ? { marca_modelo: v.modelo } : !raw ? { marca_modelo: '' } : {}),
+      }))
+    },
+    [fleetByPlaca],
+  )
+
+  const onPlacaBlur = useCallback(() => {
+    setDadosVeiculo((p) => {
+      const raw = normalizePlacaChecklistInput(p.placa ?? '')
+      const v = fleetByPlaca.get(raw)
+      return { ...p, placa: raw, marca_modelo: v ? v.modelo : '' }
+    })
+  }, [fleetByPlaca])
 
   const respondidos   = Object.values(respostas).filter((v) => v !== null).length
   const ncCount       = Object.values(respostas).filter((v) => v === 'nc').length
@@ -455,7 +709,8 @@ function FormularioChecklist({
 
   const camposObrigatorios = schema.camposExtras?.filter((c) => c.obrigatorio) ?? []
   const camposPreenchidos  = camposObrigatorios.every((c) => (dadosVeiculo[c.id] ?? '').trim() !== '')
-  const podEnviar = tudo100 && camposPreenchidos
+  const evidenciaNr12Ok = !schema.temEvidencia || arquivos.length > 0
+  const podEnviar = tudo100 && camposPreenchidos && evidenciaNr12Ok
 
   // Número sequencial global de cada item
   const numeroItem = (grupoIdx: number, itemIdx: number) => {
@@ -474,22 +729,55 @@ function FormularioChecklist({
     })
 
     // Scroll com highlight para o próximo item sem resposta
-    setTimeout(() => {
+    const t1 = setTimeout(() => {
       setRespostas((current) => {
         const novas = { ...current, [id]: current[id] === valor ? null : valor }
         const proximoId = todosItens.find((it) => novas[it.id] == null)?.id
         if (proximoId && itemRefs.current[proximoId]) {
           itemRefs.current[proximoId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
           setItemDestacado(proximoId)
-          setTimeout(() => setItemDestacado(null), 1200)
+          const t2 = setTimeout(() => setItemDestacado(null), 1200)
+          scrollTimers.current.push(t2)
         }
         return current // não alterar state aqui, só lemos
       })
     }, 150)
+    scrollTimers.current.push(t1)
   }, [todosItens])
 
   const setDado = (id: string, valor: string) =>
     setDadosVeiculo((prev) => ({ ...prev, [id]: valor }))
+
+  const pedirLocalizacao = useCallback(() => {
+    setLocalidadeGeoErro('')
+    if (!navigator.geolocation) {
+      setLocalidadeGeoErro('Geolocalização não disponível neste navegador.')
+      return
+    }
+    setLocalidadeGeoLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(6)
+        const lng = pos.coords.longitude.toFixed(6)
+        setDadosVeiculo((p) => ({ ...p, localidade: `${lat}, ${lng}` }))
+        setLocalidadeGeoLoading(false)
+      },
+      (err) => {
+        setLocalidadeGeoLoading(false)
+        const code = err.code
+        const msg =
+          code === 1
+            ? 'Permissão de localização negada.'
+            : code === 2
+              ? 'Posição indisponível.'
+              : code === 3
+                ? 'Tempo esgotado. Tente novamente em área aberta.'
+                : 'Não foi possível obter a localização.'
+        setLocalidadeGeoErro(msg)
+      },
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    )
+  }, [])
 
   const addFotoItem  = (id: string, novos: File[]) =>
     setFotosItem((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), ...novos].slice(0, 3) }))
@@ -578,7 +866,7 @@ function FormularioChecklist({
       const itensNc = todosItens
         .filter((it) => respostas[it.id] === 'nc')
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true })
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: dadosVeiculo['placa'] ?? '' })
       setConcluido(true)
       setEnviando(false)
       return
@@ -618,7 +906,8 @@ function FormularioChecklist({
 
     if (error) {
       try {
-        await enqueueChecklist(buildChecklistPayload({ ...observacoes }, []), buildOfflineFiles())
+        // Usa observacoesFinais (com URLs de fotos já embutidas) no fallback offline
+        await enqueueChecklist(buildChecklistPayload(observacoesFinais, evidenciaUrls), buildOfflineFiles())
       } catch {
         setErroEnvio('Erro ao enviar e salvar offline. Verifique o armazenamento do dispositivo.')
         setEnviando(false)
@@ -626,14 +915,14 @@ function FormularioChecklist({
       }
     }
 
-
     // Monta lista de itens NC para a tela de conclusão
     const itensNc = todosItens
       .filter((it) => respostas[it.id] === 'nc')
       .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
-    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error) })
+    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: dadosVeiculo['placa'] ?? '' })
     setConcluido(true)
+    setEnviando(false)
   }
 
   if (concluido && resultadoFinal) {
@@ -643,6 +932,9 @@ function FormularioChecklist({
         ncCount={resultadoFinal.ncCount}
         itensNc={resultadoFinal.itensNc}
         offline={resultadoFinal.offline}
+        nomeSupervisor={resultadoFinal.nomeSupervisor}
+        veiculo={resultadoFinal.veiculo}
+        operador={operador}
       />
     )
   }
@@ -715,7 +1007,7 @@ function FormularioChecklist({
         </div>
 
         {/* ── Dados do Veículo ─────────────────────────────────────── */}
-        <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
+        <div className={`overflow-visible rounded-2xl ${CGB_CARD}`}>
           <div className={CGB_SECTION_HEADER}>
             <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
               Dados do Veículo
@@ -742,7 +1034,112 @@ function FormularioChecklist({
                 <label className={CGB_FIELD_LABEL}>
                   {campo.label}{campo.obrigatorio ? ' *' : ''}
                 </label>
-                {campo.tipo === 'select' && campo.opcoes && campo.opcoes.length > 0 ? (
+                {campo.id === 'placa' ? (
+                  <div className="relative z-10">
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      aria-autocomplete="list"
+                      aria-expanded={placaSuggestOpen}
+                      aria-controls={`checklist-placa-sugestoes-${schema.id}`}
+                      role="combobox"
+                      value={dadosVeiculo.placa ?? ''}
+                      onChange={(e) => {
+                        onPlacaChange(e.target.value)
+                        setPlacaSuggestOpen(true)
+                      }}
+                      onFocus={() => setPlacaSuggestOpen(true)}
+                      onBlur={() => {
+                        onPlacaBlur()
+                        window.setTimeout(() => setPlacaSuggestOpen(false), 200)
+                      }}
+                      onKeyDown={(e) => {
+                        if (!placaSuggestOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                          setPlacaSuggestOpen(true)
+                          return
+                        }
+                        if (e.key === 'Escape') {
+                          setPlacaSuggestOpen(false)
+                          return
+                        }
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setPlacaHighlightIdx((i) =>
+                            placasSugeridas.length === 0 ? 0 : Math.min(placasSugeridas.length - 1, i + 1),
+                          )
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setPlacaHighlightIdx((i) => Math.max(0, i - 1))
+                        } else if (e.key === 'Enter' && placaSuggestOpen && placasSugeridas[placaHighlightIdx]) {
+                          e.preventDefault()
+                          const p = placasSugeridas[placaHighlightIdx]
+                          if (p) selecionarPlacaSugestao(p)
+                        }
+                      }}
+                      placeholder="Digite para buscar..."
+                      className="w-full bg-transparent text-base font-semibold uppercase tracking-wide text-slate-900 outline-none placeholder:normal-case placeholder:text-slate-300 dark:text-slate-100"
+                    />
+                    {placaSuggestOpen && placasSugeridas.length > 0 ? (
+                      <ul
+                        id={`checklist-placa-sugestoes-${schema.id}`}
+                        role="listbox"
+                        className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-600 dark:bg-slate-900"
+                      >
+                        {placasSugeridas.map((placaVal, idx) => (
+                          <li key={placaVal}>
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={idx === placaHighlightIdx}
+                              className={`flex w-full px-3 py-2 text-left text-sm font-bold uppercase tracking-wide ${
+                                idx === placaHighlightIdx
+                                  ? 'bg-[#7f1022]/12 text-[#7f1022] dark:bg-rose-500/20 dark:text-rose-200'
+                                  : 'text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800'
+                              }`}
+                              onMouseDown={(ev) => ev.preventDefault()}
+                              onMouseEnter={() => setPlacaHighlightIdx(idx)}
+                              onClick={() => selecionarPlacaSugestao(placaVal)}
+                            >
+                              {placaVal}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : campo.id === 'localidade' ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-stretch gap-2">
+                      <input
+                        type="text"
+                        inputMode="text"
+                        value={dadosVeiculo.localidade ?? ''}
+                        onChange={(e) => {
+                          setLocalidadeGeoErro('')
+                          setDado('localidade', e.target.value)
+                        }}
+                        placeholder="Endereço ou use o GPS"
+                        className="min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={pedirLocalizacao}
+                        disabled={localidadeGeoLoading}
+                        className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#7f1022]/35 bg-[#7f1022]/[0.08] px-3 py-2 text-[11px] font-extrabold uppercase tracking-wide text-[#7f1022] transition hover:bg-[#7f1022]/15 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
+                      >
+                        {localidadeGeoLoading ? (
+                          <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                        ) : (
+                          <MapPin className="size-4 shrink-0" aria-hidden />
+                        )}
+                        GPS
+                      </button>
+                    </div>
+                    {localidadeGeoErro ? (
+                      <p className="text-xs font-semibold text-rose-500 dark:text-rose-400">{localidadeGeoErro}</p>
+                    ) : null}
+                  </div>
+                ) : campo.tipo === 'select' && campo.opcoes && campo.opcoes.length > 0 ? (
                   <select
                     value={dadosVeiculo[campo.id] ?? ''}
                     onChange={(e) => setDado(campo.id, e.target.value)}
@@ -775,21 +1172,7 @@ function FormularioChecklist({
 
         {/* ── Supervisor ───────────────────────────────────────────── */}
         {schema.temSupervisor && (
-          <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
-            <div className={CGB_SECTION_HEADER}>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
-                Supervisor Responsável
-              </p>
-            </div>
-            <div className="px-4 py-3">
-              <input
-                value={supervisor}
-                onChange={(e) => setSupervisor(e.target.value)}
-                placeholder="Nome completo do supervisor"
-                className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
-              />
-            </div>
-          </div>
+          <SupervisorField value={supervisor} onChange={setSupervisor} />
         )}
 
         {/* ── Grupos de itens ──────────────────────────────────────── */}
@@ -960,10 +1343,10 @@ function FormularioChecklist({
           <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
             <div className={CGB_SECTION_HEADER}>
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
-                Evidência NR12
+                Evidência NR12 *
               </p>
               <p className="mt-0.5 text-xs font-semibold text-rose-100/85">
-                Anexe fotos ou PDFs da inspeção geral (opcional · máx. 10 arquivos · imagens até 155 KB, ajuste automático)
+                Obrigatório — anexe fotos ou PDFs da inspeção geral (máx. 10 arquivos · imagens até 155 KB, ajuste automático)
               </p>
             </div>
             <div className="px-4 py-3">
@@ -1004,6 +1387,13 @@ function FormularioChecklist({
                 </>
               )}
             </div>
+            {tudo100 && camposPreenchidos && arquivos.length === 0 && (
+              <div className="border-t border-rose-100 bg-rose-50 px-4 py-2.5 dark:border-rose-900/30 dark:bg-rose-900/10">
+                <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
+                  ⚠ Anexe pelo menos um arquivo de evidência NR12 para enviar o checklist.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1031,9 +1421,13 @@ function FormularioChecklist({
               <p className="text-sm font-extrabold text-rose-500">🚫 {ncImperativos} item(s) impeditivo(s)</p>
             ) : ncCount > 0 ? (
               <p className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{ncCount} NC registrado(s)</p>
-            ) : tudo100 && camposPreenchidos ? (
+            ) : tudo100 && camposPreenchidos && evidenciaNr12Ok ? (
               <p className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 size={16} /> Pronto para enviar
+              </p>
+            ) : tudo100 && camposPreenchidos && schema.temEvidencia && !evidenciaNr12Ok ? (
+              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                Anexe a evidência NR12 (obrigatória)
               </p>
             ) : tudo100 ? (
               <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Preencha os dados obrigatórios</p>
