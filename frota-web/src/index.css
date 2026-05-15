@@ -65,3 +65,12 @@ body {
   clip-path: inset(50%);
 }
 
+/* Rolagem horizontal/vertical sem barra visível (ex.: chips de filtro) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+

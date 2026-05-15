@@ -35,9 +35,9 @@ import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../
 import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select } from '../components/ui/Select'
 import {
-  FLEET_STATUS_BY_PLACA_STORAGE_KEY,
-  getDisplayedFleetVehicles,
-} from '../frota/vehicleRegistry'
+  getVehicleOperationalStatusRows,
+  getVehicleOperationalStatusSummary,
+} from '../frota/vehicleOperationalStatus'
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { supabase } from '../lib/supabase'
@@ -102,6 +102,30 @@ function periodoParaInicio(periodo: string): Date {
   if (periodo === 'hoje') { d.setHours(0, 0, 0, 0); return d }
   if (periodo === '7d')  { d.setDate(d.getDate() - 6); d.setHours(0, 0, 0, 0); return d }
   d.setDate(d.getDate() - 29); d.setHours(0, 0, 0, 0); return d
+}
+
+/** Data local YYYY-MM-DD (alinhado a `data_inspecao` gravada no checklist). */
+function hojeLocalIso(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function normalizePlacaDashboard(s: string): string {
+  return s.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+function checklistMatchesDashboardBase(
+  dadosVeiculo: unknown,
+  baseFilter: string,
+  placaParaBase: Map<string, string>,
+): boolean {
+  if (baseFilter === 'todos') return true
+  const o = dadosVeiculo && typeof dadosVeiculo === 'object' ? (dadosVeiculo as Record<string, unknown>) : null
+  const placa = normalizePlacaDashboard(String(o?.placa ?? ''))
+  if (!placa) return false
+  const baseVeiculo = placaParaBase.get(placa)
+  if (!baseVeiculo) return false
+  return baseVeiculo.toLowerCase().includes(baseFilter.toLowerCase())
 }
 
 function fmtLabel(periodo: string, dateStr: string): string {
@@ -217,18 +241,6 @@ export function DashboardPage() {
   const isDark = theme === 'dark'
   const areaGradId = useId().replace(/:/g, '')
   const [viewMode, setViewMode] = useState<'bar' | 'area'>('bar')
-  const [vehicles, setVehicles] = useState(() => getDisplayedFleetVehicles())
-
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'frota.vehicles.registry' || e.key === FLEET_STATUS_BY_PLACA_STORAGE_KEY || e.key === null) {
-        setVehicles(getDisplayedFleetVehicles())
-      }
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
-
   const [periodo, setPeriodo] = useState<string>('7d')
   const [filtroBaseRapido, setFiltroBaseRapido] = useState<string>('todos')
   const [filtroProcesso, setFiltroProcesso] = useState<string>('todos')
@@ -239,23 +251,40 @@ export function DashboardPage() {
     catch { return false }
   })
 
-  // Dados de checklists realizados por dia (para o gráfico)
+  const baseEfetiva =
+    filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
+
+  const placaParaBaseOperacional = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const r of getVehicleOperationalStatusRows()) {
+      m.set(r.placa.trim().toUpperCase(), (r.base ?? '').trim())
+    }
+    return m
+  }, [])
+
+  // Checklists concluídos (progresso 100) por dia — dados reais do Supabase, filtrados pela base via placa.
   const [checklistsPorDia, setChecklistsPorDia] = useState<{ data: string; realizados: number; comNc: number }[]>([])
 
   useEffect(() => {
     const inicio = periodoParaInicio(periodo)
     const inicioIso = inicio.toISOString().slice(0, 10)
 
-    supabase
+    void supabase
       .from('checklists')
-      .select('data_inspecao, nc_count')
+      .select('data_inspecao, nc_count, dados_veiculo')
       .eq('progresso', 100)
       .gte('data_inspecao', inicioIso)
       .order('data_inspecao', { ascending: true })
       .then(({ data }) => {
-        if (!data) return
+        if (!data) {
+          setChecklistsPorDia([])
+          return
+        }
         const map = new Map<string, { realizados: number; comNc: number }>()
         for (const row of data) {
+          if (!checklistMatchesDashboardBase(row.dados_veiculo, baseEfetiva, placaParaBaseOperacional)) {
+            continue
+          }
           const dia = (row.data_inspecao as string).slice(0, 10)
           const prev = map.get(dia) ?? { realizados: 0, comNc: 0 }
           map.set(dia, {
@@ -264,15 +293,12 @@ export function DashboardPage() {
           })
         }
         setChecklistsPorDia(
-          Array.from(map.entries()).map(([data, v]) => ({ data, ...v }))
+          Array.from(map.entries()).map(([data, v]) => ({ data, ...v })),
         )
       })
-  }, [periodo])
+  }, [periodo, baseEfetiva, placaParaBaseOperacional])
 
   const { rows } = useApontamentos()
-
-  const baseEfetiva =
-    filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
 
   // Apontamentos filtrados (pendentes = não resolvidos)
   const pendenciasFiltradas = useMemo(() => {
@@ -301,19 +327,27 @@ export function DashboardPage() {
 
     const checklistsNoPeriodo = checklistsPorDia.reduce((s, d) => s + d.realizados, 0)
     const comNcNoPeriodo = checklistsPorDia.reduce((s, d) => s + d.comNc, 0)
+    const hojeIso = hojeLocalIso()
+    const checklistsRealizadosHoje =
+      checklistsPorDia.find((d) => d.data === hojeIso)?.realizados ?? 0
     const conformidade = checklistsNoPeriodo > 0
       ? `${Math.round(((checklistsNoPeriodo - comNcNoPeriodo) / checklistsNoPeriodo) * 100)}%`
       : '—'
 
-    const veiculosPorBase = baseEfetiva === 'todos'
-      ? vehicles
-      : vehicles.filter((v) => v.base.toLowerCase().includes(baseEfetiva))
-    const veiculosTotal = veiculosPorBase.length
-    const veiculosAtivos = veiculosPorBase.filter((v) => v.status === 'ATIVO').length
+    /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
+    const linhasOperacionais =
+      baseEfetiva === 'todos'
+        ? getVehicleOperationalStatusRows()
+        : getVehicleOperationalStatusRows().filter((r) => r.base.toLowerCase().includes(baseEfetiva))
+    const resumoBase = getVehicleOperationalStatusSummary(linhasOperacionais)
+    const ativosOperacionais =
+      (resumoBase.find((s) => s.label === 'ATIVOS')?.count ?? 0) +
+      (resumoBase.find((s) => s.label === 'TRANSPORTE')?.count ?? 0)
 
-    const aderencia = veiculosAtivos > 0 && checklistsNoPeriodo > 0
-      ? `${Math.min(999, Math.round((checklistsNoPeriodo / veiculosAtivos) * 100))}%`
-      : '—'
+    const aderencia =
+      ativosOperacionais > 0 && checklistsNoPeriodo > 0
+        ? `${Math.min(999, Math.round((checklistsNoPeriodo / ativosOperacionais) * 100))}%`
+        : '—'
 
     // Pendentes no período e filtro atual
     const pendentesNoPeriodo = pendenciasFiltradas.filter(
@@ -322,16 +356,16 @@ export function DashboardPage() {
 
     return [
       {
-        label: 'Total de Veículos',
-        value: String(veiculosTotal),
+        label: 'Total de veículos ativos',
+        value: String(ativosOperacionais),
         Icon: Truck,
         iconWrap: 'bg-purple-50 text-purple-600 group-hover:scale-110 dark:bg-purple-950/50 dark:text-purple-400',
         cardHover: 'hover:border-purple-400 dark:hover:border-purple-500',
         href: '/veiculos/status',
       },
       {
-        label: 'Checklists realizados',
-        value: String(checklistsNoPeriodo),
+        label: 'Checklists realizados hoje',
+        value: String(checklistsRealizadosHoje),
         Icon: ClipboardCheck,
         iconWrap: 'bg-blue-50 text-blue-600 group-hover:scale-110 dark:bg-blue-950/50 dark:text-blue-400',
         cardHover: 'hover:border-blue-400 dark:hover:border-blue-500',
@@ -360,7 +394,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDia, pendenciasFiltradas, periodo, baseEfetiva, vehicles])
+  }, [checklistsPorDia, pendenciasFiltradas, periodo, baseEfetiva])
 
   const chartUi = useMemo(
     () => ({

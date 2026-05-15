@@ -248,14 +248,17 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     void recarregar()
 
     const MAX_BACKOFF_MS = 30_000
+    let destroyed = false
 
     const subscribe = () => {
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current)
-      }
+      if (destroyed) return
+      const prev = channelRef.current
+      channelRef.current = null
+      if (prev) void supabase.removeChannel(prev)
 
+      const channelName = `apontamentos-changes-${Date.now()}`
       const ch = supabase
-        .channel('apontamentos-changes')
+        .channel(channelName)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, () => {
           void recarregar()
         })
@@ -267,6 +270,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
             reconnectAttemptsRef.current = 0
           }
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            if (destroyed) return
             const attempts = ++reconnectAttemptsRef.current
             const delay = Math.min(1_000 * 2 ** attempts, MAX_BACKOFF_MS)
             if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
@@ -283,6 +287,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     subscribe()
 
     return () => {
+      destroyed = true
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       if (channelRef.current) void supabase.removeChannel(channelRef.current)
     }

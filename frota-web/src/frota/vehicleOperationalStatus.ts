@@ -42,6 +42,16 @@ export function statusOperacionalCatalogo(placa: string, prefixoPlanilha: string
   return prefixoParaStatusOperacional(prefixoPlanilha)
 }
 
+/**
+ * Critério do KPI «Total de veículos ativos» no dashboard / registo: soma operacional
+ * equivalente às caixas ATIVOS ∪ TRANSPORTE (exclui Reserva e estados não ativos).
+ */
+export function isOperacionalAtivosDashboardKpi(placa: string, prefixoPlanilha: string): boolean {
+  const op = statusOperacionalCatalogo(placa, prefixoPlanilha)
+  if (NOT_ACTIVE_OPERATIONAL_STATUS_SET.has(op)) return false
+  return op !== 'RESERVA'
+}
+
 export function getVehicleOperationalStatusRows() {
   return TOTAL_VEHICLE_ROWS.map((row) => ({
     ...row,

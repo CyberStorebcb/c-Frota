@@ -7,49 +7,46 @@ import {
   type VehicleOperationalStatus,
 } from '../frota/vehicleOperationalStatus'
 
-const STATUS_STYLE: Record<VehicleOperationalStatus, { card: string; badge: string; description: string }> = {
+const STATUS_STYLE: Record<VehicleOperationalStatus, { card: string; badge: string }> = {
   ATIVOS: {
     card: 'border-emerald-300/70 bg-emerald-50/70 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100',
     badge: 'bg-emerald-600 text-white',
-    description: 'Veículos em operação com prefixo ativo (cartões Reserva e Transporte completam o conjunto ativo).',
   },
   DESMOBILIZADO: {
     card: 'border-rose-300/70 bg-rose-50/70 text-rose-950 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100',
     badge: 'bg-rose-600 text-white',
-    description: 'Veículos retirados de operação.',
   },
   'EM MOBILIZAÇÃO': {
     card: 'border-blue-300/70 bg-blue-50/70 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-100',
     badge: 'bg-blue-600 text-white',
-    description: 'Veículos em preparação para entrada na operação.',
   },
   AGUARDANDO: {
     card: 'border-amber-300/70 bg-amber-50/70 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100',
     badge: 'bg-amber-500 text-white',
-    description: 'Veículos aguardando definição ou liberação.',
   },
   RESERVA: {
     card: 'border-slate-300/80 bg-slate-50/80 text-slate-950 dark:border-slate-700/70 dark:bg-slate-900/60 dark:text-slate-100',
     badge: 'bg-slate-700 text-white',
-    description: 'Veículos mantidos como reserva.',
   },
   TRANSPORTE: {
     card: 'border-cyan-300/70 bg-cyan-50/70 text-cyan-950 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-cyan-100',
     badge: 'bg-cyan-600 text-white',
-    description: 'Veículos identificados para transporte.',
   },
   AVARIADO: {
     card: 'border-orange-300/70 bg-orange-50/70 text-orange-950 dark:border-orange-900/60 dark:bg-orange-950/20 dark:text-orange-100',
     badge: 'bg-orange-600 text-white',
-    description: 'Veículos com registro de avaria.',
   },
 }
 
 export function VeiculosStatusPage() {
   const statusRows = getVehicleOperationalStatusRows()
   const summary = getVehicleOperationalStatusSummary(statusRows)
-  /** Placas na base (ex.: 412); independente da soma visual dos cartões. */
+  /** Placas na base (ex.: 412); não é a soma dos números exibidos nos cartões (ex.: ATIVOS inclui Transporte na visualização). */
   const totalFrota = statusRows.length
+  const transporteQty = summary.find((s) => s.label === 'TRANSPORTE')?.count ?? 0
+
+  const contagemNoCartao = (item: (typeof summary)[number]) =>
+    item.label === 'ATIVOS' ? item.count + transporteQty : item.count
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
@@ -91,8 +88,7 @@ export function VeiculosStatusPage() {
                   <Truck size={24} aria-hidden />
                 </div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] opacity-70">{item.label}</p>
-                <p className="mt-2 text-5xl font-black tabular-nums tracking-tight">{item.count}</p>
-                <p className="mt-4 max-w-[22rem] text-sm font-semibold leading-relaxed opacity-75">{style.description}</p>
+                <p className="mt-2 text-5xl font-black tabular-nums tracking-tight">{contagemNoCartao(item)}</p>
               </article>
             )
           })}
@@ -106,7 +102,7 @@ export function VeiculosStatusPage() {
             <div>
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Detalhamento</h2>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Cada placa em uma categoria; ATIVOS + Reserva + Transporte cobrem o conjunto operacionalmente ativo.
+                Cada placa em uma categoria na tabela; no cartão, ATIVOS inclui também as placas de Transporte.
               </p>
             </div>
           </div>

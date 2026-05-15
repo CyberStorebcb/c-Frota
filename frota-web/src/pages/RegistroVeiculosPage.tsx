@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   AlertCircle,
   Ban,
@@ -42,7 +42,7 @@ import {
   type VehicleStatus,
   type VehicleTipo,
 } from '../frota/vehicleRegistry'
-import { isVehicleOperacionalAtivo } from '../frota/vehicleOperationalStatus'
+import { isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
 import { renderFormattedText } from '../utils/renderFormattedAiText'
 
 const TYPE_FILTER_IDLE =
@@ -137,7 +137,64 @@ const VEHICLE_TYPES: {
   },
 ]
 
+/** Chips principais na barra; Oficina e Motopoda entram no menu "Mais". */
+const VEHICLE_TYPES_TOOLBAR_MAIN = VEHICLE_TYPES.filter((t) => t.id !== 'OFICINA' && t.id !== 'MOTOPODA')
+const VEHICLE_TYPES_TOOLBAR_MORE = VEHICLE_TYPES.filter((t) => t.id === 'OFICINA' || t.id === 'MOTOPODA')
+
 const LAYOUT_STORAGE_KEY = 'frota.vehicles.registroLayout'
+
+/** Fecha `{` correspondente (assume strings JSON com aspas `"`). */
+function findMatchingBraceEnd(src: string, startIdx: number): number {
+  let depth = 0
+  let inStr = false
+  let escape = false
+  for (let i = startIdx; i < src.length; i++) {
+    const ch = src[i]!
+    if (escape) {
+      escape = false
+      continue
+    }
+    if (inStr) {
+      if (ch === '\\') escape = true
+      else if (ch === '"') inStr = false
+      continue
+    }
+    if (ch === '"') {
+      inStr = true
+      continue
+    }
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+  return -1
+}
+
+/**
+ * Remove ecos do resumo JSON e fenced code que o modelo às vezes cola na análise
+ * (melhora legibilidade no painel).
+ */
+function sanitizeAiFleetSuggestionText(raw: string): string {
+  const trimmed = raw.replace(/\r\n/g, '\n').trim()
+  if (!trimmed) return trimmed
+  if (/^Erro\b/i.test(trimmed) || /^Desculpe\b/i.test(trimmed)) return trimmed
+
+  let s = trimmed.replace(/```(?:json)?\s*[\s\S]*?```/gi, '\n')
+  s = s.replace(/\n{3,}/g, '\n\n').trim()
+
+  const reSummary = /\{\s*"totalFrota"\s*:/
+  let idx = s.search(reSummary)
+  while (idx !== -1) {
+    const end = findMatchingBraceEnd(s, idx)
+    if (end === -1) break
+    s = (s.slice(0, idx) + s.slice(end + 1)).replace(/^\s*\n/, '').trim()
+    idx = s.search(reSummary)
+  }
+
+  return s.trim()
+}
 
 function readInitialLayout(): 'grid' | 'list' {
   try {
@@ -290,6 +347,8 @@ export function RegistroVeiculosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | VehicleTipo>('ALL')
+  const [moreTypeMenuOpen, setMoreTypeMenuOpen] = useState(false)
+  const moreTypeMenuRef = useRef<HTMLDivElement>(null)
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [formData, setFormData] = useState(defaultForm)
   const [menuForId, setMenuForId] = useState<string | null>(null)
@@ -343,6 +402,23 @@ export function RegistroVeiculosPage() {
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [menuForId])
+
+  useEffect(() => {
+    if (!moreTypeMenuOpen) return
+    const onDoc = (e: MouseEvent) => {
+      const el = moreTypeMenuRef.current
+      if (el && !el.contains(e.target as Node)) setMoreTypeMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMoreTypeMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [moreTypeMenuOpen])
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -433,7 +509,9 @@ export function RegistroVeiculosPage() {
   const fleetStats = useMemo(
     () => ({
       total: vehicles.length,
-      ativos: vehicles.filter((v) => v.status === 'ATIVO' && isVehicleOperacionalAtivo(v.prefixo)).length,
+      ativos: vehicles.filter(
+        (v) => v.status === 'ATIVO' && isOperacionalAtivosDashboardKpi(v.placa, v.prefixo),
+      ).length,
       manutencao: vehicles.filter((v) => v.emManutencao).length,
     }),
     [vehicles],
@@ -492,6 +570,11 @@ export function RegistroVeiculosPage() {
     return '[]'
   }, [vehicles])
 
+  const aiSuggestionSanitized = useMemo(() => {
+    if (!aiAnalysis) return ''
+    return sanitizeAiFleetSuggestionText(aiAnalysis)
+  }, [aiAnalysis])
+
   const geminiConfigured = isGeminiConfigured()
 
   const inputFilterClass =
@@ -521,10 +604,11 @@ export function RegistroVeiculosPage() {
     }
     setIsAiLoading(true)
     try {
-      const prompt = `Resumo factual (fonte de verdade para totais e contagens por tipo; não contradigas estes números): ${fleetAiSummaryJson}\n\nAmostra detalhada da frota em JSON (pode estar truncada, só para contexto qualitativo): ${fleetContextJson}\n\nTarefa: analisa a frota GOMAN e dá 3 sugestões estratégicas curtas.`
+      const prompt = `Resumo factual (fonte de verdade para totais e contagens por tipo; não contradigas estes números): ${fleetAiSummaryJson}\n\nAmostra detalhada da frota em JSON (pode estar truncada, só para contexto qualitativo): ${fleetContextJson}\n\nTarefa: analisa a frota GOMAN e apresenta **3 sugestões estratégicas** curtas e acionáveis.\n\nFormato (obrigatório):\n- Usa parágrafos curtos e listas com linhas começadas por "* " para cada ponto principal.\n- Não incluas JSON nem blocos de código (\`\`\`). Não repitas o resumo factual; se citares números, integra-os na frase.`
+
       const result = await askGemini(
         prompt,
-        'És um analista de dados de logística. Para números, usa apenas o bloco JSON inicial com totalFrota, porTipo e porStatus. Sê conciso e profissional em Português de Portugal.',
+        'És um analista de dados de logística. Para totais ou contagens, usa apenas totalFrota, porTipo e porStatus do resumo factual no início do prompt. Nunca incluas JSON, \`\`\` nem dados em bruto na resposta ao utilizador — só texto útil. Português de Portugal, conciso e profissional.',
       )
       setAiAnalysis(result.ok ? result.text : 'Erro ao conectar com o serviço de inteligência. Tente novamente.')
     } catch {
@@ -658,25 +742,42 @@ export function RegistroVeiculosPage() {
         </header>
 
         {aiAnalysis ? (
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-blue-700 p-6 text-white shadow-xl dark:from-indigo-700 dark:to-blue-900">
-            <div className="relative z-10">
-              <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-indigo-200">
-                <BrainCircuit size={16} aria-hidden />
-                Sugestões da inteligência artificial
+          <div className="relative overflow-hidden rounded-3xl border border-indigo-200/90 bg-white shadow-xl dark:border-indigo-500/30 dark:bg-slate-900">
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-600 to-blue-700 px-5 py-4 dark:from-indigo-700 dark:to-blue-900">
+              <div className="pointer-events-none absolute -right-8 -top-10 size-32 rounded-full bg-white/10 blur-2xl" aria-hidden />
+              <div className="relative flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 shadow-lg shadow-indigo-950/20">
+                    <BrainCircuit size={22} className="text-white" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-100/95">Sugestões</p>
+                    <h2 className="mt-0.5 text-lg font-black tracking-tight text-white">Inteligência artificial</h2>
+                    <p className="mt-1 max-w-xl text-xs font-semibold leading-snug text-indigo-100/85">
+                      Análise com base nos totais da frota e numa amostra dos veículos — sem dados em bruto na resposta.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiAnalysis(null)}
+                  className="shrink-0 rounded-xl p-2 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                  aria-label="Fechar sugestões"
+                >
+                  <X size={20} strokeWidth={2.25} aria-hidden />
+                </button>
               </div>
-              <div className="text-sm font-medium leading-relaxed [&_ul]:text-white/95">
-                {renderFormattedText(aiAnalysis)}
-              </div>
+              <Sparkles className="pointer-events-none absolute -bottom-6 right-2 text-white/[0.12]" size={88} aria-hidden />
             </div>
-            <button
-              type="button"
-              onClick={() => setAiAnalysis(null)}
-              className="absolute right-4 top-4 text-white/50 transition-colors hover:text-white"
-              aria-label="Fechar sugestões"
-            >
-              <X size={18} />
-            </button>
-            <Sparkles className="pointer-events-none absolute -bottom-4 -right-4 text-white/10" size={120} aria-hidden />
+            <div className="border-t border-slate-100 bg-slate-50/40 px-5 py-5 dark:border-slate-800 dark:bg-slate-950/40">
+              {aiSuggestionSanitized ? (
+                <div className="max-w-none text-slate-900 dark:text-slate-100">{renderFormattedText(aiSuggestionSanitized)}</div>
+              ) : (
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  Não foi possível apresentar o texto das sugestões. Gere a análise novamente.
+                </p>
+              )}
+            </div>
           </div>
         ) : null}
 
@@ -704,7 +805,7 @@ export function RegistroVeiculosPage() {
                   'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-600/25 ring-2 ring-white/30 dark:from-emerald-600 dark:to-teal-800 dark:shadow-emerald-950/35 dark:ring-emerald-400/20',
               },
               {
-                label: 'MANUTENÇÃO',
+                label: 'Precisam de atenção',
                 value: ncNaoImpeditivos ?? '—',
                 Icon: AlertCircle,
                 card:
@@ -720,16 +821,20 @@ export function RegistroVeiculosPage() {
               className={`group relative overflow-hidden rounded-3xl border p-6 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${card}`}
             >
               <div
+                className={`pointer-events-none absolute -left-12 -bottom-12 size-36 rounded-full opacity-40 blur-3xl transition-opacity duration-300 group-hover:opacity-70 ${orb}`}
+                aria-hidden
+              />
+              <div
                 className={`pointer-events-none absolute -right-10 -top-10 size-40 rounded-full blur-3xl transition-opacity duration-300 group-hover:opacity-90 ${orb}`}
                 aria-hidden
               />
-              <div className="relative flex items-center justify-center gap-2.5">
+              <div className="relative flex w-full min-w-0 items-center gap-4">
                 <div
                   className={`flex size-14 shrink-0 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105 ${iconWrap}`}
                 >
                   <Icon size={26} strokeWidth={2.25} aria-hidden />
                 </div>
-                <div className="min-w-0 space-y-0.5 text-left">
+                <div className="min-w-0 flex-1 space-y-0.5 text-left">
                   <span className="block text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                     {label}
                   </span>
@@ -740,50 +845,133 @@ export function RegistroVeiculosPage() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <div
-              className="flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:pb-0 sm:flex-1"
-              role="toolbar"
-              aria-label="Filtrar por tipo de veículo"
-            >
-              <button
-                type="button"
-                onClick={() => setFilterType('ALL')}
-                title={`${vehicles.length} ${vehicles.length === 1 ? 'veículo' : 'veículos'} na frota (todos os tipos)`}
-                className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                  filterType === 'ALL'
-                    ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
-                    : `${TYPE_FILTER_IDLE}`
-                }`}
+        <div className="flex min-w-0 flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            {/*
+              O painel do "Mais" não pode ficar dentro de `overflow-x-auto` (recorte vertical).
+              A área rolável não usa flex-1: se cresce, cria um vão grande entre o último chip e "Mais".
+              Com `max-w-full shrink` ela só ocupa a largura dos chips até o limite do pai e encolhe se necessário.
+            */}
+            <div className="flex min-w-0 w-full items-center gap-2 sm:w-0 sm:min-w-0 sm:flex-1">
+              <div
+                className="no-scrollbar max-w-full min-w-0 shrink overflow-x-auto scroll-smooth"
+                role="toolbar"
+                aria-label="Filtrar por tipo de veículo"
               >
-                Todos
-              </button>
-              {VEHICLE_TYPES.map((type) => {
-                const Icon = type.icon
-                const active = filterType === type.id
-                const n = countByTipo.get(type.id) ?? 0
-                const title = `${n} ${n === 1 ? 'veículo' : 'veículos'} — ${type.label}`
-                return (
+                <div className="flex w-max items-center gap-2">
                   <button
-                    key={type.id}
                     type="button"
-                    onClick={() => setFilterType(type.id)}
-                    title={title}
-                    aria-label={title}
-                    className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                      active ? type.pillActive : TYPE_FILTER_IDLE
+                    onClick={() => {
+                      setMoreTypeMenuOpen(false)
+                      setFilterType('ALL')
+                    }}
+                    title={`${vehicles.length} ${vehicles.length === 1 ? 'veículo' : 'veículos'} na frota (todos os tipos)`}
+                    className={`inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-4 text-sm font-bold transition-all ${
+                      filterType === 'ALL'
+                        ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                        : `${TYPE_FILTER_IDLE}`
                     }`}
                   >
-                    <Icon size={14} strokeWidth={2.5} aria-hidden />
-                    {type.label}
+                    Todos
                   </button>
-                )
-              })}
+                  {VEHICLE_TYPES_TOOLBAR_MAIN.map((type) => {
+                    const Icon = type.icon
+                    const active = filterType === type.id
+                    const n = countByTipo.get(type.id) ?? 0
+                    const title = `${n} ${n === 1 ? 'veículo' : 'veículos'} — ${type.label}`
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => {
+                          setMoreTypeMenuOpen(false)
+                          setFilterType(type.id)
+                        }}
+                        title={title}
+                        aria-label={title}
+                        className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-bold transition-all ${
+                          active ? type.pillActive : TYPE_FILTER_IDLE
+                        }`}
+                      >
+                        <Icon size={14} strokeWidth={2.5} className="shrink-0" aria-hidden />
+                        {type.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="relative shrink-0" ref={moreTypeMenuRef}>
+                <button
+                  type="button"
+                  id="filtro-tipo-mais"
+                  aria-expanded={moreTypeMenuOpen}
+                  aria-haspopup="menu"
+                  aria-controls="menu-filtro-tipo-mais"
+                  onClick={() => setMoreTypeMenuOpen((o) => !o)}
+                  title={
+                    filterType === 'OFICINA' || filterType === 'MOTOPODA'
+                      ? `${VEHICLE_TYPES.find((t) => t.id === filterType)?.label ?? ''} — ${countByTipo.get(filterType) ?? 0} veículos`
+                      : 'Mais tipos de veículo'
+                  }
+                  className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-4 text-sm font-bold transition-all ${
+                    filterType === 'OFICINA' || filterType === 'MOTOPODA'
+                      ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                      : moreTypeMenuOpen
+                        ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white'
+                        : TYPE_FILTER_IDLE
+                  }`}
+                >
+                  <span>Mais</span>
+                  <ChevronDown
+                    size={15}
+                    strokeWidth={2.5}
+                    aria-hidden
+                    className={`shrink-0 opacity-70 transition-transform duration-200 ${moreTypeMenuOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {moreTypeMenuOpen ? (
+                  <div
+                    id="menu-filtro-tipo-mais"
+                    role="menu"
+                    aria-labelledby="filtro-tipo-mais"
+                    className="anim-dropdown-in absolute left-0 top-[calc(100%+0.375rem)] z-[100] min-w-[14rem] rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/[0.04] dark:border-slate-600/80 dark:bg-slate-900 dark:shadow-black/40 dark:ring-white/[0.06]"
+                  >
+                    {VEHICLE_TYPES_TOOLBAR_MORE.map((type) => {
+                      const Icon = type.icon
+                      const active = filterType === type.id
+                      const n = countByTipo.get(type.id) ?? 0
+                      const labelCount = `${n} ${n === 1 ? 'veículo' : 'veículos'}`
+                      return (
+                        <button
+                          key={type.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setFilterType(type.id)
+                            setMoreTypeMenuOpen(false)
+                          }}
+                          className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-bold transition-colors ${
+                            active
+                              ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                              : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/80'
+                          }`}
+                        >
+                          <Icon size={16} strokeWidth={2.5} aria-hidden className={`shrink-0 ${type.color}`} />
+                          <span className="min-w-0 flex-1">{type.label}</span>
+                          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-slate-400 dark:text-slate-500">
+                            {labelCount}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div
-              className="flex shrink-0 justify-center gap-1 self-center rounded-xl bg-slate-100 p-1 dark:bg-slate-800 sm:self-auto"
+              className="flex h-10 shrink-0 items-center justify-center gap-0.5 self-center rounded-xl bg-slate-100 p-0.5 dark:bg-slate-800 sm:self-auto"
               role="group"
               aria-label="Modo de exibição"
             >
@@ -792,7 +980,7 @@ export function RegistroVeiculosPage() {
                 onClick={() => setLayout('list')}
                 aria-pressed={layoutMode === 'list'}
                 title="Lista"
-                className={`rounded-lg p-2 transition-all ${
+                className={`inline-flex size-9 items-center justify-center rounded-lg transition-all ${
                   layoutMode === 'list' ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400' : 'text-slate-500'
                 }`}
               >
@@ -803,7 +991,7 @@ export function RegistroVeiculosPage() {
                 onClick={() => setLayout('grid')}
                 aria-pressed={layoutMode === 'grid'}
                 title="Grelha"
-                className={`rounded-lg p-2 transition-all ${
+                className={`inline-flex size-9 items-center justify-center rounded-lg transition-all ${
                   layoutMode === 'grid' ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-900 dark:text-blue-400' : 'text-slate-500'
                 }`}
               >
