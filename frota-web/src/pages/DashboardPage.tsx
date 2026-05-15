@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   type LucideIcon,
@@ -13,18 +13,6 @@ import {
   Gauge,
   Truck,
 } from 'lucide-react'
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 
 import {
   BASE_DASHBOARD_QUICK_SELECT_OPTIONS,
@@ -41,73 +29,97 @@ import {
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { supabase } from '../lib/supabase'
+import type { DashboardAdesaoChartRow } from './DashboardAdesaoCharts'
 
-type ChartRow = { name: string; realizados: number; naoRealizados: number }
-
-const CHART_COLORS = {
-  realizados: '#1E40AF',
-  naoRealizados: '#FF8A65',
-} as const
-
-type AdesaoTooltipPayload = {
-  name?: string
-  value?: number | string
-  color?: string
-  dataKey?: string | number
-}
-
-function AdesaoTooltipBody({
-  active,
-  payload,
-  label,
-  isDark,
-}: {
-  active?: boolean
-  payload?: AdesaoTooltipPayload[]
-  label?: string | number
-  isDark: boolean
-}) {
-  if (!active || !payload?.length) return null
-  const shell = isDark
-    ? 'border border-slate-600/70 bg-slate-950/95 text-slate-100 shadow-2xl shadow-black/40 backdrop-blur-md'
-    : 'border border-slate-200/90 bg-white/95 text-slate-900 shadow-2xl shadow-slate-900/10 backdrop-blur-md'
-  return (
-    <div className={`min-w-[188px] rounded-2xl px-3 py-2.5 ${shell}`}>
-      <p className="mb-2 border-b border-slate-400/25 pb-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:border-slate-500/30 dark:text-slate-400">
-        {label}
-      </p>
-      <ul className="space-y-2">
-        {payload.map((p) => (
-          <li key={String(p.dataKey)} className="flex items-center justify-between gap-8 text-[13px] font-bold tabular-nums">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full shadow-sm" style={{ backgroundColor: p.color }} />
-              <span className="truncate text-slate-600 dark:text-slate-300">{p.name}</span>
-            </span>
-            <span className="shrink-0 text-slate-900 dark:text-white">{p.value}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+const LazyDashboardAdesaoCharts = lazy(() =>
+  import('./DashboardAdesaoCharts').then((m) => ({ default: m.DashboardAdesaoCharts })),
+)
 
 const PERIODO_OPTIONS = [
   { label: 'Hoje', value: 'hoje' },
   { label: 'Últimos 7 dias', value: '7d' },
   { label: 'Últimos 30 dias', value: '30d' },
+  { label: 'Últimos 90 dias', value: '90d' },
+  { label: 'Intervalo personalizado', value: 'custom' },
 ] as const
 
-function periodoParaInicio(periodo: string): Date {
-  const d = new Date()
-  if (periodo === 'hoje') { d.setHours(0, 0, 0, 0); return d }
-  if (periodo === '7d')  { d.setDate(d.getDate() - 6); d.setHours(0, 0, 0, 0); return d }
-  d.setDate(d.getDate() - 29); d.setHours(0, 0, 0, 0); return d
-}
+type DashboardChartLabelMode = 'hoje' | '7d' | '30d'
 
 /** Data local YYYY-MM-DD (alinhado a `data_inspecao` gravada no checklist). */
 function hojeLocalIso(): string {
   const d = new Date()
+  return dateToLocalIso(d)
+}
+
+function dateToLocalIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function defaultCustomDesdeIso(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - 6)
+  d.setHours(0, 0, 0, 0)
+  return dateToLocalIso(d)
+}
+
+type DashboardPeriodoLimites = {
+  inicioIso: string
+  fimIso: string
+  inicioMs: number
+  fimMsEnd: number
+  chartMode: DashboardChartLabelMode
+}
+
+function computePeriodoLimites(
+  periodo: string,
+  customDesde: string,
+  customAte: string,
+): DashboardPeriodoLimites {
+  const hoje = hojeLocalIso()
+  if (periodo === 'custom') {
+    let a = customDesde.trim()
+    let b = customAte.trim()
+    const isoOk = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+    if (!isoOk(a)) a = defaultCustomDesdeIso()
+    if (!isoOk(b)) b = hoje
+    if (a > b) [a, b] = [b, a]
+    const d0 = new Date(a + 'T12:00:00')
+    const d1 = new Date(b + 'T12:00:00')
+    const spanDays = Math.max(1, Math.round((d1.getTime() - d0.getTime()) / 86_400_000) + 1)
+    const chartMode: DashboardChartLabelMode = spanDays <= 1 ? 'hoje' : spanDays <= 7 ? '7d' : '30d'
+    return {
+      inicioIso: a,
+      fimIso: b,
+      inicioMs: new Date(a + 'T00:00:00').getTime(),
+      fimMsEnd: new Date(b + 'T23:59:59.999').getTime(),
+      chartMode,
+    }
+  }
+
+  if (periodo === 'hoje') {
+    return {
+      inicioIso: hoje,
+      fimIso: hoje,
+      inicioMs: new Date(hoje + 'T00:00:00').getTime(),
+      fimMsEnd: new Date(hoje + 'T23:59:59.999').getTime(),
+      chartMode: 'hoje',
+    }
+  }
+
+  const t = new Date()
+  t.setHours(0, 0, 0, 0)
+  const daysBack =
+    periodo === '7d' ? 6 : periodo === '30d' ? 29 : periodo === '90d' ? 89 : 29
+  t.setDate(t.getDate() - daysBack)
+  const inicioIso = dateToLocalIso(t)
+  const chartMode: DashboardChartLabelMode = periodo === '7d' ? '7d' : '30d'
+  return {
+    inicioIso,
+    fimIso: hoje,
+    inicioMs: new Date(inicioIso + 'T00:00:00').getTime(),
+    fimMsEnd: new Date(hoje + 'T23:59:59.999').getTime(),
+    chartMode,
+  }
 }
 
 function normalizePlacaDashboard(s: string): string {
@@ -128,12 +140,12 @@ function checklistMatchesDashboardBase(
   return baseVeiculo.toLowerCase().includes(baseFilter.toLowerCase())
 }
 
-function fmtLabel(periodo: string, dateStr: string): string {
+function fmtChartLabel(chartMode: DashboardChartLabelMode, dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
-  if (periodo === 'hoje') {
+  if (chartMode === 'hoje') {
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
-  if (periodo === '7d') {
+  if (chartMode === '7d') {
     return d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
   }
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -242,6 +254,8 @@ export function DashboardPage() {
   const areaGradId = useId().replace(/:/g, '')
   const [viewMode, setViewMode] = useState<'bar' | 'area'>('bar')
   const [periodo, setPeriodo] = useState<string>('7d')
+  const [customDesde, setCustomDesde] = useState<string>(defaultCustomDesdeIso)
+  const [customAte, setCustomAte] = useState<string>(() => hojeLocalIso())
   const [filtroBaseRapido, setFiltroBaseRapido] = useState<string>('todos')
   const [filtroProcesso, setFiltroProcesso] = useState<string>('todos')
   const [filtroBase, setFiltroBase] = useState<string>('todos')
@@ -262,18 +276,27 @@ export function DashboardPage() {
     return m
   }, [])
 
+  const periodoLimites = useMemo(
+    () => computePeriodoLimites(periodo, customDesde, customAte),
+    [periodo, customDesde, customAte],
+  )
+  const periodoInicioIso = periodoLimites.inicioIso
+  const periodoFimIso = periodoLimites.fimIso
+  const periodoChartMode = periodoLimites.chartMode
+
   // Checklists concluídos (progresso 100) por dia — dados reais do Supabase, filtrados pela base via placa.
   const [checklistsPorDia, setChecklistsPorDia] = useState<{ data: string; realizados: number; comNc: number }[]>([])
 
   useEffect(() => {
-    const inicio = periodoParaInicio(periodo)
-    const inicioIso = inicio.toISOString().slice(0, 10)
+    const hojeIso = hojeLocalIso()
+    const fimFetchIso = periodoFimIso < hojeIso ? hojeIso : periodoFimIso
 
     void supabase
       .from('checklists')
       .select('data_inspecao, nc_count, dados_veiculo')
       .eq('progresso', 100)
-      .gte('data_inspecao', inicioIso)
+      .gte('data_inspecao', periodoInicioIso)
+      .lte('data_inspecao', fimFetchIso)
       .order('data_inspecao', { ascending: true })
       .then(({ data }) => {
         if (!data) {
@@ -296,7 +319,7 @@ export function DashboardPage() {
           Array.from(map.entries()).map(([data, v]) => ({ data, ...v })),
         )
       })
-  }, [periodo, baseEfetiva, placaParaBaseOperacional])
+  }, [periodoInicioIso, periodoFimIso, baseEfetiva, placaParaBaseOperacional])
 
   const { rows } = useApontamentos()
 
@@ -311,22 +334,28 @@ export function DashboardPage() {
     })
   }, [rows, filtroProcesso, baseEfetiva, filtroCoordenador])
 
+  const checklistsPorDiaNoPeriodo = useMemo(() => {
+    return checklistsPorDia
+      .filter((d) => d.data >= periodoInicioIso && d.data <= periodoFimIso)
+      .sort((a, b) => a.data.localeCompare(b.data))
+  }, [checklistsPorDia, periodoInicioIso, periodoFimIso])
+
   // Gráfico: realizados vs com NC no período
-  const chartData = useMemo<ChartRow[]>(() => {
-    return checklistsPorDia.map((d) => ({
-      name: fmtLabel(periodo, d.data),
+  const chartData = useMemo<DashboardAdesaoChartRow[]>(() => {
+    return checklistsPorDiaNoPeriodo.map((d) => ({
+      name: fmtChartLabel(periodoChartMode, d.data),
       realizados: d.realizados,
       naoRealizados: d.comNc,
     }))
-  }, [checklistsPorDia, periodo])
+  }, [checklistsPorDiaNoPeriodo, periodoChartMode])
 
   // KPIs
   const stats = useMemo<Stat[]>(() => {
-    const inicio = periodoParaInicio(periodo)
-    const inicioMs = inicio.getTime()
+    const { fimMsEnd } = periodoLimites
+    const inicioMs = periodoLimites.inicioMs
 
-    const checklistsNoPeriodo = checklistsPorDia.reduce((s, d) => s + d.realizados, 0)
-    const comNcNoPeriodo = checklistsPorDia.reduce((s, d) => s + d.comNc, 0)
+    const checklistsNoPeriodo = checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.realizados, 0)
+    const comNcNoPeriodo = checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.comNc, 0)
     const hojeIso = hojeLocalIso()
     const checklistsRealizadosHoje =
       checklistsPorDia.find((d) => d.data === hojeIso)?.realizados ?? 0
@@ -350,9 +379,10 @@ export function DashboardPage() {
         : '—'
 
     // Pendentes no período e filtro atual
-    const pendentesNoPeriodo = pendenciasFiltradas.filter(
-      (r) => new Date(r.dataApontamento + 'T00:00:00').getTime() >= inicioMs
-    ).length
+    const pendentesNoPeriodo = pendenciasFiltradas.filter((r) => {
+      const t = new Date(r.dataApontamento + 'T00:00:00').getTime()
+      return t >= inicioMs && t <= fimMsEnd
+    }).length
 
     return [
       {
@@ -394,7 +424,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDia, pendenciasFiltradas, periodo, baseEfetiva])
+  }, [checklistsPorDia, checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, baseEfetiva])
 
   const chartUi = useMemo(
     () => ({
@@ -405,19 +435,69 @@ export function DashboardPage() {
   )
 
   return (
-    <div className="-mx-3 -my-3 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent text-slate-900 dark:text-slate-100 sm:-mx-4 sm:-my-4 lg:-mx-8 lg:-my-6 lg:overflow-hidden">
+    <div className="-mx-3 -my-3 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent text-slate-900 dark:text-slate-100 sm:-mx-4 sm:-my-4 lg:-mx-8 lg:-my-6">
       <div className="shrink-0 overflow-hidden border-b border-slate-200/80 bg-transparent dark:border-slate-800/60 dark:bg-transparent sm:rounded-t-xl lg:rounded-t-2xl">
         <header className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-3.5 lg:px-8">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-5 lg:gap-8">
             <GomanLogo mode="full" />
             <div className="hidden h-8 w-px shrink-0 bg-slate-200 dark:bg-slate-700 md:block" />
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <QuickSelect
-                icon={Calendar}
-                value={periodo}
-                onChange={setPeriodo}
-                options={PERIODO_OPTIONS}
-              />
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+              <div className="relative min-w-0">
+                <Calendar
+                  className="pointer-events-none absolute left-3 top-1/2 z-10 size-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                  aria-hidden
+                />
+                <select
+                  id="dashboard-periodo-preset"
+                  value={periodo}
+                  onChange={(e) => setPeriodo(e.target.value)}
+                  aria-label="Período do dashboard"
+                  className="w-full min-w-[132px] appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-bold text-slate-900 shadow-sm outline-none transition-colors hover:bg-slate-50 focus:ring-2 focus:ring-blue-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900/60 sm:min-w-[158px]"
+                >
+                  {PERIODO_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                  aria-hidden
+                />
+              </div>
+              {periodo === 'custom' ? (
+                <div
+                  className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-end sm:gap-2"
+                  role="group"
+                  aria-labelledby="dashboard-periodo-preset"
+                >
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 sm:min-w-[9.5rem]">
+                    <span className="pl-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      De
+                    </span>
+                    <input
+                      type="date"
+                      value={customDesde}
+                      max={hojeLocalIso()}
+                      onChange={(e) => setCustomDesde(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold tabular-nums text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 sm:min-w-[9.5rem]">
+                    <span className="pl-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      Até
+                    </span>
+                    <input
+                      type="date"
+                      value={customAte}
+                      min={customDesde}
+                      max={hojeLocalIso()}
+                      onChange={(e) => setCustomAte(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold tabular-nums text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                </div>
+              ) : null}
               <QuickSelect
                 icon={Filter}
                 value={filtroBaseRapido}
@@ -501,11 +581,12 @@ export function DashboardPage() {
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
             {stats.map((s) => {
               const Card = s.href ? Link : 'div'
+              const isLast = stats[stats.length - 1]?.label === s.label
               return (
               <Card
                 key={s.label}
                 to={s.href ?? '#'}
-                className={`group flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${s.cardHover} ${s.href ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40' : ''}`}
+                className={`group flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${isLast ? 'col-span-2 sm:col-span-1' : ''} ${s.cardHover} ${s.href ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40' : ''}`}
               >
                 <div className={`mb-3 shrink-0 rounded-xl p-3 transition-transform sm:rounded-2xl sm:p-3.5 ${s.iconWrap}`}>
                   <s.Icon size={26} aria-hidden />
@@ -565,159 +646,25 @@ export function DashboardPage() {
             </div>
 
             <div className="flex h-[min(52vh,480px)] min-h-[260px] min-w-0 flex-1 flex-col p-3 sm:min-h-[300px] sm:p-4 lg:h-[min(56vh,560px)] lg:p-5">
-              {chartData.length === 0 ? (
-                <div className="flex flex-1 items-center justify-center text-sm font-semibold text-slate-400 dark:text-slate-600">
-                  Nenhum checklist registrado neste período.
-                </div>
-              ) : (
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-                minWidth={0}
-                minHeight={240}
-                initialDimension={{ width: 640, height: 320 }}
+              <Suspense
+                fallback={
+                  <div className="flex min-h-[240px] flex-1 items-center justify-center gap-2 text-sm font-semibold text-slate-400 dark:text-slate-500">
+                    <span
+                      className="size-5 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-300"
+                      aria-hidden
+                    />
+                    A carregar gráfico…
+                  </div>
+                }
               >
-                {viewMode === 'bar' ? (
-                  <BarChart
-                    data={chartData}
-                    margin={{ top: 12, right: 10, left: 4, bottom: 8 }}
-                    barCategoryGap="18%"
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartUi.grid} />
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fontWeight: 800, fill: chartUi.tick }}
-                      tickMargin={8}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fontWeight: 800, fill: chartUi.tick }}
-                      width={44}
-                    />
-                    <Tooltip
-                      content={(props) => (
-                        <AdesaoTooltipBody
-                          active={props.active}
-                          payload={props.payload as unknown as AdesaoTooltipPayload[] | undefined}
-                          label={props.label}
-                          isDark={isDark}
-                        />
-                      )}
-                      cursor={false}
-                      animationDuration={280}
-                      animationEasing="ease-out"
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      align="center"
-                      iconType="circle"
-                      wrapperStyle={{ paddingTop: 18, fontSize: 11, fontWeight: 800 }}
-                      formatter={(value) => <span className="text-slate-600 dark:text-slate-400">{value}</span>}
-                    />
-                    <Bar
-                      dataKey="realizados"
-                      name="Realizados"
-                      fill={CHART_COLORS.realizados}
-                      radius={[12, 12, 0, 0]}
-                      barSize={40}
-                      animationDuration={720}
-                      animationEasing="ease-out"
-                      animationBegin={0}
-                      activeBar={{ fill: CHART_COLORS.realizados, stroke: '#93c5fd', strokeWidth: 2, opacity: 0.98 }}
-                    />
-                    <Bar
-                      dataKey="naoRealizados"
-                      name="Com NC"
-                      fill={CHART_COLORS.naoRealizados}
-                      radius={[12, 12, 0, 0]}
-                      barSize={40}
-                      animationDuration={720}
-                      animationEasing="ease-out"
-                      animationBegin={90}
-                      activeBar={{ fill: CHART_COLORS.naoRealizados, stroke: '#fdba74', strokeWidth: 2, opacity: 0.98 }}
-                    />
-                  </BarChart>
-                ) : (
-                  <AreaChart data={chartData} margin={{ top: 12, right: 10, left: 4, bottom: 8 }}>
-                    <defs>
-                      <linearGradient id={`colorReal-${areaGradId}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1E40AF" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#1E40AF" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id={`colorNao-${areaGradId}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#FF8A65" stopOpacity={0.28} />
-                        <stop offset="95%" stopColor="#FF8A65" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartUi.grid} />
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fontWeight: 800, fill: chartUi.tick }}
-                      tickMargin={8}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fontWeight: 800, fill: chartUi.tick }}
-                      width={44}
-                    />
-                    <Tooltip
-                      content={(props) => (
-                        <AdesaoTooltipBody
-                          active={props.active}
-                          payload={props.payload as unknown as AdesaoTooltipPayload[] | undefined}
-                          label={props.label}
-                          isDark={isDark}
-                        />
-                      )}
-                      cursor={false}
-                      animationDuration={280}
-                      animationEasing="ease-out"
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      align="center"
-                      iconType="circle"
-                      wrapperStyle={{ paddingTop: 18, fontSize: 11, fontWeight: 800 }}
-                      formatter={(value) => <span className="text-slate-600 dark:text-slate-400">{value}</span>}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="realizados"
-                      name="Realizados"
-                      stroke={CHART_COLORS.realizados}
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill={`url(#colorReal-${areaGradId})`}
-                      dot={{ r: 4, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.realizados }}
-                      activeDot={{ r: 7, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.realizados }}
-                      animationDuration={900}
-                      animationEasing="ease-out"
-                      animationBegin={0}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="naoRealizados"
-                      name="Com NC"
-                      stroke={CHART_COLORS.naoRealizados}
-                      strokeWidth={2.5}
-                      fill={`url(#colorNao-${areaGradId})`}
-                      fillOpacity={1}
-                      dot={{ r: 3.5, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.naoRealizados }}
-                      activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.naoRealizados }}
-                      animationDuration={900}
-                      animationEasing="ease-out"
-                      animationBegin={120}
-                    />
-                  </AreaChart>
-                )}
-              </ResponsiveContainer>
-              )}
+                <LazyDashboardAdesaoCharts
+                  chartData={chartData}
+                  viewMode={viewMode}
+                  chartUi={chartUi}
+                  isDark={isDark}
+                  areaGradId={areaGradId}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

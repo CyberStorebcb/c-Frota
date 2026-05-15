@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { supabase, type HistoricoRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
+import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
 
 // ---------------------------------------------------------------------------
 // Tipo público
@@ -78,7 +79,7 @@ function rowToResolucao(r: any): Resolucao {
 function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<string, Resolucao>): Apontamento {
   const id = `${cl.id}__${itemId}`
   const dv = cl.dados_veiculo ?? {}
-  const placa   = dv.placa   ?? ''
+  const placa   = normalizePlaca(dv.placa ?? '')
   const prefixo = dv.prefixo ?? ''
   const schema  = SCHEMA_MAP[cl.tipo as string]
   const item    = schema?.grupos.flatMap((g) => g.itens).find((i) => i.id === itemId)
@@ -104,7 +105,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     checklistId:     cl.id,
     ncItemId:        itemId,
     veiculoId:       `placa-${placa.toLowerCase() || 'desconhecido'}`,
-    veiculoLabel:    prefixo && placa ? `${prefixo} · ${placa}` : placa || cl.nome_operador,
+    veiculoLabel:    prefixo && placa ? `${prefixo} · ${formatPlaca(placa)}` : formatPlaca(placa) || cl.nome_operador,
     prefixo,
     defeito:         label,
     dataApontamento: cl.data_inspecao,
@@ -245,7 +246,9 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    void recarregar()
+    queueMicrotask(() => {
+      void recarregar()
+    })
 
     const MAX_BACKOFF_MS = 30_000
     let destroyed = false
@@ -398,6 +401,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook exposto junto ao provider
 export function useApontamentos() {
   const ctx = useContext(ApontamentosContext)
   if (!ctx) throw new Error('useApontamentos deve ser usado dentro de ApontamentosProvider')

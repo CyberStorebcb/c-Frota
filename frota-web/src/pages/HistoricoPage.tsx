@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, CalendarCheck2, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
-import { jsPDF } from 'jspdf'
-import { PDFDocument } from 'pdf-lib'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import { Portal } from '../components/ui/Portal'
@@ -93,6 +91,7 @@ async function ensurePngOrJpegDataUrl(dataUrl: string): Promise<{ bytes: Uint8Ar
 }
 
 async function mergeOsIntoReport(reportBytes: ArrayBuffer, osDataUrl: string): Promise<Uint8Array> {
+  const { PDFDocument } = await import('pdf-lib')
   const merged = await PDFDocument.load(reportBytes)
   const mime = dataUrlMime(osDataUrl)
 
@@ -173,6 +172,7 @@ export function HistoricoPage() {
   }, [rows, query, valorMin, valorMax, dataInicio, dataFim])
 
   const gerarPdf = async (r: (typeof historico)[number]) => {
+    const { jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'pt', format: 'a4' })
     const pageW = doc.internal.pageSize.getWidth()
     const pageH = doc.internal.pageSize.getHeight()
@@ -550,7 +550,6 @@ export function HistoricoPage() {
       doc.setTextColor(120)
       doc.text('Sem imagens anexadas.', margin, y + 18)
       doc.setTextColor(0)
-      y += 40
     } else {
       const cols = 3
       const gap = 10
@@ -578,7 +577,6 @@ export function HistoricoPage() {
         const iy = y + 14 + (boxH3 - ih) / 2
         doc.addImage(jpeg.data, 'JPEG', ix, iy, iw, ih)
       }
-      y += 14 + boxH3 + 10
     }
 
     // Rodapé com paginação
@@ -702,7 +700,7 @@ export function HistoricoPage() {
               type="date"
               value={dataInicio}
               onChange={(e) => setDataInicio(e.target.value)}
-              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
             />
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
@@ -713,7 +711,7 @@ export function HistoricoPage() {
               type="date"
               value={dataFim}
               onChange={(e) => setDataFim(e.target.value)}
-              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
             />
           </div>
           {(dataInicio || dataFim) && (

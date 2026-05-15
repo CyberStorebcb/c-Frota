@@ -189,7 +189,7 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
 
   return (
     <div
-      className={`relative flex min-h-dvh w-full flex-col overflow-y-auto transition-colors duration-500 sm:h-dvh sm:min-h-0 sm:flex-row sm:overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
+      className={`relative flex min-h-dvh w-full flex-col overflow-y-auto transition-colors duration-500 lg:h-dvh lg:min-h-0 lg:flex-row lg:overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
     >
       <button
         type="button"
@@ -208,12 +208,12 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
         className="pointer-events-none fixed inset-0 z-[1] flex select-none items-center justify-center overflow-hidden"
         aria-hidden
       >
-        <span className="rotate-[-16deg] whitespace-nowrap text-[min(20vw,10rem)] font-black tracking-[0.32em] text-slate-900/[0.06] sm:text-[min(16vw,8rem)] dark:text-white/[0.08]">
+        <span className="rotate-[-16deg] whitespace-nowrap text-[min(28vw,9rem)] font-black tracking-[0.32em] text-slate-900/[0.06] lg:text-[min(16vw,8rem)] dark:text-white/[0.08]">
           CGB
         </span>
       </div>
 
-      <div className="relative z-10 hidden h-full w-full shrink-0 overflow-hidden bg-[#0B1120] sm:block sm:w-[42%] lg:w-[440px] xl:w-[500px] 2xl:w-[520px]">
+      <div className="relative z-10 hidden h-full w-full shrink-0 overflow-hidden bg-[#0B1120] lg:block lg:w-[440px] xl:w-[500px] 2xl:w-[520px]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_18%,rgba(181,22,73,0.38),transparent_28%),radial-gradient(circle_at_22%_48%,rgba(30,64,175,0.32),transparent_34%),linear-gradient(180deg,#0b1020_0%,#07101f_48%,#030712_100%)]" />
         <div className="pointer-events-none absolute -right-28 top-20 h-72 w-72 rotate-45 rounded-[3rem] border border-rose-400/20 bg-[#b51649]/15 shadow-[0_0_90px_rgba(181,22,73,0.22)]" />
         <div className="pointer-events-none absolute -left-24 bottom-16 h-64 w-64 rotate-45 rounded-[3rem] border border-rose-300/10 bg-[#7f1022]/20 blur-[1px]" />
@@ -272,15 +272,15 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
       </div>
 
       <div
-        className={`relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-8 pb-20 transition-colors duration-500 sm:h-full sm:min-h-0 sm:px-8 sm:py-8 sm:pb-10 lg:py-10 xl:pb-12 ${isDark ? 'bg-slate-950' : 'bg-white'}`}
+        className={`relative z-10 flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pb-24 pt-20 transition-colors duration-500 sm:px-8 sm:pt-24 lg:h-full lg:min-h-0 lg:justify-center lg:py-10 lg:pb-12 ${isDark ? 'bg-slate-950' : 'bg-white'}`}
       >
-        <div className="mb-8 flex w-full max-w-[380px] shrink-0 items-center justify-center rounded-3xl border border-slate-200 bg-white/80 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:hidden">
+        <div className="mb-8 flex w-full max-w-[380px] shrink-0 items-center justify-center rounded-3xl border border-slate-200 bg-white/80 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 lg:hidden">
           <CollapsedNavMark size="md" className="mr-3" />
           <BrandLogo tone={isDark ? 'on-dark' : 'on-light'} variant="horizontal" className="!max-h-10" />
         </div>
 
         <div className="w-full max-w-[380px]">
-          <header className="mb-8 text-center sm:mb-8 sm:text-left xl:mb-10">
+          <header className="mb-7 text-center lg:mb-8 lg:text-left xl:mb-10">
             <h1 className={`text-3xl font-black tracking-tight lg:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>Acessar</h1>
             <p className="mt-2 text-sm font-bold text-slate-500 lg:mt-3 lg:text-base">Portal CGB de gestão e apontamentos da frota</p>
           </header>
@@ -436,7 +436,7 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
                 </p>
               ) : null}
 
-              <div className={`max-h-[240px] overflow-y-auto rounded-2xl border p-3 text-xs font-semibold leading-relaxed [scrollbar-color:#b51649_rgba(148,163,184,.25)] [scrollbar-width:thin] ${
+              <div className={`max-h-[180px] overflow-y-auto rounded-2xl border p-3 text-xs font-semibold leading-relaxed [scrollbar-color:#b51649_rgba(148,163,184,.25)] [scrollbar-width:thin] xl:max-h-[240px] ${
                 isDark
                   ? 'border-slate-800 bg-slate-950 text-slate-100'
                   : 'border-slate-200 bg-slate-50 text-slate-700'

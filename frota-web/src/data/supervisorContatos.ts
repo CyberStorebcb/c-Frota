@@ -23,6 +23,7 @@ export const SUPERVISOR_WHATSAPP: Record<string, string> = {
   'RAIMUNDO HERMESSON BRITO VIEIRA DA SILVA':'5599985094768',  // GSTC - PDS
   'RAIMUNDO NONATO ALMEIDA DO NASCIMENTO':   '5599991122742',  // GOMAN - PDT  (lido: 9112-1242 — confirmar se não é 9112-1242)
   'WERBETH RODRIGUES CARVALHO':              '5587981782927',  // GOMAN - BCB
+  'ITALO BRUNO DA SILVA FONTES':             '5599984491810',
 }
 
 /** Número de fallback quando o supervisor não for encontrado no mapeamento. */
@@ -64,13 +65,14 @@ export function buildWhatsappLink(params: {
   ncCount: number
   ncImperativos: number
   itensNc: { label: string; imperativo: boolean }[]
+  fotosUrls?: string[]
 }): string {
-  const { numero, nomeSupervisor, operador, veiculo, ncCount, ncImperativos, itensNc } = params
+  const { numero, nomeSupervisor, operador, veiculo, ncCount, ncImperativos, itensNc, fotosUrls = [] } = params
   const bloqueado = ncImperativos > 0
-  const status = bloqueado ? '🚫 VEÍCULO IMPEDIDO' : '⚠ NC REGISTRADO'
+  const status = bloqueado ? '🚫 VEICULO IMPEDIDO' : '⚠️ NC REGISTRADO'
 
   const listaItens = itensNc
-    .map((it) => `${it.imperativo ? '🚫' : '⚠'} ${it.label}`)
+    .map((it) => `${it.imperativo ? '🚫' : '⚠️'} ${it.label}`)
     .join('\n')
 
   const linhas = [
@@ -79,12 +81,15 @@ export function buildWhatsappLink(params: {
     `Olá, ${nomeSupervisor}!`,
     `O operador *${operador}* acabou de concluir um checklist com *${ncCount} item(s) NC*.`,
     `Veículo: *${veiculo || 'não informado'}*`,
-    ...(bloqueado ? [`\n⛔ *${ncImperativos} item(s) impeditivo(s)* — veículo impedido de operar até correção.`] : []),
+    ...(bloqueado ? [`\n🚫 *${ncImperativos} item(s) impeditivo(s)* — veículo impedido de operar até correção.`] : []),
     '',
     '*Itens com NC:*',
     listaItens,
+    ...(fotosUrls.length > 0
+      ? ['', `📷 *${fotosUrls.length} foto(s) registrada(s):*`, ...fotosUrls]
+      : []),
     '',
-    'Por favor, verifique e tome as providências necessárias.',
+    'Por favor, verifique e tome as providencias necessarias.',
   ]
 
   return `https://wa.me/${numero}?text=${encodeURIComponent(linhas.join('\n'))}`

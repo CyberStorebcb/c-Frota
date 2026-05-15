@@ -144,7 +144,13 @@ export function ManagePage() {
   const [pagina, setPagina] = useState(1)
   const [pageSizeStr, setPageSizeStr] = useState('25')
   const pageSize = Number(pageSizeStr) || 25
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const tabelaRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const vehicleOptions = useMemo<SelectOption[]>(() => {
     const map = new Map<string, string>()
@@ -232,24 +238,15 @@ export function ManagePage() {
   }, [rowsMatchingFiltros, visao])
 
   const stats = useMemo(() => {
-    const now = Date.now()
     const pendentes = rowsMatchingFiltros.filter((r) => !r.resolvido).length
     const resolvidos = rowsMatchingFiltros.filter((r) => r.resolvido).length
-    const entrantes = rowsMatchingFiltros.filter((r) => isDefeitoEntrante(r, now)).length
+    const entrantes = rowsMatchingFiltros.filter((r) => isDefeitoEntrante(r, nowMs)).length
     return { total: rowsMatchingFiltros.length, pendentes, resolvidos, entrantes }
-  }, [rowsMatchingFiltros])
+  }, [rowsMatchingFiltros, nowMs])
 
   const totalFiltrados = sortedFiltered.length
   const totalPaginas = Math.max(1, Math.ceil(totalFiltrados / pageSize))
   const paginaEfetiva = Math.min(Math.max(1, pagina), totalPaginas)
-
-  useEffect(() => {
-    if (pagina !== paginaEfetiva) setPagina(paginaEfetiva)
-  }, [pagina, paginaEfetiva])
-
-  useEffect(() => {
-    setPagina(1)
-  }, [visao, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query, pageSizeStr])
 
   const paginaRows = useMemo(() => {
     const start = (paginaEfetiva - 1) * pageSize
@@ -279,12 +276,13 @@ export function ManagePage() {
     setResponsavel('todos')
     setPrefixo('todos')
     setData('todos')
+    setPagina(1)
   }
 
   const prazoPassou = (prazoIso: string | null, resolvido: boolean) => {
     if (resolvido || !prazoIso) return false
     const t = new Date(prazoIso + 'T23:59:59').getTime()
-    return Date.now() > t
+    return nowMs > t
   }
 
   const [resolveOpen, setResolveOpen] = useState(false)
@@ -378,15 +376,17 @@ export function ManagePage() {
 
   useEffect(() => {
     if (!canMarkResolved && resolveOpen) {
-      setResolveOpen(false)
-      setResolveId(null)
-      setResolveValor('')
-      setResolveData(new Date().toISOString().slice(0, 10))
-      setResolveDescricao('')
-      setResolveImgs([])
-      setResolveOsFile(null)
-      if (fileRef.current) fileRef.current.value = ''
-      if (osFileRef.current) osFileRef.current.value = ''
+      queueMicrotask(() => {
+        setResolveOpen(false)
+        setResolveId(null)
+        setResolveValor('')
+        setResolveData(new Date().toISOString().slice(0, 10))
+        setResolveDescricao('')
+        setResolveImgs([])
+        setResolveOsFile(null)
+        if (fileRef.current) fileRef.current.value = ''
+        if (osFileRef.current) osFileRef.current.value = ''
+      })
     }
   }, [canMarkResolved, resolveOpen])
 
@@ -431,7 +431,7 @@ export function ManagePage() {
           icon={<ClipboardList size={18} />}
           tone="slate"
           selected={visao === 'apontamentos'}
-          onClick={() => setVisao('apontamentos')}
+          onClick={() => { setVisao('apontamentos'); setPagina(1) }}
         />
         <StatPill
           label="Pendentes"
@@ -439,7 +439,7 @@ export function ManagePage() {
           icon={<AlertTriangle size={18} />}
           tone="rose"
           selected={visao === 'pendentes'}
-          onClick={() => setVisao('pendentes')}
+          onClick={() => { setVisao('pendentes'); setPagina(1) }}
         />
         <StatPill
           label="Resolvidos"
@@ -447,7 +447,7 @@ export function ManagePage() {
           icon={<CheckCircle2 size={18} />}
           tone="emerald"
           selected={visao === 'resolvidos'}
-          onClick={() => setVisao('resolvidos')}
+          onClick={() => { setVisao('resolvidos'); setPagina(1) }}
         />
         <StatPill
           label="Defeitos entrantes"
@@ -478,19 +478,44 @@ export function ManagePage() {
         <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
             <div className="flex flex-col gap-3 p-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
                 <Select
                   label="Filtrar por veículo"
                   value={vehicleId}
                   options={vehicleOptions}
-                  onChange={setVehicleId}
+                  onChange={(v) => { setVehicleId(v); setPagina(1) }}
                 />
-                <Select label="Processo" value={processo} options={PROCESSO_FILTER_SELECT_OPTIONS} onChange={setProcesso} />
-                <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={setBase} />
-                <Select label="Coordenador" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setCoordenador} />
-                <Select label="Responsável" value={responsavel} options={respOptions} onChange={setResponsavel} />
-                <Select label="Prefixo" value={prefixo} options={prefixoOptions} onChange={setPrefixo} />
-                <Select label="Data" value={data} options={dataOpts} onChange={setData} />
+                <Select
+                  label="Processo"
+                  value={processo}
+                  options={PROCESSO_FILTER_SELECT_OPTIONS}
+                  onChange={(v) => { setProcesso(v); setPagina(1) }}
+                />
+                <Select
+                  label="Base"
+                  value={base}
+                  options={BASE_FILTER_SELECT_OPTIONS}
+                  onChange={(v) => { setBase(v); setPagina(1) }}
+                />
+                <Select
+                  label="Coordenador"
+                  value={coordenador}
+                  options={COORDENADOR_FILTER_SELECT_OPTIONS}
+                  onChange={(v) => { setCoordenador(v); setPagina(1) }}
+                />
+                <Select
+                  label="Responsável"
+                  value={responsavel}
+                  options={respOptions}
+                  onChange={(v) => { setResponsavel(v); setPagina(1) }}
+                />
+                <Select
+                  label="Prefixo"
+                  value={prefixo}
+                  options={prefixoOptions}
+                  onChange={(v) => { setPrefixo(v); setPagina(1) }}
+                />
+                <Select label="Data" value={data} options={dataOpts} onChange={(v) => { setData(v); setPagina(1) }} />
               </div>
               <div className="flex items-end gap-3">
                 <div className="min-w-0 flex-1">
@@ -501,7 +526,7 @@ export function ManagePage() {
                     <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
                     <input
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => { setQuery(e.target.value); setPagina(1) }}
                       placeholder="Texto do defeito, prefixo ou placa..."
                       className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
                     />
@@ -669,7 +694,7 @@ export function ManagePage() {
                   label="Por página"
                   value={pageSizeStr}
                   options={PAGE_SIZE_OPTIONS}
-                  onChange={setPageSizeStr}
+                  onChange={(v) => { setPageSizeStr(v); setPagina(1) }}
                 />
               </div>
               <div className="flex items-center gap-1">

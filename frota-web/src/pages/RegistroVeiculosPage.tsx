@@ -32,8 +32,10 @@ import {
   addFleetVehicle,
   FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY,
   FLEET_STATUS_BY_PLACA_STORAGE_KEY,
+  formatPlaca,
   getDisplayedFleetVehicles,
   isEmbeddedCatalogFleetVehicleId,
+  normalizePlaca,
   removeFleetVehicle,
   setFleetVehicleManutencao,
   setFleetVehicleStatus,
@@ -431,21 +433,26 @@ export function RegistroVeiculosPage() {
   }, [])
 
   useEffect(() => {
-    if (!canRegisterVehicle && isModalOpen) setIsModalOpen(false)
+    if (!canRegisterVehicle && isModalOpen) {
+      queueMicrotask(() => setIsModalOpen(false))
+    }
   }, [canRegisterVehicle, isModalOpen])
 
   /** Busca + tipo (barra superior); igual em grelha e em lista. */
   const globallyFilteredVehicles = useMemo(() => {
     return vehicles.filter((v) => {
-      const placaStr = String(v.placa || '').toLowerCase()
+      const placaNorm = normalizePlaca(v.placa)
+      const placaDisplay = formatPlaca(v.placa).toLowerCase()
       const modeloStr = String(v.modelo || '').toLowerCase()
       const prefixoStr = String(v.prefixo || '').toLowerCase()
       const baseStr = String(v.base || '').toLowerCase()
       const respStr = String(v.responsavel || '').toLowerCase()
       const searchStr = search.toLowerCase()
+      const searchPlaca = normalizePlaca(search)
       const matchesSearch =
         !searchStr ||
-        placaStr.includes(searchStr) ||
+        (searchPlaca ? placaNorm.includes(searchPlaca) : false) ||
+        placaDisplay.includes(searchStr) ||
         modeloStr.includes(searchStr) ||
         prefixoStr.includes(searchStr) ||
         baseStr.includes(searchStr) ||
@@ -459,13 +466,13 @@ export function RegistroVeiculosPage() {
   const filteredVehicles = useMemo(() => {
     if (layoutMode !== 'list') return globallyFilteredVehicles
 
-    const fp = colFilterPlaca.trim().toUpperCase()
+    const fp = normalizePlaca(colFilterPlaca)
     const fm = colFilterModeloPrefixo.trim().toLowerCase()
     const fo = colFilterOrgResp.trim().toLowerCase()
     const fl = colFilterLocalBase.trim().toLowerCase()
 
     return globallyFilteredVehicles.filter((v) => {
-      if (fp && !String(v.placa || '').toUpperCase().includes(fp)) return false
+      if (fp && !normalizePlaca(v.placa).includes(fp)) return false
       if (fm) {
         const blob = `${v.modelo} ${v.prefixo}`.toLowerCase()
         if (!blob.includes(fm)) return false
@@ -604,11 +611,11 @@ export function RegistroVeiculosPage() {
     }
     setIsAiLoading(true)
     try {
-      const prompt = `Resumo factual (fonte de verdade para totais e contagens por tipo; não contradigas estes números): ${fleetAiSummaryJson}\n\nAmostra detalhada da frota em JSON (pode estar truncada, só para contexto qualitativo): ${fleetContextJson}\n\nTarefa: analisa a frota GOMAN e apresenta **3 sugestões estratégicas** curtas e acionáveis.\n\nFormato (obrigatório):\n- Usa parágrafos curtos e listas com linhas começadas por "* " para cada ponto principal.\n- Não incluas JSON nem blocos de código (\`\`\`). Não repitas o resumo factual; se citares números, integra-os na frase.`
+      const prompt = `Resumo factual (fonte de verdade para totais e contagens por tipo; não contradigas estes números): ${fleetAiSummaryJson}\n\nAmostra detalhada da frota em JSON (pode estar truncada, só para contexto qualitativo): ${fleetContextJson}\n\nTarefa: analisa a frota GOMAN e apresenta **3 sugestões estratégicas** curtas e acionáveis.\n\nFormato (obrigatório):\n- Usa parágrafos curtos e listas com linhas começadas por "* " para cada ponto principal.\n- Não incluas JSON nem blocos de código (código entre três crases). Não repitas o resumo factual; se citares números, integra-os na frase.`
 
       const result = await askGemini(
         prompt,
-        'És um analista de dados de logística. Para totais ou contagens, usa apenas totalFrota, porTipo e porStatus do resumo factual no início do prompt. Nunca incluas JSON, \`\`\` nem dados em bruto na resposta ao utilizador — só texto útil. Português de Portugal, conciso e profissional.',
+        'És um analista de dados de logística. Para totais ou contagens, usa apenas totalFrota, porTipo e porStatus do resumo factual no início do prompt. Nunca incluas JSON, fences de código markdown nem dados em bruto na resposta ao utilizador — só texto útil. Português de Portugal, conciso e profissional.',
       )
       setAiAnalysis(result.ok ? result.text : 'Erro ao conectar com o serviço de inteligência. Tente novamente.')
     } catch {
@@ -1065,7 +1072,7 @@ export function RegistroVeiculosPage() {
 
                 <div className="mt-5 space-y-1">
                   <h3 className="text-xl font-black uppercase leading-none tracking-tight text-slate-900 dark:text-white">
-                    {vehicle.placa}
+                    {formatPlaca(vehicle.placa)}
                   </h3>
                   <p className="text-sm font-bold uppercase text-slate-500 dark:text-slate-400">
                     {vehicle.modelo} • {vehicle.prefixo}
@@ -1285,7 +1292,7 @@ export function RegistroVeiculosPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <span className="font-mono text-sm font-black uppercase text-slate-900 dark:text-white">{vehicle.placa}</span>
+                        <span className="font-mono text-sm font-black uppercase text-slate-900 dark:text-white">{formatPlaca(vehicle.placa)}</span>
                       </td>
                       <td className="max-w-[220px] px-4 py-3 align-middle">
                         <div className="mx-auto max-w-full truncate text-xs font-bold uppercase text-slate-600 dark:text-slate-300">
@@ -1408,8 +1415,8 @@ export function RegistroVeiculosPage() {
                       required
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm font-bold uppercase text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                       placeholder="ABC-1234"
-                      value={formData.placa}
-                      onChange={(e) => setFormData({ ...formData, placa: e.target.value })}
+                      value={formatPlaca(formData.placa)}
+                      onChange={(e) => setFormData({ ...formData, placa: normalizePlaca(e.target.value) })}
                     />
                   </div>
                 </div>

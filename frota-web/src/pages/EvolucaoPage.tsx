@@ -34,6 +34,8 @@ import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/p
 import { Select, type SelectOption } from '../components/ui/Select'
 
 const TOOLTIP_EXEMPLOS_MAX = 5
+const TOOLTIP_W = 240
+const TOOLTIP_H = 220
 
 const DATA_OPTS: SelectOption[] = [
   { value: 'todos', label: 'Todos' },
@@ -82,6 +84,14 @@ function cardTextStyle(dias: number | null): string {
   if (dias <= 15) return 'text-emerald-600 dark:text-emerald-400'
   if (dias <= 30) return 'text-orange-600 dark:text-orange-400'
   return 'text-red-600 dark:text-red-400'
+}
+
+function tooltipPosition(x: number, y: number) {
+  if (typeof window === 'undefined') return { left: x + 14, top: y - 10 }
+  return {
+    left: Math.max(8, Math.min(x + 14, window.innerWidth - TOOLTIP_W)),
+    top: Math.max(8, Math.min(y - 10, window.innerHeight - TOOLTIP_H)),
+  }
 }
 
 const LEGENDA_CORES = [
@@ -1019,7 +1029,7 @@ export function EvolucaoPage() {
 
       {/* Tooltips */}
       {tooltipCell && (
-        <div style={{ position: 'fixed', left: tooltipCell.x + 14, top: tooltipCell.y - 10, zIndex: 9999, pointerEvents: 'none' }}
+        <div style={{ position: 'fixed', ...tooltipPosition(tooltipCell.x, tooltipCell.y), zIndex: 9999, pointerEvents: 'none' }}
           className="max-w-[220px] rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-700 dark:bg-slate-900">
           <div className="font-black text-slate-900 dark:text-slate-100">{tooltipCell.point.periodo}</div>
           <div className="mt-2 space-y-1 font-semibold text-slate-600 dark:text-slate-300">
@@ -1042,7 +1052,7 @@ export function EvolucaoPage() {
       )}
 
       {tooltipLine2 && (
-        <div style={{ position: 'fixed', left: tooltipLine2.x + 14, top: tooltipLine2.y - 10, zIndex: 9999, pointerEvents: 'none' }}
+        <div style={{ position: 'fixed', ...tooltipPosition(tooltipLine2.x, tooltipLine2.y), zIndex: 9999, pointerEvents: 'none' }}
           className="max-w-[220px] rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-700 dark:bg-slate-900">
           <div className="font-black text-slate-900 dark:text-slate-100">{tooltipLine2.periodo}</div>
           <div className="mt-2 space-y-1 font-semibold text-slate-600 dark:text-slate-300">

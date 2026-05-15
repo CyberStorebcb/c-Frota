@@ -162,7 +162,7 @@ function ChecklistForm({ schema, onVoltar }: { schema: ChecklistSchemaDef; onVol
                   type="date"
                   value={dataInspecao}
                   onChange={(e) => setDataInspecao(e.target.value)}
-                  className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+                  className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
                 />
               </div>
               {/* Campos extras do schema */}

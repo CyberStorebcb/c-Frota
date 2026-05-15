@@ -1,4 +1,5 @@
-const CACHE_NAME = 'frota-checklists-v6'
+const CACHE_NAME = 'frota-checklists-v7'
+const BACKGROUND_SYNC_TAG = 'frota-sync-checklists'
 const APP_SHELL = [
   '/',
   '/checklist',
@@ -59,4 +60,38 @@ self.addEventListener('fetch', (event) => {
       })
     }),
   )
+})
+
+// ---------------------------------------------------------------------------
+// Background Sync — dispara quando o dispositivo recupera conexão,
+// mesmo com o app fechado (Android/Chrome).
+// ---------------------------------------------------------------------------
+self.addEventListener('sync', (event) => {
+  if (event.tag === BACKGROUND_SYNC_TAG) {
+    event.waitUntil(notifyClientsToSync())
+  }
+})
+
+// Avisa todos os clientes abertos para disparar a sincronização
+async function notifyClientsToSync() {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  if (clients.length > 0) {
+    // App está aberto — avisa para sincronizar
+    for (const client of clients) {
+      client.postMessage({ type: 'SW_BACKGROUND_SYNC' })
+    }
+  }
+  // Se não houver clientes abertos, a sincronização acontecerá
+  // quando o usuário abrir o app (OfflineSyncProvider cuida disso)
+}
+
+// Recebe mensagem do app para registrar um sync tag
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'REGISTER_BACKGROUND_SYNC') {
+    if ('SyncManager' in self) {
+      self.registration.sync.register(BACKGROUND_SYNC_TAG).catch(() => {
+        // Background Sync não suportado ou falhou — sem problema, cai no fallback
+      })
+    }
+  }
 })

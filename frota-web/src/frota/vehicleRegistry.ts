@@ -190,8 +190,14 @@ function legacyAreaToTipo(area: string): VehicleTipo {
   return map[area]
 }
 
-function normalizePlaca(s: string): string {
-  return s.trim().toUpperCase()
+export function normalizePlaca(s: string): string {
+  return s.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7)
+}
+
+export function formatPlaca(s: string): string {
+  const p = normalizePlaca(s)
+  if (/^[A-Z]{3}\d{4}$/.test(p)) return `${p.slice(0, 3)}-${p.slice(3)}`
+  return p
 }
 
 function normalizePrefixo(s: string): string {
@@ -352,7 +358,7 @@ function writeFleetVehicles(list: FleetVehicle[]): void {
 }
 
 export function labelVeiculo(v: FleetVehicle): string {
-  return `${v.placa} · ${v.modelo}`
+  return `${formatPlaca(v.placa)} · ${v.modelo}`
 }
 
 export function addFleetVehicle(

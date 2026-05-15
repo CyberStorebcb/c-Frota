@@ -33,7 +33,19 @@ export function UsuariosPage() {
     setCarregando(false)
   }
 
-  useEffect(() => { void carregar() }, [])
+  useEffect(() => {
+    void (async () => {
+      await Promise.resolve()
+      setCarregando(true)
+      const { data, error } = await supabase.rpc('list_users_with_roles')
+      if (error) {
+        showMsg('Erro ao carregar: ' + error.message, false)
+      } else {
+        setUsers((data as ProfileRow[]) ?? [])
+      }
+      setCarregando(false)
+    })()
+  }, [])
 
   const alterarRole = async (id: string, novoRole: 'admin' | 'user') => {
     const { error } = await supabase

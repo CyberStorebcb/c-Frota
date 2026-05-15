@@ -1,34 +1,66 @@
 import { useEffect, useState } from 'react'
 import { getOfflineQueueSummary, subscribeOfflineQueue, type SyncSummary } from './offlineQueue'
-import { syncOfflineChecklists } from './syncOfflineChecklists'
+import { syncOfflineChecklists, subscribeSyncResult } from './syncOfflineChecklists'
 
 export function SyncStatus() {
   const [online, setOnline] = useState(() => navigator.onLine)
   const [summary, setSummary] = useState<SyncSummary>({ pending: 0, syncing: 0, error: 0 })
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
+    let successTimer: ReturnType<typeof setTimeout> | null = null
+
     const refresh = async () => {
       const next = await getOfflineQueueSummary()
       if (mounted) setSummary(next)
     }
+
     const handleOnline = () => {
       setOnline(true)
       void syncOfflineChecklists().then(refresh).catch(refresh)
     }
     const handleOffline = () => setOnline(false)
 
+    // Ouve resultado de sincronização para exibir notificação de sucesso
+    const unsubscribeSync = subscribeSyncResult((result) => {
+      if (!mounted) return
+      if (successTimer) clearTimeout(successTimer)
+      setSuccessMsg(
+        result.synced === 1
+          ? '1 checklist sincronizado com sucesso!'
+          : `${result.synced} checklists sincronizados com sucesso!`
+      )
+      // Some após 5 segundos
+      successTimer = setTimeout(() => {
+        if (mounted) setSuccessMsg(null)
+      }, 5000)
+    })
+
     void refresh()
-    const unsubscribe = subscribeOfflineQueue(refresh)
+    const unsubscribeQueue = subscribeOfflineQueue(refresh)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+
     return () => {
       mounted = false
-      unsubscribe()
+      if (successTimer) clearTimeout(successTimer)
+      unsubscribeQueue()
+      unsubscribeSync()
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
+
+  // Notificação de sucesso (sobrepõe o banner normal por 5s)
+  if (successMsg) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+        <span>✓</span>
+        {successMsg}
+      </div>
+    )
+  }
 
   const totalPendencias = summary.pending + summary.syncing + summary.error
   const tone = !online

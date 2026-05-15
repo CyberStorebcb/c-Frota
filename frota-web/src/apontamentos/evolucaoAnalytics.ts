@@ -224,7 +224,7 @@ export function buildResolvidosCsv(rows: Apontamento[]): string {
     'dias_ate_resolver',
   ].join(';')
 
-  const esc = (s: string) => `\"${String(s).replace(/\"/g, '\"\"')}\"`
+  const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`
 
   const lines = rows.map((r) => {
     const d = diasEntreApontamentoEResolucao(r)

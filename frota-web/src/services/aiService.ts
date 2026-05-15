@@ -96,7 +96,7 @@ export async function askGemini(prompt: string, systemInstruction: string): Prom
   const model = await resolveGenerateContentModel(apiKey)
   const url = `${GEMINI_MODELS_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
 
-  let lastErrorMessage = 'Não foi possível conectar. Tente de novo em instantes.'
+  const lastErrorMessage = 'Não foi possível conectar. Tente de novo em instantes.'
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
     try {

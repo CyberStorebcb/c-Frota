@@ -9,8 +9,25 @@ import {
   type OfflineChecklistRecord,
 } from './offlineQueue'
 
+export type SyncResult = {
+  synced: number
+  failed: number
+}
+
+type SyncListener = (result: SyncResult) => void
+const syncListeners = new Set<SyncListener>()
+
+export function subscribeSyncResult(listener: SyncListener) {
+  syncListeners.add(listener)
+  return () => syncListeners.delete(listener)
+}
+
+function notifySyncResult(result: SyncResult) {
+  for (const l of syncListeners) l(result)
+}
+
 function safeFileName(fileName: string) {
-  return fileName.replace(/\s+/g, '_').replace(/[^\w.\-]/g, '_')
+  return fileName.replace(/\s+/g, '_').replace(/[^\w.-]/g, '_')
 }
 
 async function uploadOfflineFile(schemaId: string, ts: number, file: OfflineChecklistFile, index: number): Promise<string> {
@@ -53,13 +70,16 @@ async function sendRecord(record: OfflineChecklistRecord) {
   if (error) throw error
 }
 
-let syncingPromise: Promise<void> | null = null
+let syncingPromise: Promise<SyncResult> | null = null
 
-export function syncOfflineChecklists() {
+export function syncOfflineChecklists(): Promise<SyncResult> {
   if (syncingPromise) return syncingPromise
 
-  syncingPromise = (async () => {
+  syncingPromise = (async (): Promise<SyncResult> => {
     const records = await listPendingOfflineChecklists()
+    let synced = 0
+    let failed = 0
+
     for (const record of records) {
       const syncingRecord: OfflineChecklistRecord = {
         ...record,
@@ -71,19 +91,33 @@ export function syncOfflineChecklists() {
       try {
         await sendRecord(syncingRecord)
         await removeOfflineChecklist(syncingRecord.localId)
+        synced++
       } catch (error) {
         await updateOfflineChecklist({
           ...syncingRecord,
           status: 'error',
           lastError: error instanceof Error ? error.message : 'Erro desconhecido ao sincronizar',
         })
+        failed++
       }
     }
-    // Remove registros expirados e que esgotaram tentativas
+
     await cleanupOfflineQueue()
+
+    const result: SyncResult = { synced, failed }
+    if (synced > 0) notifySyncResult(result)
+    return result
   })().finally(() => {
     syncingPromise = null
   })
 
   return syncingPromise
+}
+
+// Registra background sync no SW para quando o app estiver fechado
+export function requestBackgroundSync() {
+  if (!('serviceWorker' in navigator)) return
+  navigator.serviceWorker.ready.then((reg) => {
+    reg.active?.postMessage({ type: 'REGISTER_BACKGROUND_SYNC' })
+  }).catch(() => {})
 }

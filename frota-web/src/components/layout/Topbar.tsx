@@ -47,6 +47,9 @@ export function Topbar({
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 w-full max-w-xl dark:border-slate-800 dark:bg-slate-900/40">
           <Search size={16} className="text-slate-400 dark:text-slate-500" />
           <input
+            aria-label="Busca global"
+            readOnly
+            title="Busca global em desenvolvimento"
             placeholder="Buscar..."
             className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
@@ -59,7 +62,11 @@ export function Topbar({
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900">
+        <button
+          type="button"
+          className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+          aria-label="Notificações"
+        >
           <Bell size={18} />
         </button>
       </div>

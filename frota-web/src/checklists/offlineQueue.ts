@@ -79,7 +79,10 @@ function openDb(): Promise<IDBDatabase> {
       }
     }
     request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    request.onerror = () => {
+      dbPromise = null  // permite retry na próxima chamada
+      reject(request.error)
+    }
   })
   return dbPromise
 }
@@ -101,6 +104,15 @@ export async function enqueueChecklist(payload: ChecklistInsert, files: OfflineC
   const tx = db.transaction(STORE_NAME, 'readwrite')
   tx.objectStore(STORE_NAME).put(record)
   await txDone(tx)
+
+  // Registra background sync no SW para sincronizar mesmo com app fechado
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then((reg) => {
+      if ('sync' in reg) {
+        return (reg.sync as { register: (tag: string) => Promise<void> }).register('frota-sync-checklists')
+      }
+    }).catch(() => {})
+  }
   notify()
   return record
 }
@@ -115,9 +127,15 @@ export async function listOfflineChecklists(): Promise<OfflineChecklistRecord[]>
 
 export async function listPendingOfflineChecklists(): Promise<OfflineChecklistRecord[]> {
   const records = await listOfflineChecklists()
-  return records.filter(
-    (r) => (r.status === 'pending' || r.status === 'error') && r.attempts < MAX_RETRY_ATTEMPTS,
-  )
+  // Registros presos em 'syncing' por mais de 5 minutos são tratados como 'error'
+  const SYNCING_TIMEOUT_MS = 5 * 60 * 1000
+  const now = Date.now()
+  return records.filter((r) => {
+    if (r.status === 'syncing') {
+      return now - new Date(r.updatedAt).getTime() > SYNCING_TIMEOUT_MS && r.attempts < MAX_RETRY_ATTEMPTS
+    }
+    return (r.status === 'pending' || r.status === 'error') && r.attempts < MAX_RETRY_ATTEMPTS
+  })
 }
 
 export async function updateOfflineChecklist(record: OfflineChecklistRecord) {

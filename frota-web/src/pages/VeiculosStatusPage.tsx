@@ -6,6 +6,7 @@ import {
   VEHICLE_OPERATIONAL_STATUS_LABELS,
   type VehicleOperationalStatus,
 } from '../frota/vehicleOperationalStatus'
+import { formatPlaca } from '../frota/vehicleRegistry'
 
 const STATUS_STYLE: Record<VehicleOperationalStatus, { card: string; badge: string }> = {
   ATIVOS: {
@@ -124,7 +125,7 @@ export function VeiculosStatusPage() {
                       <td className="px-5 py-3 font-black text-slate-900 dark:text-white">{label}</td>
                       <td className="px-5 py-3 text-right font-black tabular-nums text-slate-900 dark:text-white">{item.count}</td>
                       <td className="max-w-[420px] px-5 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        {item.vehicles.map((v) => v.placa).join(', ') || '—'}
+                        {item.vehicles.map((v) => formatPlaca(v.placa)).join(', ') || '—'}
                       </td>
                     </tr>
                   )

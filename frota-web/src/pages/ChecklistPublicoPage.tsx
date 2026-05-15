@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Navigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -21,7 +22,7 @@ import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
-import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
+import { formatPlaca, getDisplayedFleetVehicles, normalizePlaca } from '../frota/vehicleRegistry'
 import { compressChecklistImageIfNeeded } from '../utils/compressChecklistImage'
 import { buildWhatsappLink, getSupervisorWhatsapp, isSupervisorReconhecido, SUPERVISOR_WHATSAPP } from '../data/supervisorContatos'
 
@@ -251,6 +252,8 @@ function TelaConclusao({
   nomeSupervisor,
   veiculo,
   operador,
+  fotosPreview,
+  fotosUrls,
 }: {
   ncImperativos: number
   ncCount: number
@@ -259,6 +262,8 @@ function TelaConclusao({
   nomeSupervisor: string
   veiculo: string
   operador: string
+  fotosPreview: string[]
+  fotosUrls: string[]
 }) {
   const { theme } = useTheme()
   const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
@@ -274,6 +279,7 @@ function TelaConclusao({
         ncCount,
         ncImperativos,
         itensNc,
+        fotosUrls,
       })
     : null
 
@@ -376,6 +382,26 @@ function TelaConclusao({
           </div>
         )}
 
+        {/* Fotos registradas */}
+        {fotosPreview.length > 0 && (
+          <div className="w-full text-left">
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              Fotos registradas ({fotosPreview.length})
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {fotosPreview.map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={url}
+                    alt={`Foto ${i + 1}`}
+                    className="h-24 w-full rounded-xl border border-slate-200 object-cover shadow-sm dark:border-slate-700"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <p className="text-xs font-semibold text-slate-400">Você já pode fechar esta página.</p>
       </div>
     </div>
@@ -473,10 +499,6 @@ function FotosItem({
   )
 }
 
-function normalizePlacaChecklistInput(raw: string): string {
-  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
-}
-
 // ---------------------------------------------------------------------------
 // Autocomplete de supervisor
 // ---------------------------------------------------------------------------
@@ -486,7 +508,8 @@ const SUPERVISORES = Object.keys(SUPERVISOR_WHATSAPP)
 
 function SupervisorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [portalStyle, setPortalStyle] = useState<React.CSSProperties>({})
+  const cardRef = useRef<HTMLDivElement>(null)
   const reconhecido = value.trim().length > 0 && isSupervisorReconhecido(value)
 
   const sugestoes = value.trim().length === 0
@@ -498,21 +521,41 @@ function SupervisorField({ value, onChange }: { value: string; onChange: (v: str
       )
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    const handleClick = (e: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) setOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const handleScroll = () => setOpen(false)
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
   }, [])
 
+  useLayoutEffect(() => {
+    if (!open || sugestoes.length === 0) return
+
+    const el = cardRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setPortalStyle({
+      position: 'fixed',
+      top: r.bottom + 4,
+      left: r.left,
+      width: r.width,
+      zIndex: 9999,
+    })
+  }, [open, sugestoes.length, value])
+
   return (
-    <div ref={ref} className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
-      <div className={CGB_SECTION_HEADER}>
+    <div ref={cardRef} className={`rounded-2xl ${CGB_CARD}`}>
+      <div className={`rounded-t-2xl ${CGB_SECTION_HEADER}`}>
         <p className="text-[11px] font-extrabold uppercase tracking-widest text-white">
           Supervisor Responsável
         </p>
       </div>
-      <div className="relative px-4 py-3">
+      <div className="px-4 py-3">
         <div className="flex items-center gap-2">
           <input
             value={value}
@@ -530,7 +573,6 @@ function SupervisorField({ value, onChange }: { value: string; onChange: (v: str
           )}
         </div>
 
-        {/* Badge de confirmação abaixo do input */}
         {reconhecido && (
           <div className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/50 dark:bg-emerald-900/20">
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
@@ -541,29 +583,34 @@ function SupervisorField({ value, onChange }: { value: string; onChange: (v: str
             </p>
           </div>
         )}
-
-        {open && sugestoes.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 mx-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-            {sugestoes.map((s) => (
-              <button
-                key={s.label}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  onChange(s.label)
-                  setOpen(false)
-                }}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:text-slate-200 dark:hover:bg-rose-900/30 dark:hover:text-rose-300"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[11px] font-extrabold text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
-                  {s.label.charAt(0)}
-                </span>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Portal: renderiza no body para escapar de qualquer overflow/stacking context */}
+      {open && sugestoes.length > 0 && createPortal(
+        <div
+          style={portalStyle}
+          className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        >
+          {sugestoes.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                onChange(s.label)
+                setOpen(false)
+              }}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:text-slate-200 dark:hover:bg-rose-900/30 dark:hover:text-rose-300"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[11px] font-extrabold text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
+                {s.label.charAt(0)}
+              </span>
+              {s.label}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
@@ -589,6 +636,7 @@ function FormularioChecklist({
   const [dadosVeiculo, setDadosVeiculo]   = useState<Record<string, string>>({})
   const [localidadeGeoLoading, setLocalidadeGeoLoading] = useState(false)
   const [localidadeGeoErro, setLocalidadeGeoErro] = useState('')
+  const [localidadeCoords, setLocalidadeCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [dataInspecao, setDataInspecao]   = useState(() => new Date().toISOString().split('T')[0] ?? '')
   const [problemas, setProblemas]         = useState('')
   const [descricaoProblema, setDescricaoProblema] = useState('')
@@ -604,6 +652,8 @@ function FormularioChecklist({
     offline?: boolean
     nomeSupervisor: string
     veiculo: string
+    fotosPreview: string[]
+    fotosUrls: string[]  // URLs reais do Supabase Storage (para WhatsApp)
   } | null>(null)
   // highlight do item atual após scroll
   const [itemDestacado, setItemDestacado] = useState<string | null>(null)
@@ -641,7 +691,7 @@ function FormularioChecklist({
     void fleetTick
     const map = new Map<string, ReturnType<typeof getDisplayedFleetVehicles>[number]>()
     for (const v of getDisplayedFleetVehicles()) {
-      map.set(v.placa, v)
+      map.set(normalizePlaca(v.placa), v)
     }
     return map
   }, [fleetTick])
@@ -652,23 +702,19 @@ function FormularioChecklist({
   )
 
   const placasSugeridas = useMemo(() => {
-    const q = normalizePlacaChecklistInput(dadosVeiculo.placa ?? '')
+    const q = normalizePlaca(dadosVeiculo.placa ?? '')
     const limite = 20
     if (!q) return placasOrdenadas.slice(0, limite)
     const matches = placasOrdenadas.filter((p) => p.includes(q))
     return matches.slice(0, limite)
   }, [placasOrdenadas, dadosVeiculo.placa])
 
-  useEffect(() => {
-    setPlacaHighlightIdx((i) => {
-      if (placasSugeridas.length === 0) return 0
-      return Math.min(i, placasSugeridas.length - 1)
-    })
-  }, [placasSugeridas])
+  const placaHighlightSafe =
+    placasSugeridas.length === 0 ? 0 : Math.min(placaHighlightIdx, placasSugeridas.length - 1)
 
   const selecionarPlacaSugestao = useCallback(
     (placaEscolhida: string) => {
-      const raw = normalizePlacaChecklistInput(placaEscolhida)
+      const raw = normalizePlaca(placaEscolhida)
       const v = fleetByPlaca.get(raw)
       setDadosVeiculo((p) => ({
         ...p,
@@ -677,12 +723,12 @@ function FormularioChecklist({
       }))
       setPlacaSuggestOpen(false)
     },
-    [fleetByPlaca],
+    [fleetByPlaca, setDadosVeiculo, setPlacaSuggestOpen],
   )
 
   const onPlacaChange = useCallback(
     (rawInput: string) => {
-      const raw = normalizePlacaChecklistInput(rawInput)
+      const raw = normalizePlaca(rawInput)
       const v = fleetByPlaca.get(raw)
       setDadosVeiculo((p) => ({
         ...p,
@@ -690,16 +736,16 @@ function FormularioChecklist({
         ...(v ? { marca_modelo: v.modelo } : !raw ? { marca_modelo: '' } : {}),
       }))
     },
-    [fleetByPlaca],
+    [fleetByPlaca, setDadosVeiculo],
   )
 
   const onPlacaBlur = useCallback(() => {
     setDadosVeiculo((p) => {
-      const raw = normalizePlacaChecklistInput(p.placa ?? '')
+      const raw = normalizePlaca(p.placa ?? '')
       const v = fleetByPlaca.get(raw)
       return { ...p, placa: raw, marca_modelo: v ? v.modelo : '' }
     })
-  }, [fleetByPlaca])
+  }, [fleetByPlaca, setDadosVeiculo])
 
   const respondidos   = Object.values(respostas).filter((v) => v !== null).length
   const ncCount       = Object.values(respostas).filter((v) => v === 'nc').length
@@ -743,7 +789,7 @@ function FormularioChecklist({
       })
     }, 150)
     scrollTimers.current.push(t1)
-  }, [todosItens])
+  }, [todosItens, setFotosItem, setItemDestacado, setRespostas])
 
   const setDado = (id: string, valor: string) =>
     setDadosVeiculo((prev) => ({ ...prev, [id]: valor }))
@@ -755,29 +801,81 @@ function FormularioChecklist({
       return
     }
     setLocalidadeGeoLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude.toFixed(6)
-        const lng = pos.coords.longitude.toFixed(6)
-        setDadosVeiculo((p) => ({ ...p, localidade: `${lat}, ${lng}` }))
+
+    // Usa watchPosition para aguardar a leitura mais precisa (GPS real, não IP/Wi-Fi)
+    // Aceita a posição somente quando accuracy <= 50m ou após 10s (o que vier primeiro)
+    const ACCURACY_TARGET = 50   // metros
+    const MAX_WAIT_MS     = 10_000
+    const watchState = { id: 0 }
+    let settled = false
+
+    const finish = async (lat: number, lng: number) => {
+      if (settled) return
+      settled = true
+      navigator.geolocation.clearWatch(watchState.id)
+      setLocalidadeCoords({ lat, lng })
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=pt-BR`,
+          { headers: { 'User-Agent': 'FrotaWeb/1.0' } },
+        )
+        if (resp.ok) {
+          const data = await resp.json() as { address?: Record<string, string> }
+          const a = data.address ?? {}
+          // Rua: prioriza road, depois pedestrian (sem cair em suburb que pode ser subdivisão administrativa)
+          const rua = a.road ?? a.pedestrian ?? a.footway ?? ''
+          // Bairro: neighbourhood e city_district são mais precisos que suburb no Brasil
+          const bairro = a.neighbourhood ?? a.city_district ?? a.quarter ?? ''
+          // Cidade
+          const cidade = a.city ?? a.town ?? a.village ?? a.municipality ?? ''
+          const partes = [rua, bairro, cidade].filter(Boolean)
+          const uniq = partes.filter((v, i, arr) => arr.indexOf(v) === i)
+          const endereco = uniq.join(', ')
+          setDadosVeiculo((p) => ({ ...p, localidade: endereco || `${lat.toFixed(6)}, ${lng.toFixed(6)}` }))
+        } else {
+          setDadosVeiculo((p) => ({ ...p, localidade: `${lat.toFixed(6)}, ${lng.toFixed(6)}` }))
+        }
+      } catch {
+        setDadosVeiculo((p) => ({ ...p, localidade: `${lat.toFixed(6)}, ${lng.toFixed(6)}` }))
+      }
+      setLocalidadeGeoLoading(false)
+    }
+
+    // Fallback: usa a melhor posição obtida até aqui após MAX_WAIT_MS
+    let bestPos: GeolocationPosition | null = null
+    const fallbackTimer = setTimeout(() => {
+      if (!settled && bestPos) void finish(bestPos.coords.latitude, bestPos.coords.longitude)
+      else if (!settled) {
+        settled = true
+        navigator.geolocation.clearWatch(watchState.id)
         setLocalidadeGeoLoading(false)
+        setLocalidadeGeoErro('Tempo esgotado. Tente novamente em área aberta.')
+      }
+    }, MAX_WAIT_MS)
+
+    watchState.id = navigator.geolocation.watchPosition(
+      (pos) => {
+        bestPos = pos
+        if (pos.coords.accuracy <= ACCURACY_TARGET) {
+          clearTimeout(fallbackTimer)
+          void finish(pos.coords.latitude, pos.coords.longitude)
+        }
       },
       (err) => {
+        clearTimeout(fallbackTimer)
+        if (settled) return
+        settled = true
+        navigator.geolocation.clearWatch(watchState.id)
         setLocalidadeGeoLoading(false)
-        const code = err.code
         const msg =
-          code === 1
-            ? 'Permissão de localização negada.'
-            : code === 2
-              ? 'Posição indisponível.'
-              : code === 3
-                ? 'Tempo esgotado. Tente novamente em área aberta.'
-                : 'Não foi possível obter a localização.'
+          err.code === 1 ? 'Permissão de localização negada.'
+          : err.code === 2 ? 'Posição indisponível.'
+          : 'Tempo esgotado. Tente novamente em área aberta.'
         setLocalidadeGeoErro(msg)
       },
-      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+      { enableHighAccuracy: true, maximumAge: 0 },
     )
-  }, [])
+  }, [setDadosVeiculo, setLocalidadeCoords, setLocalidadeGeoErro, setLocalidadeGeoLoading])
 
   const addFotoItem  = (id: string, novos: File[]) =>
     setFotosItem((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), ...novos].slice(0, 3) }))
@@ -866,7 +964,8 @@ function FormularioChecklist({
       const itensNc = todosItens
         .filter((it) => respostas[it.id] === 'nc')
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: dadosVeiculo['placa'] ?? '' })
+      const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [] })
       setConcluido(true)
       setEnviando(false)
       return
@@ -920,7 +1019,8 @@ function FormularioChecklist({
       .filter((it) => respostas[it.id] === 'nc')
       .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
-    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: dadosVeiculo['placa'] ?? '' })
+    const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
+    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls })
     setConcluido(true)
     setEnviando(false)
   }
@@ -935,6 +1035,8 @@ function FormularioChecklist({
         nomeSupervisor={resultadoFinal.nomeSupervisor}
         veiculo={resultadoFinal.veiculo}
         operador={operador}
+        fotosPreview={resultadoFinal.fotosPreview}
+        fotosUrls={resultadoFinal.fotosUrls}
       />
     )
   }
@@ -1021,7 +1123,7 @@ function FormularioChecklist({
                 type="date"
                 value={dataInspecao}
                 onChange={(e) => setDataInspecao(e.target.value)}
-                className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+                className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:[color-scheme:dark] dark:text-slate-100"
               />
             </div>
             {(schema.camposExtras ?? []).map((campo) => (
@@ -1043,7 +1145,7 @@ function FormularioChecklist({
                       aria-expanded={placaSuggestOpen}
                       aria-controls={`checklist-placa-sugestoes-${schema.id}`}
                       role="combobox"
-                      value={dadosVeiculo.placa ?? ''}
+                      value={formatPlaca(dadosVeiculo.placa ?? '')}
                       onChange={(e) => {
                         onPlacaChange(e.target.value)
                         setPlacaSuggestOpen(true)
@@ -1064,15 +1166,23 @@ function FormularioChecklist({
                         }
                         if (e.key === 'ArrowDown') {
                           e.preventDefault()
-                          setPlacaHighlightIdx((i) =>
-                            placasSugeridas.length === 0 ? 0 : Math.min(placasSugeridas.length - 1, i + 1),
-                          )
+                          setPlacaHighlightIdx((i) => {
+                            const len = placasSugeridas.length
+                            if (len === 0) return 0
+                            const cur = Math.min(i, len - 1)
+                            return Math.min(len - 1, cur + 1)
+                          })
                         } else if (e.key === 'ArrowUp') {
                           e.preventDefault()
-                          setPlacaHighlightIdx((i) => Math.max(0, i - 1))
-                        } else if (e.key === 'Enter' && placaSuggestOpen && placasSugeridas[placaHighlightIdx]) {
+                          setPlacaHighlightIdx((i) => {
+                            const len = placasSugeridas.length
+                            if (len === 0) return 0
+                            const cur = Math.min(i, len - 1)
+                            return Math.max(0, cur - 1)
+                          })
+                        } else if (e.key === 'Enter' && placaSuggestOpen && placasSugeridas[placaHighlightSafe]) {
                           e.preventDefault()
-                          const p = placasSugeridas[placaHighlightIdx]
+                          const p = placasSugeridas[placaHighlightSafe]
                           if (p) selecionarPlacaSugestao(p)
                         }
                       }}
@@ -1090,9 +1200,9 @@ function FormularioChecklist({
                             <button
                               type="button"
                               role="option"
-                              aria-selected={idx === placaHighlightIdx}
+                              aria-selected={idx === placaHighlightSafe}
                               className={`flex w-full px-3 py-2 text-left text-sm font-bold uppercase tracking-wide ${
-                                idx === placaHighlightIdx
+                                idx === placaHighlightSafe
                                   ? 'bg-[#7f1022]/12 text-[#7f1022] dark:bg-rose-500/20 dark:text-rose-200'
                                   : 'text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800'
                               }`}
@@ -1100,11 +1210,20 @@ function FormularioChecklist({
                               onMouseEnter={() => setPlacaHighlightIdx(idx)}
                               onClick={() => selecionarPlacaSugestao(placaVal)}
                             >
-                              {placaVal}
+                              {formatPlaca(placaVal)}
                             </button>
                           </li>
                         ))}
                       </ul>
+                    ) : placaSuggestOpen && (dadosVeiculo.placa ?? '').length > 0 && placasSugeridas.length === 0 ? (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-xl dark:border-slate-600 dark:bg-slate-900">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Placa não encontrada no cadastro.{' '}
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">
+                            Continue digitando para usar manualmente.
+                          </span>
+                        </p>
+                      </div>
                     ) : null}
                   </div>
                 ) : campo.id === 'localidade' ? (
@@ -1137,6 +1256,22 @@ function FormularioChecklist({
                     </div>
                     {localidadeGeoErro ? (
                       <p className="text-xs font-semibold text-rose-500 dark:text-rose-400">{localidadeGeoErro}</p>
+                    ) : null}
+                    {localidadeCoords && !localidadeGeoLoading ? (
+                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                        <iframe
+                          title="Mapa da localização"
+                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${localidadeCoords.lng - 0.005},${localidadeCoords.lat - 0.005},${localidadeCoords.lng + 0.005},${localidadeCoords.lat + 0.005}&layer=mapnik&marker=${localidadeCoords.lat},${localidadeCoords.lng}`}
+                          className="h-44 w-full border-0"
+                          loading="lazy"
+                        />
+                        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 dark:bg-slate-800">
+                          <MapPin className="size-3.5 shrink-0 text-[#7f1022] dark:text-rose-400" aria-hidden />
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            {dadosVeiculo.localidade}
+                          </span>
+                        </div>
+                      </div>
                     ) : null}
                   </div>
                 ) : campo.tipo === 'select' && campo.opcoes && campo.opcoes.length > 0 ? (

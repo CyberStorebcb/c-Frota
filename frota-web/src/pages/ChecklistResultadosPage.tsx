@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SelectCustom } from '../components/ui/SelectCustom'
 import {
@@ -24,6 +24,7 @@ import {
 import { supabase, type ChecklistRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 import { useAuth } from '../auth/AuthContext'
+import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath()
@@ -86,7 +87,7 @@ function exportarCSV(rows: ChecklistRow[]) {
       TIPO_BADGE[r.tipo]?.label ?? r.tipo,
       r.nome_operador,
       r.matricula,
-      dv.placa ?? '',
+      formatPlaca(String(dv.placa ?? '')),
       dv.km_atual ?? '',
       dv.prefixo ?? '',
       dv.processo ?? '',
@@ -324,7 +325,7 @@ function Lightbox({ urls, index, onClose, onPrev, onNext }: {
 
 function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void }) {
   const schema = SCHEMA_MAP[row.tipo]
-  const placa = row.dados_veiculo?.placa ?? ''
+  const placa = formatPlaca(row.dados_veiculo?.placa ?? '')
   const km = row.dados_veiculo?.km_atual ?? ''
 
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
@@ -399,7 +400,9 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
                 <div key={k} className="text-xs">
                   <span className="font-extrabold uppercase text-slate-500">{k.replace(/_/g, ' ')}</span>
                   {': '}
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{v}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {k === 'placa' ? formatPlaca(String(v ?? '')) : v}
+                  </span>
                 </div>
               ))}
             </div>
@@ -590,7 +593,7 @@ function LinhaChecklist({
 }) {
   const [expandido, setExpandido] = useState(false)
   const schema = SCHEMA_MAP[row.tipo]
-  const placa = row.dados_veiculo?.placa ?? ''
+  const placa = formatPlaca(row.dados_veiculo?.placa ?? '')
   const km = row.dados_veiculo?.km_atual ?? ''
 
   return (
@@ -752,6 +755,7 @@ export function ChecklistResultadosPage() {
   const [ordemDir, setOrdemDir]       = useState<OrdemDir>('desc')
   const [detalhe, setDetalhe]         = useState<ChecklistRow | null>(null)
   const [sparkRows, setSparkRows]     = useState<ChecklistRow[]>([])
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   const totalPaginas = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE))
 
@@ -761,7 +765,15 @@ export function ChecklistResultadosPage() {
     if (somenteNc)  q = q.gt('nc_count', 0)
     if (dataInicio) q = q.gte('data_inspecao', dataInicio)
     if (dataFim)    q = q.lte('data_inspecao', dataFim)
-    if (query)      q = q.or(`nome_operador.ilike.%${query}%,matricula.ilike.%${query}%`)
+    if (query) {
+      const placaBusca = normalizePlaca(query)
+      const filtrosTexto = [`nome_operador.ilike.%${query}%`, `matricula.ilike.%${query}%`]
+      if (placaBusca) {
+        filtrosTexto.push(`dados_veiculo->>placa.ilike.%${placaBusca}%`)
+        filtrosTexto.push(`dados_veiculo->>placa.ilike.%${formatPlaca(placaBusca)}%`)
+      }
+      q = q.or(filtrosTexto.join(','))
+    }
     return q
   }
 
@@ -776,32 +788,6 @@ export function ChecklistResultadosPage() {
     return applyFilters(base) as ReturnType<typeof supabase.from> & { then: unknown }
   }
 
-  const carregar = async (pagina: number) => {
-    setCarregando(true)
-    setErro('')
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const [{ data, error, count }, comNcRes, semNcRes] = await Promise.all([
-        (buildQuery(pagina) as any),
-        applyFilters(supabase.from('checklists').select('id', { count: 'exact', head: true }).gt('nc_count', 0)) as any,
-        applyFilters(supabase.from('checklists').select('id', { count: 'exact', head: true }).eq('nc_count', 0)) as any,
-      ])
-      if (error) {
-        setErro('Erro ao carregar dados do Supabase.')
-      } else {
-        setRows((data as ChecklistRow[]) ?? [])
-        setTotal(count ?? 0)
-        setTotalComNc(comNcRes.count ?? 0)
-        setTotalSemNc(semNcRes.count ?? 0)
-      }
-    } catch (e) {
-      setErro('Erro inesperado ao carregar dados.')
-      console.error(e)
-    } finally {
-      setCarregando(false)
-    }
-  }
-
   const apagarChecklist = async (row: ChecklistRow) => {
     setApagando(true)
     const r1 = await supabase.from('apontamentos').delete().like('id', `${row.id}__%`)
@@ -810,47 +796,82 @@ export function ChecklistResultadosPage() {
     if (r2.error) console.error('Erro ao apagar checklist:', r2.error)
     setConfirmDelete(null)
     setApagando(false)
-    void carregar(paginaAtual)
-  }
-
-  // Carrega dados para o sparkline respeitando filtros de data ativos
-  const carregarSpark = async () => {
-    let q = supabase
-      .from('checklists')
-      .select('data_inspecao,nc_count')
-      .order('data_inspecao', { ascending: true })
-
-    if (dataInicio || dataFim) {
-      if (dataInicio) q = q.gte('data_inspecao', dataInicio) as typeof q
-      if (dataFim)    q = q.lte('data_inspecao', dataFim) as typeof q
-    } else {
-      const oitoSemanas = new Date()
-      oitoSemanas.setDate(oitoSemanas.getDate() - 56)
-      q = q.gte('data_inspecao', oitoSemanas.toISOString().slice(0, 10)) as typeof q
-    }
-
-    const { data } = await q
-    if (data) setSparkRows(data as ChecklistRow[])
+    setReloadNonce((n) => n + 1)
   }
 
   // Debounce na busca por texto
   useEffect(() => {
-    const t = setTimeout(() => setQuery(queryInput), 400)
+    const t = setTimeout(() => {
+      setQuery(queryInput)
+      setPaginaAtual(1)
+    }, 400)
     return () => clearTimeout(t)
   }, [queryInput])
 
-  // Recarrega página 1 quando filtros/ordem mudam
   useEffect(() => {
-    setPaginaAtual(1)
-    void carregar(1)
-  }, [tipoFiltro, somenteNc, dataInicio, dataFim, query, ordemCol, ordemDir]) // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false
+    void (async () => {
+      await Promise.resolve()
+      if (cancelled) return
+      setCarregando(true)
+      setErro('')
+      try {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const [{ data, error, count }, comNcRes, semNcRes] = await Promise.all([
+          (buildQuery(paginaAtual) as any),
+          applyFilters(supabase.from('checklists').select('id', { count: 'exact', head: true }).gt('nc_count', 0)) as any,
+          applyFilters(supabase.from('checklists').select('id', { count: 'exact', head: true }).eq('nc_count', 0)) as any,
+        ])
+        /* eslint-enable @typescript-eslint/no-explicit-any */
+        if (cancelled) return
+        if (error) {
+          setErro('Erro ao carregar dados do Supabase.')
+        } else {
+          setRows((data as ChecklistRow[]) ?? [])
+          setTotal(count ?? 0)
+          setTotalComNc(comNcRes.count ?? 0)
+          setTotalSemNc(semNcRes.count ?? 0)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setErro('Erro inesperado ao carregar dados.')
+          console.error(e)
+        }
+      } finally {
+        if (!cancelled) setCarregando(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [paginaAtual, tipoFiltro, somenteNc, dataInicio, dataFim, query, ordemCol, ordemDir, reloadNonce]) // eslint-disable-line react-hooks/exhaustive-deps -- buildQuery/applyFilters só refletem esses filtros
 
-  // Carrega nova página quando paginaAtual muda
   useEffect(() => {
-    void carregar(paginaAtual)
-  }, [paginaAtual]) // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false
+    void (async () => {
+      let q = supabase
+        .from('checklists')
+        .select('data_inspecao,nc_count')
+        .order('data_inspecao', { ascending: true })
 
-  useEffect(() => { void carregarSpark() }, [dataInicio, dataFim]) // eslint-disable-line react-hooks/exhaustive-deps
+      if (dataInicio || dataFim) {
+        if (dataInicio) q = q.gte('data_inspecao', dataInicio) as typeof q
+        if (dataFim) q = q.lte('data_inspecao', dataFim) as typeof q
+      } else {
+        const oitoSemanas = new Date()
+        oitoSemanas.setDate(oitoSemanas.getDate() - 56)
+        q = q.gte('data_inspecao', oitoSemanas.toISOString().slice(0, 10)) as typeof q
+      }
+
+      const { data } = await q
+      if (cancelled) return
+      await Promise.resolve()
+      if (data) setSparkRows(data as ChecklistRow[])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [dataInicio, dataFim])
 
   const irParaPagina = (p: number) => {
     if (p < 1 || p > totalPaginas || p === paginaAtual) return
@@ -859,6 +880,7 @@ export function ChecklistResultadosPage() {
   }
 
   const toggleOrdem = (col: OrdemCol) => {
+    setPaginaAtual(1)
     if (ordemCol === col) {
       setOrdemDir((d) => (d === 'desc' ? 'asc' : 'desc'))
     } else {
@@ -866,6 +888,8 @@ export function ChecklistResultadosPage() {
       setOrdemDir('desc')
     }
   }
+
+  const semanas = calcSemanas(sparkRows, (dataInicio || dataFim) ? Infinity : 8)
 
   const handleExportar = async () => {
     setExportando(true)
@@ -1084,11 +1108,6 @@ export function ChecklistResultadosPage() {
 
   const filtrados = rows  // filtro de texto já vai pro servidor
   const totalNc = filtrados.reduce((acc, r) => acc + r.nc_count, 0)
-  const semanas = useMemo(() => {
-    // Com filtro de período usa todas as semanas; sem filtro limita a 8
-    const n = (dataInicio || dataFim) ? Infinity : 8
-    return calcSemanas(sparkRows, n)
-  }, [sparkRows, dataInicio, dataFim])
 
   return (
     <div className="space-y-5">
@@ -1139,7 +1158,7 @@ export function ChecklistResultadosPage() {
           </button>
           <button
             type="button"
-            onClick={() => void carregar(paginaAtual)}
+            onClick={() => setReloadNonce((n) => n + 1)}
             disabled={carregando}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
           >
@@ -1257,21 +1276,21 @@ export function ChecklistResultadosPage() {
                   <input
                     value={queryInput}
                     onChange={(e) => setQueryInput(e.target.value)}
-                    placeholder="Operador, matrícula..."
+                    placeholder="Operador, matrícula ou placa..."
                     className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100"
                   />
                 </div>
 
                 <SelectCustom
                   value={tipoFiltro}
-                  onChange={setTipoFiltro}
+                  onChange={(v) => { setTipoFiltro(v); setPaginaAtual(1) }}
                   options={TIPOS.map((t) => ({ value: t.id, label: t.label }))}
                   placeholder="Todos"
                 />
 
                 <button
                   type="button"
-                  onClick={() => setSomenteNc((v) => !v)}
+                  onClick={() => { setSomenteNc((v) => !v); setPaginaAtual(1) }}
                   className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-extrabold transition-all duration-150 active:scale-95 ${
                     somenteNc
                       ? 'border-rose-300 bg-rose-50 text-rose-600 shadow-sm shadow-rose-200/60 hover:border-rose-400 hover:bg-rose-100 hover:shadow-rose-300/50 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/35'
@@ -1290,8 +1309,8 @@ export function ChecklistResultadosPage() {
                   <input
                     type="date"
                     value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+                    onChange={(e) => { setDataInicio(e.target.value); setPaginaAtual(1) }}
+                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
                   />
                 </div>
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
@@ -1299,14 +1318,22 @@ export function ChecklistResultadosPage() {
                   <input
                     type="date"
                     value={dataFim}
-                    onChange={(e) => setDataFim(e.target.value)}
-                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark::[color-scheme:dark]"
+                    onChange={(e) => { setDataFim(e.target.value); setPaginaAtual(1) }}
+                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
                   />
                 </div>
                 {(dataInicio || dataFim || tipoFiltro || somenteNc || queryInput) && (
                   <button
                     type="button"
-                    onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro(''); setSomenteNc(false); setQueryInput(''); setQuery('') }}
+                    onClick={() => {
+                      setDataInicio('')
+                      setDataFim('')
+                      setTipoFiltro('')
+                      setSomenteNc(false)
+                      setQueryInput('')
+                      setQuery('')
+                      setPaginaAtual(1)
+                    }}
                     className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
                   >
                     <X size={12} />
@@ -1331,7 +1358,7 @@ export function ChecklistResultadosPage() {
             <p className="text-sm font-extrabold text-rose-500">{erro}</p>
             <button
               type="button"
-              onClick={() => void carregar(paginaAtual)}
+              onClick={() => setReloadNonce((n) => n + 1)}
               className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300"
             >
               Tentar novamente
@@ -1475,7 +1502,7 @@ export function ChecklistResultadosPage() {
             <div className="mb-5 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
               <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{confirmDelete.nome_operador}</div>
               <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {TIPO_BADGE[confirmDelete.tipo]?.label ?? confirmDelete.tipo} · {confirmDelete.dados_veiculo?.placa ?? '—'} · {formatDateBR(confirmDelete.data_inspecao)}
+                {TIPO_BADGE[confirmDelete.tipo]?.label ?? confirmDelete.tipo} · {formatPlaca(confirmDelete.dados_veiculo?.placa ?? '') || '—'} · {formatDateBR(confirmDelete.data_inspecao)}
               </div>
             </div>
             <div className="flex gap-2">

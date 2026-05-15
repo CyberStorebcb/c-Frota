@@ -29,6 +29,14 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, 'true') } catch { /* ignore */ }
   }, [])
 
+  const closeMenuWhenClickingContent = useCallback(() => {
+    if (sidebarOpen) closeSidebar()
+
+    // No desktop, "fechar" o menu lateral equivale a colapsar a sidebar expandida.
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches
+    if (isDesktop && !sidebarCollapsed) collapseSidebar()
+  }, [closeSidebar, collapseSidebar, sidebarCollapsed, sidebarOpen])
+
   return (
     <div className="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="flex h-full w-full">
@@ -45,10 +53,7 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
           />
           <main
             className="flex h-[calc(100%-56px)] min-h-0 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
-            onClick={() => {
-              if (sidebarOpen) closeSidebar()
-              if (!sidebarCollapsed) collapseSidebar()
-            }}
+            onClick={closeMenuWhenClickingContent}
           >
             {children}
           </main>
