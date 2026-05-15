@@ -1,8 +1,8 @@
-const CACHE_NAME = 'frota-checklists-v8'
+const CACHE_NAME = 'frota-checklists-v9'
 const BACKGROUND_SYNC_TAG = 'frota-sync-checklists'
+
+// Apenas o shell estático que raramente muda
 const APP_SHELL = [
-  '/',
-  '/checklist',
   '/manifest.webmanifest',
   '/branding/app-icon.png',
   '/branding/favicon.png',
@@ -12,59 +12,100 @@ const APP_SHELL = [
   '/icons.svg',
 ]
 
+// ---------------------------------------------------------------------------
+// Install — pré-cacheia apenas o shell estático; JS/CSS têm hash no nome,
+// serão cacheados individualmente pelo fetch handler.
+// ---------------------------------------------------------------------------
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting()),
+      .then(() => self.skipWaiting()),  // ativa imediatamente sem esperar tabs fecharem
   )
 })
 
+// ---------------------------------------------------------------------------
+// Activate — remove caches antigos e notifica clientes sobre nova versão.
+// ---------------------------------------------------------------------------
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+      )
+      .then(() => self.clients.claim())
+      .then(async () => {
+        // Avisa todos os clientes abertos que há uma nova versão disponível
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+        for (const client of clients) {
+          client.postMessage({ type: 'SW_UPDATED' })
+        }
+      }),
   )
 })
 
+// ---------------------------------------------------------------------------
+// Fetch — estratégia por tipo de recurso:
+//   • Navegação (HTML): network-first com fallback offline
+//   • Assets com hash (JS/CSS): cache-first (hash garante frescor)
+//   • Outros: network-first com cache como fallback
+// ---------------------------------------------------------------------------
 self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
+
+  // Ignora requisições externas (Supabase, Nominatim, etc.)
   if (url.origin !== self.location.origin) return
 
+  // Navegação — network-first, fallback para / em offline
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put('/checklist', copy))
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
           return response
         })
         .catch(async () => {
-          return (await caches.match('/checklist')) || caches.match('/')
+          const cached = await caches.match(request)
+          return cached || caches.match('/') || new Response('Offline', { status: 503 })
         }),
     )
     return
   }
 
+  // Assets com hash no nome (ex: index-Abc123.js) — cache-first
+  const hasHash = /\.[0-9a-f]{8,}\.(js|css)$/i.test(url.pathname)
+  if (hasHash) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached
+        return fetch(request).then((response) => {
+          const copy = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
+          return response
+        })
+      }),
+    )
+    return
+  }
+
+  // Demais recursos — network-first com fallback do cache
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached
-      return fetch(request).then((response) => {
+    fetch(request)
+      .then((response) => {
         const copy = response.clone()
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
         return response
       })
-    }),
+      .catch(() => caches.match(request)),
   )
 })
 
 // ---------------------------------------------------------------------------
-// Background Sync — dispara quando o dispositivo recupera conexão,
-// mesmo com o app fechado (Android/Chrome).
+// Background Sync
 // ---------------------------------------------------------------------------
 self.addEventListener('sync', (event) => {
   if (event.tag === BACKGROUND_SYNC_TAG) {
@@ -72,26 +113,17 @@ self.addEventListener('sync', (event) => {
   }
 })
 
-// Avisa todos os clientes abertos para disparar a sincronização
 async function notifyClientsToSync() {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  if (clients.length > 0) {
-    // App está aberto — avisa para sincronizar
-    for (const client of clients) {
-      client.postMessage({ type: 'SW_BACKGROUND_SYNC' })
-    }
+  for (const client of clients) {
+    client.postMessage({ type: 'SW_BACKGROUND_SYNC' })
   }
-  // Se não houver clientes abertos, a sincronização acontecerá
-  // quando o usuário abrir o app (OfflineSyncProvider cuida disso)
 }
 
-// Recebe mensagem do app para registrar um sync tag
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'REGISTER_BACKGROUND_SYNC') {
     if ('SyncManager' in self) {
-      self.registration.sync.register(BACKGROUND_SYNC_TAG).catch(() => {
-        // Background Sync não suportado ou falhou — sem problema, cai no fallback
-      })
+      self.registration.sync.register(BACKGROUND_SYNC_TAG).catch(() => {})
     }
   }
 })

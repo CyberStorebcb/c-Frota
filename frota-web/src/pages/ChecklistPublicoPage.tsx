@@ -840,29 +840,36 @@ function FormularioChecklist({
       settled = true
       navigator.geolocation.clearWatch(watchState.id)
       setLocalidadeCoords({ lat, lng })
+
+      const coordsStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+
+      // Tenta geocoding reverso apenas se online
+      if (!navigator.onLine) {
+        setDadosVeiculo((p) => ({ ...p, localidade: coordsStr }))
+        setLocalidadeGeoLoading(false)
+        return
+      }
+
       try {
         const resp = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=pt-BR`,
-          { headers: { 'User-Agent': 'FrotaWeb/1.0' } },
+          { headers: { 'User-Agent': 'FrotaWeb/1.0' }, signal: AbortSignal.timeout(8_000) },
         )
         if (resp.ok) {
           const data = await resp.json() as { address?: Record<string, string> }
           const a = data.address ?? {}
-          // Rua: prioriza road, depois pedestrian (sem cair em suburb que pode ser subdivisão administrativa)
           const rua = a.road ?? a.pedestrian ?? a.footway ?? ''
-          // Bairro: neighbourhood e city_district são mais precisos que suburb no Brasil
           const bairro = a.neighbourhood ?? a.city_district ?? a.quarter ?? ''
-          // Cidade
           const cidade = a.city ?? a.town ?? a.village ?? a.municipality ?? ''
           const partes = [rua, bairro, cidade].filter(Boolean)
           const uniq = partes.filter((v, i, arr) => arr.indexOf(v) === i)
-          const endereco = uniq.join(', ')
-          setDadosVeiculo((p) => ({ ...p, localidade: endereco || `${lat.toFixed(6)}, ${lng.toFixed(6)}` }))
+          setDadosVeiculo((p) => ({ ...p, localidade: uniq.join(', ') || coordsStr }))
         } else {
-          setDadosVeiculo((p) => ({ ...p, localidade: `${lat.toFixed(6)}, ${lng.toFixed(6)}` }))
+          setDadosVeiculo((p) => ({ ...p, localidade: coordsStr }))
         }
       } catch {
-        setDadosVeiculo((p) => ({ ...p, localidade: `${lat.toFixed(6)}, ${lng.toFixed(6)}` }))
+        // Sem internet ou timeout — salva coordenadas brutas
+        setDadosVeiculo((p) => ({ ...p, localidade: coordsStr }))
       }
       setLocalidadeGeoLoading(false)
     }
@@ -1354,12 +1361,22 @@ function FormularioChecklist({
                     ) : null}
                     {localidadeCoords && !localidadeGeoLoading ? (
                       <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                        <iframe
-                          title="Mapa da localização"
-                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${localidadeCoords.lng - 0.005},${localidadeCoords.lat - 0.005},${localidadeCoords.lng + 0.005},${localidadeCoords.lat + 0.005}&layer=mapnik&marker=${localidadeCoords.lat},${localidadeCoords.lng}`}
-                          className="h-44 w-full border-0"
-                          loading="lazy"
-                        />
+                        {navigator.onLine ? (
+                          <iframe
+                            title="Mapa da localização"
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${localidadeCoords.lng - 0.005},${localidadeCoords.lat - 0.005},${localidadeCoords.lng + 0.005},${localidadeCoords.lat + 0.005}&layer=mapnik&marker=${localidadeCoords.lat},${localidadeCoords.lng}`}
+                            className="h-44 w-full border-0"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-44 flex-col items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800">
+                            <MapPin className="size-8 text-slate-400 dark:text-slate-500" />
+                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Mapa indisponível offline</p>
+                            <p className="font-mono text-xs text-slate-400 dark:text-slate-500">
+                              {localidadeCoords.lat.toFixed(6)}, {localidadeCoords.lng.toFixed(6)}
+                            </p>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 dark:bg-slate-800">
                           <MapPin className="size-3.5 shrink-0 text-[#7f1022] dark:text-rose-400" aria-hidden />
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
