@@ -23,9 +23,10 @@ import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../
 import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select } from '../components/ui/Select'
 import {
-  getVehicleOperationalStatusRows,
   getVehicleOperationalStatusSummary,
+  getVehicleOperationalStatusRowsWithLocals,
 } from '../frota/vehicleOperationalStatus'
+import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { supabase } from '../lib/supabase'
@@ -268,9 +269,21 @@ export function DashboardPage() {
   const baseEfetiva =
     filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
 
+  // Reage a veículos adicionados/removidos pelo admin no Registro
+  const [fleetVehicles, setFleetVehicles] = useState(() => getDisplayedFleetVehicles())
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'frota.vehicles.registry' || e.key === null) {
+        setFleetVehicles(getDisplayedFleetVehicles())
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
   const placaParaBaseOperacional = useMemo(() => {
     const m = new Map<string, string>()
-    for (const r of getVehicleOperationalStatusRows()) {
+    for (const r of getVehicleOperationalStatusRowsWithLocals(fleetVehicles)) {
       m.set(r.placa.trim().toUpperCase(), (r.base ?? '').trim())
     }
     return m
@@ -364,10 +377,11 @@ export function DashboardPage() {
       : '—'
 
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
+    const todasLinhas = getVehicleOperationalStatusRowsWithLocals(fleetVehicles)
     const linhasOperacionais =
       baseEfetiva === 'todos'
-        ? getVehicleOperationalStatusRows()
-        : getVehicleOperationalStatusRows().filter((r) => r.base.toLowerCase().includes(baseEfetiva))
+        ? todasLinhas
+        : todasLinhas.filter((r) => r.base.toLowerCase().includes(baseEfetiva))
     const resumoBase = getVehicleOperationalStatusSummary(linhasOperacionais)
     const ativosOperacionais =
       (resumoBase.find((s) => s.label === 'ATIVOS')?.count ?? 0) +
@@ -424,7 +438,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDia, checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, baseEfetiva])
+  }, [checklistsPorDia, checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, baseEfetiva, fleetVehicles])
 
   const chartUi = useMemo(
     () => ({

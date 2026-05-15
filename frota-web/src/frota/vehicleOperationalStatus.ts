@@ -59,6 +59,22 @@ export function getVehicleOperationalStatusRows() {
   }))
 }
 
+/**
+ * Versão que inclui veículos adicionados localmente pelo admin.
+ * Usada pelo Dashboard e pelo Registro para manter o KPI sincronizado.
+ */
+export function getVehicleOperationalStatusRowsWithLocals(
+  displayedVehicles: { placa: string; prefixo: string; base: string }[],
+) {
+  return displayedVehicles.map((v) => ({
+    placa: v.placa,
+    prefixo: v.prefixo ?? '',
+    base: v.base ?? '',
+    processo: '',
+    statusOperacional: statusOperacionalCatalogo(v.placa, v.prefixo ?? ''),
+  }))
+}
+
 export type VehicleOperationalStatusRow = ReturnType<typeof getVehicleOperationalStatusRows>[number]
 
 export function getVehicleOperationalStatusSummary(rowsParam?: VehicleOperationalStatusRow[]) {

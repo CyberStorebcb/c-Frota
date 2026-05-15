@@ -216,14 +216,18 @@ export function ManagePage() {
     }
     const q = query.trim().toLowerCase()
     if (q) {
-      list = list.filter(
-        (r) =>
+      const qNorm = q.replace(/[-\s]/g, '')
+      list = list.filter((r) => {
+        const labelNorm = r.veiculoLabel.toLowerCase().replace(/[-\s]/g, '')
+        return (
           r.defeito.toLowerCase().includes(q) ||
           r.veiculoLabel.toLowerCase().includes(q) ||
+          labelNorm.includes(qNorm) ||
           r.prefixo.toLowerCase().includes(q) ||
           r.base.toLowerCase().includes(q) ||
-          r.responsavel.toLowerCase().includes(q),
-      )
+          r.responsavel.toLowerCase().includes(q)
+        )
+      })
     }
     return [...list].sort(
       (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),

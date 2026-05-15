@@ -517,7 +517,7 @@ export function RegistroVeiculosPage() {
     () => ({
       total: vehicles.length,
       ativos: vehicles.filter(
-        (v) => v.status === 'ATIVO' && isOperacionalAtivosDashboardKpi(v.placa, v.prefixo),
+        (v) => isOperacionalAtivosDashboardKpi(v.placa, v.prefixo),
       ).length,
       manutencao: vehicles.filter((v) => v.emManutencao).length,
     }),

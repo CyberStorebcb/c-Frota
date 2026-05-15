@@ -637,6 +637,7 @@ function FormularioChecklist({
   const [localidadeGeoLoading, setLocalidadeGeoLoading] = useState(false)
   const [localidadeGeoErro, setLocalidadeGeoErro] = useState('')
   const [localidadeCoords, setLocalidadeCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [gpsPermissao, setGpsPermissao] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking')
   const [dataInspecao, setDataInspecao]   = useState(() => new Date().toISOString().split('T')[0] ?? '')
   const [problemas, setProblemas]         = useState('')
   const [descricaoProblema, setDescricaoProblema] = useState('')
@@ -664,6 +665,31 @@ function FormularioChecklist({
   const [fleetTick, setFleetTick] = useState(0)
   const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
   const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
+
+  // Verifica permissão de GPS ao carregar e monitora mudanças
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsPermissao('granted') // sem geolocation, não bloqueia — campo manual disponível
+      return
+    }
+    if (!navigator.permissions) {
+      setGpsPermissao('prompt') // API não disponível, trata como não decidido
+      return
+    }
+    let permStatus: PermissionStatus | null = null
+    navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+      permStatus = status
+      setGpsPermissao(status.state as 'prompt' | 'granted' | 'denied')
+      status.onchange = () => {
+        setGpsPermissao(status.state as 'prompt' | 'granted' | 'denied')
+        // Se acabou de ser concedida, limpa o erro
+        if (status.state === 'granted') setLocalidadeGeoErro('')
+      }
+    }).catch(() => setGpsPermissao('prompt'))
+    return () => {
+      if (permStatus) permStatus.onchange = null
+    }
+  }, [])
 
   useEffect(() => {
     const bump = () => setFleetTick((t) => t + 1)
@@ -868,8 +894,8 @@ function FormularioChecklist({
         navigator.geolocation.clearWatch(watchState.id)
         setLocalidadeGeoLoading(false)
         const msg =
-          err.code === 1 ? 'Permissão de localização negada.'
-          : err.code === 2 ? 'Posição indisponível.'
+          err.code === 1 ? 'Permissão negada. Toque no cadeado da barra de endereço e libere o acesso à localização.'
+          : err.code === 2 ? 'Posição indisponível. Verifique se o GPS está ativado.'
           : 'Tempo esgotado. Tente novamente em área aberta.'
         setLocalidadeGeoErro(msg)
       },
@@ -1038,6 +1064,53 @@ function FormularioChecklist({
         fotosPreview={resultadoFinal.fotosPreview}
         fotosUrls={resultadoFinal.fotosUrls}
       />
+    )
+  }
+
+  // Aguarda verificação de permissão (evita piscar)
+  if (gpsPermissao === 'checking') {
+    return (
+      <div className={`flex min-h-dvh items-center justify-center ${CHECKLIST_PAGE_BG}`}>
+        <Loader2 className="size-8 animate-spin text-rose-500" />
+      </div>
+    )
+  }
+
+  // Modal de permissão de GPS negada
+  if (gpsPermissao === 'denied') {
+    return (
+      <div className={`flex min-h-dvh flex-col items-center justify-center gap-6 px-6 ${CHECKLIST_PAGE_BG}`}>
+        <div className="w-full max-w-sm rounded-2xl border border-rose-300/40 bg-white/95 p-6 shadow-2xl dark:border-rose-800/40 dark:bg-slate-900/95">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 dark:bg-rose-950/60">
+            <MapPin className="size-7 text-rose-600 dark:text-rose-400" />
+          </div>
+          <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">
+            Localização bloqueada
+          </h1>
+          <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600 dark:text-slate-400">
+            O checklist requer acesso à sua localização para registrar onde a inspeção foi realizada. Você precisa liberar o GPS nas configurações do navegador.
+          </p>
+
+          <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-800/60">
+            <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">Como liberar:</p>
+            <ol className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-black text-rose-600 dark:bg-rose-950 dark:text-rose-400">1</span>Toque no <strong>cadeado</strong> na barra de endereço</li>
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-black text-rose-600 dark:bg-rose-950 dark:text-rose-400">2</span>Toque em <strong>Permissões</strong> ou <strong>Configurações do site</strong></li>
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-black text-rose-600 dark:bg-rose-950 dark:text-rose-400">3</span>Em <strong>Localização</strong>, selecione <strong>Permitir</strong></li>
+              <li className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-black text-rose-600 dark:bg-rose-950 dark:text-rose-400">4</span>Volte para esta página e recarregue</li>
+            </ol>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-extrabold text-white shadow hover:bg-rose-700 active:scale-95"
+          >
+            <MapPin className="size-4 shrink-0" />
+            Já liberei — recarregar
+          </button>
+        </div>
+      </div>
     )
   }
 
@@ -1255,7 +1328,29 @@ function FormularioChecklist({
                       </button>
                     </div>
                     {localidadeGeoErro ? (
-                      <p className="text-xs font-semibold text-rose-500 dark:text-rose-400">{localidadeGeoErro}</p>
+                      localidadeGeoErro.startsWith('Permissão negada') ? (
+                        <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 dark:border-rose-800/60 dark:bg-rose-950/40">
+                          <p className="mb-2 text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                            GPS bloqueado — como liberar:
+                          </p>
+                          <ol className="space-y-1 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                            <li>1. Toque no <strong>cadeado</strong> na barra de endereço do navegador</li>
+                            <li>2. Toque em <strong>Permissões</strong> ou <strong>Configurações do site</strong></li>
+                            <li>3. Em <strong>Localização</strong>, selecione <strong>Permitir</strong></li>
+                            <li>4. Recarregue a página e tente novamente</li>
+                          </ol>
+                          <button
+                            type="button"
+                            onClick={pedirLocalizacao}
+                            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-extrabold text-white hover:bg-rose-700 dark:bg-rose-700 dark:hover:bg-rose-600"
+                          >
+                            <MapPin className="size-3.5 shrink-0" aria-hidden />
+                            Tentar novamente
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs font-semibold text-rose-500 dark:text-rose-400">{localidadeGeoErro}</p>
+                      )
                     ) : null}
                     {localidadeCoords && !localidadeGeoLoading ? (
                       <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
