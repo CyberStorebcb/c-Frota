@@ -618,30 +618,75 @@ function SupervisorField({ value, onChange }: { value: string; onChange: (v: str
 // ---------------------------------------------------------------------------
 // Formulário principal
 // ---------------------------------------------------------------------------
+const FORM_SESSION_KEY = 'frota.checklist.form'
+
+function readFormDraft(schemaId: string) {
+  try {
+    const raw = sessionStorage.getItem(FORM_SESSION_KEY)
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    if (d?.schemaId !== schemaId) return null
+    return d as {
+      schemaId: string
+      respostas: Record<string, Resposta>
+      observacoes: Record<string, string>
+      dadosVeiculo: Record<string, string>
+      dataInspecao: string
+      supervisor: string
+      problemas: string
+      descricaoProblema: string
+      localidadeCoords: { lat: number; lng: number } | null
+    }
+  } catch { return null }
+}
+
+function saveFormDraft(schemaId: string, data: {
+  respostas: Record<string, Resposta>
+  observacoes: Record<string, string>
+  dadosVeiculo: Record<string, string>
+  dataInspecao: string
+  supervisor: string
+  problemas: string
+  descricaoProblema: string
+  localidadeCoords: { lat: number; lng: number } | null
+}) {
+  try { sessionStorage.setItem(FORM_SESSION_KEY, JSON.stringify({ schemaId, ...data })) }
+  catch { /* storage cheio */ }
+}
+
+function clearFormDraft() {
+  try { sessionStorage.removeItem(FORM_SESSION_KEY) }
+  catch { /* sem acesso */ }
+}
+
 function FormularioChecklist({
   schema,
   operador,
   matricula,
+  onConcluido,
 }: {
   schema: ChecklistSchemaDef
   operador: string
   matricula: string
+  onConcluido?: () => void
 }) {
   const todosItens = schema.grupos.flatMap((g) => g.itens)
   const totalItens = todosItens.length
 
-  const [respostas, setRespostas]         = useState<Record<string, Resposta>>({})
-  const [observacoes, setObservacoes]     = useState<Record<string, string>>({})
+  const draft = readFormDraft(schema.id)
+
+  const [respostas, setRespostas]         = useState<Record<string, Resposta>>(draft?.respostas ?? {})
+  const [observacoes, setObservacoes]     = useState<Record<string, string>>(draft?.observacoes ?? {})
   const [fotosItem, setFotosItem]         = useState<Record<string, File[]>>({})
-  const [dadosVeiculo, setDadosVeiculo]   = useState<Record<string, string>>({})
+  const [dadosVeiculo, setDadosVeiculo]   = useState<Record<string, string>>(draft?.dadosVeiculo ?? {})
   const [localidadeGeoLoading, setLocalidadeGeoLoading] = useState(false)
   const [localidadeGeoErro, setLocalidadeGeoErro] = useState('')
-  const [localidadeCoords, setLocalidadeCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [localidadeCoords, setLocalidadeCoords] = useState<{ lat: number; lng: number } | null>(draft?.localidadeCoords ?? null)
   const [gpsPermissao, setGpsPermissao] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking')
-  const [dataInspecao, setDataInspecao]   = useState(() => new Date().toISOString().split('T')[0] ?? '')
-  const [problemas, setProblemas]         = useState('')
-  const [descricaoProblema, setDescricaoProblema] = useState('')
-  const [supervisor, setSupervisor]       = useState('')
+  const [dataInspecao, setDataInspecao]   = useState(draft?.dataInspecao ?? new Date().toISOString().split('T')[0] ?? '')
+  const [problemas, setProblemas]         = useState(draft?.problemas ?? '')
+  const [descricaoProblema, setDescricaoProblema] = useState(draft?.descricaoProblema ?? '')
+  const [supervisor, setSupervisor]       = useState(draft?.supervisor ?? '')
   const [arquivos, setArquivos]           = useState<File[]>([])
   const [enviando, setEnviando]           = useState(false)
   const [erroEnvio, setErroEnvio]         = useState('')
@@ -665,6 +710,15 @@ function FormularioChecklist({
   const [fleetTick, setFleetTick] = useState(0)
   const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
   const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
+
+  // Auto-save do rascunho no sessionStorage a cada mudança relevante
+  useEffect(() => {
+    if (concluido) return // não salva após concluir
+    saveFormDraft(schema.id, {
+      respostas, observacoes, dadosVeiculo,
+      dataInspecao, supervisor, problemas, descricaoProblema, localidadeCoords,
+    })
+  }, [schema.id, respostas, observacoes, dadosVeiculo, dataInspecao, supervisor, problemas, descricaoProblema, localidadeCoords, concluido])
 
   // Verifica permissão de GPS ao carregar e monitora mudanças
   useEffect(() => {
@@ -999,6 +1053,8 @@ function FormularioChecklist({
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
       const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
       setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [] })
+      clearFormDraft()
+      onConcluido?.()
       setConcluido(true)
       setEnviando(false)
       return
@@ -1054,6 +1110,8 @@ function FormularioChecklist({
 
     const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
     setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls })
+    clearFormDraft()
+    onConcluido?.()
     setConcluido(true)
     setEnviando(false)
   }
@@ -1705,13 +1763,45 @@ function FormularioChecklist({
 // ---------------------------------------------------------------------------
 // Página raiz
 // ---------------------------------------------------------------------------
+const DRAFT_SESSION_KEY = 'frota.checklist.draft'
+
+function readDraftSession(): { tipo: string; operador: string; matricula: string } | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_SESSION_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
+
+function writeDraftSession(tipo: string, operador: string, matricula: string) {
+  try { sessionStorage.setItem(DRAFT_SESSION_KEY, JSON.stringify({ tipo, operador, matricula })) }
+  catch { /* storage cheio */ }
+}
+
+function clearDraftSession() {
+  try { sessionStorage.removeItem(DRAFT_SESSION_KEY) }
+  catch { /* sem acesso */ }
+}
+
 export function ChecklistPublicoPage() {
-  const [tipoSelecionado, setTipoSelecionado] = useState<string | null>(null)
-  const [operador, setOperador]   = useState<string | null>(null)
-  const [matricula, setMatricula] = useState<string | null>(null)
+  const draft = readDraftSession()
+  const [tipoSelecionado, setTipoSelecionado] = useState<string | null>(draft?.tipo ?? null)
+  const [operador, setOperador]   = useState<string | null>(draft?.operador ?? null)
+  const [matricula, setMatricula] = useState<string | null>(draft?.matricula ?? null)
+
+  const handleTipo = (tipo: string) => {
+    setTipoSelecionado(tipo)
+    if (operador && matricula) writeDraftSession(tipo, operador, matricula)
+  }
+
+  const handleOperador = (nome: string, mat: string) => {
+    setOperador(nome)
+    setMatricula(mat)
+    if (tipoSelecionado) writeDraftSession(tipoSelecionado, nome, mat)
+  }
 
   if (!tipoSelecionado) {
-    return <TelaEscolhaChecklist onSelecionar={setTipoSelecionado} />
+    return <TelaEscolhaChecklist onSelecionar={handleTipo} />
   }
 
   const schema = SCHEMA_MAP[tipoSelecionado]
@@ -1723,10 +1813,17 @@ export function ChecklistPublicoPage() {
     return (
       <TelaIdentificacao
         schema={schema}
-        onConfirmar={(n, m) => { setOperador(n); setMatricula(m) }}
+        onConfirmar={handleOperador}
       />
     )
   }
 
-  return <FormularioChecklist schema={schema} operador={operador} matricula={matricula} />
+  return (
+    <FormularioChecklist
+      schema={schema}
+      operador={operador}
+      matricula={matricula}
+      onConcluido={clearDraftSession}
+    />
+  )
 }
