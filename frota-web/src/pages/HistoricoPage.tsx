@@ -20,6 +20,20 @@ function formatMoneyBRL(v: number | null) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 }
 
+/** Ordenação do histórico: data + hora local da resolução (mais recente primeiro). */
+function resolvedAtMs(dataResolvido: string, horaResolvido: string | null): number {
+  const [yy, mm, dd] = dataResolvido.split('-').map(Number)
+  let hh = 0
+  let min = 0
+  const h = horaResolvido?.trim()
+  if (h) {
+    const p = h.split(':').map(Number)
+    hh = p[0] ?? 0
+    min = p[1] ?? 0
+  }
+  return new Date(yy || 1970, (mm || 1) - 1, dd || 1, hh, min, 0, 0).getTime()
+}
+
 function fileSafeName(s: string) {
   return s
     .normalize('NFD')
@@ -65,6 +79,18 @@ async function urlToPngData(url: string): Promise<{ data: string; w: number; h: 
   ctx.drawImage(img, 0, 0)
   const png = canvas.toDataURL('image/png')
   return { data: png, w: img.width, h: img.height }
+}
+
+/** Data URL (reparo) ou URL http(s) (fotos da NC no storage) → raster para jsPDF. */
+async function rasterSrcForPdf(src: string): Promise<{ data: string; kind: 'JPEG' | 'PNG'; w: number; h: number }> {
+  const s = src.trim()
+  if (!s) throw new Error('empty src')
+  if (s.startsWith('data:')) {
+    const jpeg = await dataUrlToJpeg(s)
+    return { data: jpeg.data, kind: 'JPEG', w: jpeg.w, h: jpeg.h }
+  }
+  const png = await urlToPngData(s)
+  return { data: png.data, kind: 'PNG', w: png.w, h: png.h }
 }
 
 function dataUrlMime(dataUrl: string): string {
@@ -165,11 +191,22 @@ export function HistoricoPage() {
     if (dataFim) {
       list = list.filter((r) => !!r.dataResolvido && r.dataResolvido <= dataFim)
     }
-    return [...list].sort(
-      (a, b) =>
-        new Date(b.dataResolvido!).getTime() - new Date(a.dataResolvido!).getTime(),
-    )
+    return [...list].sort((a, b) => {
+      const tb = resolvedAtMs(b.dataResolvido!, b.horaResolvido)
+      const ta = resolvedAtMs(a.dataResolvido!, a.horaResolvido)
+      if (tb !== ta) return tb - ta
+      return b.id.localeCompare(a.id)
+    })
   }, [rows, query, valorMin, valorMax, dataInicio, dataFim])
+
+  const totalGastoHistorico = useMemo(() => {
+    let s = 0
+    for (const r of historico) {
+      const v = r.reparoValor
+      if (v != null && Number.isFinite(v)) s += v
+    }
+    return s
+  }, [historico])
 
   const gerarPdf = async (r: (typeof historico)[number]) => {
     const { jsPDF } = await import('jspdf')
@@ -405,8 +442,8 @@ export function HistoricoPage() {
     doc.text('DADOS DA MANUTENÇÃO', boxX + (boxW * 3) / 4, y + 18, { align: 'center' })
     doc.setTextColor(0)
 
-    const leftX = boxX + 14
-    const rightX = boxX + boxW / 2 + 14
+    const leftXBox = boxX + 14
+    const rightXBox = boxX + boxW / 2 + 14
     const line1 = y + 44
     const line2 = y + 60
     const line3 = y + 76
@@ -414,28 +451,28 @@ export function HistoricoPage() {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(11)
     doc.setTextColor(40)
-    doc.text('ID:', leftX, line1)
-    doc.text('Placa:', leftX, line2)
-    doc.text('Modelo:', leftX, line3)
-    doc.text('Defeito:', rightX, line1)
-    doc.text('Tipo:', rightX, line2)
+    doc.text('ID:', leftXBox, line1)
+    doc.text('Placa:', leftXBox, line2)
+    doc.text('Modelo:', leftXBox, line3)
+    doc.text('Defeito:', rightXBox, line1)
+    doc.text('Tipo:', rightXBox, line2)
     doc.setTextColor(0)
     doc.setFont('helvetica', 'bold')
-    doc.text(veiculoId, leftX + 34, line1)
-    doc.text(placa, leftX + 46, line2)
+    doc.text(veiculoId, leftXBox + 34, line1)
+    doc.text(placa, leftXBox + 46, line2)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(120)
-    doc.text('[Modelo do Veículo]', leftX + 58, line3)
+    doc.text('[Modelo do Veículo]', leftXBox + 58, line3)
     doc.setTextColor(0)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    const defectX = rightX + 54
+    const defectX = rightXBox + 54
     const defectW = boxW / 2 - 80
     const defectLines = doc.splitTextToSize(formatDefeitoParaExibicao(r.defeito), defectW) as string[]
     const used = defectLines.slice(0, 2)
     doc.text(used, defectX, line1, { maxWidth: defectW })
     const defectExtra = clamp(used.length - 1, 0, 1) * 12
-    doc.text('Manutenção Corretiva', rightX + 34, line2 + defectExtra)
+    doc.text('Manutenção Corretiva', rightXBox + 34, line2 + defectExtra)
     doc.setFont('helvetica', 'normal')
     y += boxH + 10
 
@@ -535,49 +572,90 @@ export function HistoricoPage() {
       y += usedH + 18
     }
 
-    // Evidências
+    // Evidências: duas colunas — esquerda defeito (antes) · direita corrigido (depois)
+    const maxEvidenceEach = 3
+    const antes = (r.ncFotos ?? []).filter(Boolean).slice(0, maxEvidenceEach)
+    const depois = (r.reparoImagens ?? []).filter(Boolean).slice(0, maxEvidenceEach)
+    const colMiddleGap = 14
+    const colW = (pageW - margin * 2 - colMiddleGap) / 2
+    const leftX = margin
+    const rightX = margin + colW + colMiddleGap
+    const rowH = 152
+    const rowGap = 10
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(14)
     doc.setTextColor(30)
     doc.text('Evidências', margin, y)
     doc.setTextColor(0)
-    y += 14
+    y += 18
 
-    const imgs = (r.reparoImagens ?? []).slice(0, 3)
-    if (imgs.length === 0) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(11)
-      doc.setTextColor(120)
-      doc.text('Sem imagens anexadas.', margin, y + 18)
-      doc.setTextColor(0)
-    } else {
-      const cols = 3
-      const gap = 10
-      const boxW3 = (pageW - margin * 2 - gap * (cols - 1)) / cols
-      const boxH3 = 150
-      if (y + boxH3 + 40 > pageH) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(55)
+    const headY = y
+    doc.text('Antes (defeito)', leftX + colW / 2, headY, { align: 'center' })
+    doc.text('Depois (corrigido)', rightX + colW / 2, headY, { align: 'center' })
+    doc.setTextColor(0)
+    y = headY + 16
+
+    const drawEvidenceCell = async (src: string | undefined, x0: number, top: number, emptyMsg: string) => {
+      doc.setDrawColor(210)
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(x0, top, colW, rowH, 10, 10, 'FD')
+      if (!src) {
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(10)
+        doc.setTextColor(150)
+        doc.text(emptyMsg, x0 + colW / 2, top + rowH / 2, { align: 'center' })
+        doc.setTextColor(0)
+        doc.setFont('helvetica', 'normal')
+        return
+      }
+      try {
+        const raster = await rasterSrcForPdf(src)
+        const ratio = Math.min((colW - 16) / raster.w, (rowH - 16) / raster.h)
+        const iw = raster.w * ratio
+        const ih = raster.h * ratio
+        const ix = x0 + (colW - iw) / 2
+        const iy = top + (rowH - ih) / 2
+        doc.addImage(raster.data, raster.kind, ix, iy, iw, ih)
+      } catch {
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(9)
+        doc.setTextColor(140)
+        doc.text('Imagem indisponível.', x0 + colW / 2, top + rowH / 2, { align: 'center' })
+        doc.setTextColor(0)
+        doc.setFont('helvetica', 'normal')
+      }
+    }
+
+    const hasAny = antes.length > 0 || depois.length > 0
+    const nRows = hasAny ? Math.max(antes.length, depois.length) : 1
+
+    for (let row = 0; row < nRows; row += 1) {
+      if (y + rowH + 30 > pageH) {
         doc.addPage()
         y = margin
       }
-
-      for (let i = 0; i < imgs.length; i += 1) {
-        const col = i % cols
-        const x = margin + col * (boxW3 + gap)
-        const src = imgs[i]!
-
-        doc.setDrawColor(210)
-        doc.setFillColor(255, 255, 255)
-        doc.roundedRect(x, y + 14, boxW3, boxH3, 10, 10, 'FD')
-
-        const jpeg = await dataUrlToJpeg(src)
-        const ratio = Math.min((boxW3 - 16) / jpeg.w, (boxH3 - 16) / jpeg.h)
-        const iw = jpeg.w * ratio
-        const ih = jpeg.h * ratio
-        const ix = x + (boxW3 - iw) / 2
-        const iy = y + 14 + (boxH3 - ih) / 2
-        doc.addImage(jpeg.data, 'JPEG', ix, iy, iw, ih)
-      }
+      const top = y
+      const leftSrc = hasAny ? antes[row] : undefined
+      const rightSrc = hasAny ? depois[row] : undefined
+      await drawEvidenceCell(
+        hasAny ? leftSrc : undefined,
+        leftX,
+        top,
+        hasAny ? 'Sem foto nesta posição.' : 'Sem fotos da não conformidade registradas.',
+      )
+      await drawEvidenceCell(
+        hasAny ? rightSrc : undefined,
+        rightX,
+        top,
+        hasAny ? 'Sem foto nesta posição.' : 'Sem imagens anexadas na resolução.',
+      )
+      y = top + rowH + rowGap
     }
+    y += 12
 
     // Rodapé com paginação
     const pages = doc.getNumberOfPages()
@@ -685,9 +763,19 @@ export function HistoricoPage() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <CalendarCheck2 size={14} />
-            {historico.length} registro(s) resolvido(s)
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex min-w-[10rem] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+              <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Total gasto
+              </span>
+              <span className="text-sm font-black tabular-nums text-slate-900 dark:text-slate-100">
+                {formatMoneyBRL(totalGastoHistorico)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <CalendarCheck2 size={14} />
+              {historico.length} registro(s) resolvido(s)
+            </div>
           </div>
         </div>
 
@@ -727,7 +815,7 @@ export function HistoricoPage() {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="min-w-[1080px] w-full border-collapse text-left text-sm">
+          <table className="min-w-[1080px] w-full border-collapse text-center text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
                 <th className="px-4 py-3">Veículo</th>
@@ -757,12 +845,14 @@ export function HistoricoPage() {
                     className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40"
                   >
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-2">
-                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
-                          <Truck size={14} />
+                      <div className="flex justify-center">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+                            <Truck size={14} />
+                          </span>
+                          <span className="font-mono text-xs tracking-tight">{r.veiculoLabel}</span>
                         </span>
-                        <span className="font-mono text-xs tracking-tight">{r.veiculoLabel}</span>
-                      </span>
+                      </div>
                     </td>
                     <td className="max-w-[300px] px-4 py-3 text-xs leading-snug sm:text-sm">{formatDefeitoParaExibicao(r.defeito)}</td>
                     <td className="max-w-[340px] px-4 py-3 text-xs leading-snug text-slate-700 dark:text-slate-300 sm:text-sm">
@@ -775,21 +865,23 @@ export function HistoricoPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
                       {formatDateBR(r.dataApontamento)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs font-black text-emerald-700 dark:text-emerald-400 sm:text-sm">
-                      <div>{formatDateBR(r.dataResolvido!)}</div>
-                      {r.horaResolvido ? (
-                        <div className="mt-0.5 text-[11px] font-extrabold text-slate-500 dark:text-slate-400">
-                          {r.horaResolvido}
-                        </div>
-                      ) : null}
+                    <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
+                      <div className="flex flex-col items-center font-black text-emerald-700 dark:text-emerald-400">
+                        <span>{formatDateBR(r.dataResolvido!)}</span>
+                        {r.horaResolvido ? (
+                          <span className="mt-0.5 text-[11px] font-extrabold text-slate-500 dark:text-slate-400">
+                            {r.horaResolvido}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-black text-slate-900 dark:text-slate-100 sm:text-sm">
                       {formatMoneyBRL(r.reparoValor)}
                     </td>
                     <td className="px-4 py-3">
                       {r.reparoImagens?.length ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex gap-2">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <div className="flex flex-wrap justify-center gap-2">
                             {r.reparoImagens.slice(0, 3).map((src, idx) => (
                               <button
                                 key={src}
@@ -805,7 +897,7 @@ export function HistoricoPage() {
                           <button
                             type="button"
                             onClick={() => void gerarPdf(r)}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
                             title="Gerar relatório em PDF"
                             aria-label="Gerar relatório em PDF"
                           >
@@ -813,7 +905,7 @@ export function HistoricoPage() {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
                           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">—</span>
                           <button
                             type="button"

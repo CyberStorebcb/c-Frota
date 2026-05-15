@@ -1,12 +1,10 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Loader2, Lock, LogIn, Mail, MessageSquare, Moon, Sparkles, Sun } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Lock, LogIn, Mail, Moon, Sun } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
-import { askGemini, isGeminiConfigured } from '../services/aiService'
 import { useTheme } from '../theme/ThemeProvider'
-import { renderFormattedText } from '../utils/renderFormattedAiText'
 
 const FLUX_VB_H = 800
 const FLUX_VB_W = 60
@@ -136,41 +134,10 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
-  const [aiQuestion, setAiQuestion] = useState('')
-  const [aiResponse, setAiResponse] = useState('')
-  const [isAiLoading, setIsAiLoading] = useState(false)
-
   useEffect(() => {
     if (!user || location.pathname !== '/login') return
     navigate(from, { replace: true })
   }, [user, location.pathname, from, navigate])
-
-  async function askAiAssistant() {
-    if (!aiQuestion.trim()) return
-
-    setIsAiLoading(true)
-    setAiResponse('')
-
-    const systemPrompt = `Você é um assistente técnico especializado em manutenção de frotas de veículos e logística.
-Responda de forma curta e objetiva em português. Se a pergunta for totalmente fora de frota, logística ou manutenção,
-peça educadamente para focar nesses temas.
-Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) e uma ideia por linha quando fizer sentido.`
-
-    try {
-      const result = await askGemini(aiQuestion.trim(), systemPrompt)
-      if (result.ok === false) {
-        if (result.kind === 'not_configured') {
-          setAiResponse('O assistente não está disponível neste ambiente.')
-        } else {
-          setAiResponse(result.message)
-        }
-        return
-      }
-      setAiResponse(result.text)
-    } finally {
-      setIsAiLoading(false)
-    }
-  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -185,7 +152,6 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
   }
 
   const isDark = theme === 'dark'
-  const geminiReady = isGeminiConfigured()
 
   return (
     <div
@@ -255,13 +221,6 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-xs font-bold leading-relaxed text-slate-300 backdrop-blur">
-              <div className="mb-1 flex items-center gap-2 text-rose-100">
-                <Sparkles size={15} />
-                <span className="text-[10px] font-black uppercase tracking-[0.22em]">Assistente técnico CGB</span>
-              </div>
-              Use o assistente no painel de acesso para consultar checklists, manutenção e operação da frota.
-            </div>
           </div>
 
           <div className="flex items-center justify-between gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 xl:text-[11px]">
@@ -379,74 +338,6 @@ Para títulos ou itens de lista, usa markdown com **negrito** (ex.: **Pneus:**) 
               )}
             </button>
           </form>
-
-          <section className={`mt-5 overflow-hidden rounded-3xl border shadow-xl ${
-            isDark
-              ? 'border-slate-800 bg-slate-900/80 shadow-black/20'
-              : 'border-slate-200 bg-white shadow-slate-200/70'
-          }`}>
-            <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-[#b51649] dark:text-rose-300" />
-                <div>
-                  <h2 className="text-xs font-black uppercase tracking-[0.18em] text-[#7f1022] dark:text-rose-200">
-                    Assistente técnico CGB
-                  </h2>
-                  <p className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                    Tire dúvidas antes de entrar no sistema.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 p-4">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                  placeholder="Ex.: O que checar antes da viagem?"
-                  className={`w-full rounded-2xl border py-3 pl-4 pr-11 text-sm font-semibold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 ${
-                    isDark
-                      ? 'border-slate-800 bg-slate-950 text-white placeholder:text-slate-500'
-                      : 'border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400'
-                  }`}
-                  onKeyDown={(e) => e.key === 'Enter' && void askAiAssistant()}
-                  disabled={isAiLoading || !geminiReady}
-                />
-                <button
-                  type="button"
-                  onClick={() => void askAiAssistant()}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#b51649] transition hover:text-[#7f1022] disabled:opacity-50 dark:text-rose-300 dark:hover:text-rose-200"
-                  disabled={isAiLoading || !geminiReady}
-                  aria-label="Enviar pergunta"
-                >
-                  {isAiLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageSquare size={18} strokeWidth={2} />}
-                </button>
-              </div>
-
-              {!geminiReady ? (
-                <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-300">
-                  O assistente não está disponível neste ambiente.
-                  {import.meta.env.DEV ? (
-                    <span className="mt-1 block text-[11px] text-amber-600/90 dark:text-amber-300/80">
-                      Defina <code className="font-mono">VITE_GEMINI_API_KEY</code> no arquivo <code className="font-mono">.env</code>.
-                    </span>
-                  ) : null}
-                </p>
-              ) : null}
-
-              <div className={`max-h-[180px] overflow-y-auto rounded-2xl border p-3 text-xs font-semibold leading-relaxed [scrollbar-color:#b51649_rgba(148,163,184,.25)] [scrollbar-width:thin] xl:max-h-[240px] ${
-                isDark
-                  ? 'border-slate-800 bg-slate-950 text-slate-100'
-                  : 'border-slate-200 bg-slate-50 text-slate-700'
-              }`}>
-                {geminiReady && aiResponse
-                  ? renderFormattedText(aiResponse)
-                  : 'Pergunte algo sobre checklist, manutenção preventiva ou operação da frota.'}
-              </div>
-            </div>
-          </section>
         </div>
       </div>
 

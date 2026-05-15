@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { BRANDING } from '../branding/paths'
 
-const OWNER_NAME = 'Italo Bruno da Silva Fontes'
+const OWNER_NAME = 'CGB ENERGIA'
 const LAST_UPDATED = '12 de maio de 2026'
-const OWNER_PHOTO = '/branding/italo-bruno-da-silva-fontes.png'
 
 function LegalShell({
   title,
@@ -19,17 +19,31 @@ function LegalShell({
       <div className="mx-auto max-w-3xl">
         <header className="mb-6 overflow-hidden rounded-[2rem] bg-[#0b1020] p-6 text-white shadow-[0_24px_70px_rgba(15,23,42,0.20)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-3xl border border-white/15 bg-white/10 shadow-[0_18px_45px_rgba(0,0,0,0.28)] ring-4 ring-white/10 sm:h-28 sm:w-28">
-              <img
-                src={OWNER_PHOTO}
-                alt={OWNER_NAME}
-                className="h-full w-full object-cover object-top"
-                loading="eager"
-                decoding="async"
-              />
+            <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 shadow-[0_18px_45px_rgba(0,0,0,0.28)] ring-1 ring-white/15">
+              <div
+                className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#0b1020] shadow-sm ring-1 ring-white/10"
+                title="CGB Frota"
+              >
+                <img
+                  src={BRANDING.favicon}
+                  alt="CGB Frota"
+                  className="h-[72%] w-[72%] object-contain"
+                  width={40}
+                  height={40}
+                  loading="eager"
+                  decoding="async"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-black leading-none tracking-tight text-white">
+                  CGB{' '}
+                  <span className="text-sm font-bold text-slate-400">Frota</span>
+                </p>
+                <div className="mt-2 h-1 w-14 max-w-full rounded-full bg-gradient-to-r from-sky-400 to-sky-500" />
+              </div>
             </div>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-rose-200">Titular do software</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-rose-200">Desenvolvedor do software</p>
               <h1 className="mt-1 text-3xl font-black tracking-tight">{title}</h1>
               <p className="mt-1 text-sm font-extrabold text-white/90">{OWNER_NAME}</p>
             </div>
@@ -43,7 +57,7 @@ function LegalShell({
         </section>
 
         <footer className="mt-6 flex flex-col gap-3 text-sm font-semibold text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} {OWNER_NAME}. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} CGB Engenharia. Desenvolvido por {OWNER_NAME}.</p>
           <div className="flex gap-3">
             <Link className="text-[#9f1239] hover:underline dark:text-rose-300" to="/login">Login</Link>
             <Link className="text-[#9f1239] hover:underline dark:text-rose-300" to="/termos">Termos</Link>
@@ -70,16 +84,16 @@ export function TermsPage() {
   return (
     <LegalShell
       title="Termos de Uso"
-      subtitle={`Este documento informa as condicoes de uso do aplicativo e reforca a titularidade do software por ${OWNER_NAME}.`}
+      subtitle={`Este documento informa as condicoes de uso do aplicativo. O software foi desenvolvido por ${OWNER_NAME}.`}
     >
-      <LegalBlock title="1. Titularidade do software">
+      <LegalBlock title="1. Desenvolvimento do software">
         <p>
           O codigo-fonte, arquitetura, telas, fluxos, regras de negocio, componentes especificos, documentacao e demais elementos
-          proprios desta aplicacao sao de titularidade de {OWNER_NAME}, salvo quando expressamente indicado de outra forma.
+          proprios desta aplicacao foram desenvolvidos por {OWNER_NAME}.
         </p>
         <p>
           Nenhuma parte deste software pode ser copiada, modificada, distribuida, revendida, sublicenciada ou explorada comercialmente
-          sem autorizacao previa e por escrito do titular.
+          sem autorizacao previa e por escrito.
         </p>
       </LegalBlock>
 
@@ -93,7 +107,7 @@ export function TermsPage() {
       <LegalBlock title="3. Marcas, logotipos e identidade visual">
         <p>
           Marcas, nomes comerciais, logotipos e materiais de identidade visual eventualmente exibidos na aplicacao pertencem aos seus
-          respectivos titulares. O uso desses elementos nao altera a titularidade do software desenvolvido por {OWNER_NAME}.
+          respectivos titulares. O uso desses elementos nao altera os direitos sobre o software desenvolvido por {OWNER_NAME}.
         </p>
       </LegalBlock>
 
@@ -169,10 +183,10 @@ export function PrivacyPage() {
         </p>
       </LegalBlock>
 
-      <LegalBlock title="7. Responsavel pelo software">
+      <LegalBlock title="7. Desenvolvedor do software">
         <p>
-          A titularidade do software e de {OWNER_NAME}. Questoes sobre uso, licenciamento e titularidade devem ser tratadas diretamente
-          com o titular.
+          O software foi desenvolvido por {OWNER_NAME}. Questoes sobre uso, licenciamento e desenvolvimento devem ser tratadas diretamente
+          com o desenvolvedor.
         </p>
       </LegalBlock>
     </LegalShell>

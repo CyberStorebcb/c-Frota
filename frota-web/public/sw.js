@@ -1,4 +1,4 @@
-const CACHE_NAME = 'frota-checklists-v7'
+const CACHE_NAME = 'frota-checklists-v8'
 const BACKGROUND_SYNC_TAG = 'frota-sync-checklists'
 const APP_SHELL = [
   '/',

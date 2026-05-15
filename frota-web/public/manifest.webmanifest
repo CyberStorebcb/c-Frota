@@ -10,7 +10,7 @@
   "theme_color": "#2b2421",
   "icons": [
     {
-      "src": "/branding/app-icon.png",
+      "src": "/branding/favicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
@@ -23,7 +23,7 @@
       "url": "/checklist",
       "icons": [
         {
-          "src": "/branding/app-icon.png",
+          "src": "/branding/favicon.png",
           "sizes": "512x512",
           "type": "image/png"
         }
