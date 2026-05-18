@@ -39,35 +39,84 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   // Quando o SW ativa uma nova versão, exibe banner para o usuário atualizar
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data?.type !== 'SW_UPDATED') return
-
-    // Cria banner de atualização flutuante
-    const existing = document.getElementById('pwa-update-banner')
-    if (existing) return
+    if (document.getElementById('pwa-update-banner')) return
 
     const banner = document.createElement('div')
     banner.id = 'pwa-update-banner'
     banner.style.cssText = [
-      'position:fixed', 'bottom:80px', 'left:50%', 'transform:translateX(-50%)',
-      'z-index:9999', 'display:flex', 'align-items:center', 'gap:12px',
-      'background:#0b1020', 'color:#fff', 'border:1px solid rgba(255,255,255,0.15)',
-      'border-radius:16px', 'padding:12px 16px', 'box-shadow:0 8px 32px rgba(0,0,0,0.4)',
-      'font-family:sans-serif', 'font-size:13px', 'font-weight:700',
-      'white-space:nowrap', 'max-width:calc(100vw - 32px)',
+      'position:fixed', 'bottom:0', 'left:0', 'right:0',
+      'z-index:99999',
+      'background:#0b1020',
+      'border-top:1px solid rgba(255,255,255,0.12)',
+      'box-shadow:0 -8px 40px rgba(0,0,0,0.55)',
+      'padding:16px 20px',
+      'padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px))',
+      'display:flex', 'flex-direction:column', 'gap:12px',
+      'font-family:system-ui,sans-serif',
+      'animation:slide-up 0.3s ease',
     ].join(';')
 
-    const text = document.createElement('span')
-    text.textContent = 'Nova versão disponível!'
-    banner.appendChild(text)
+    // Animação
+    const style = document.createElement('style')
+    style.textContent = `
+      @keyframes slide-up {
+        from { transform: translateY(100%); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
+    `
+    document.head.appendChild(style)
 
+    // Linha superior: ícone + texto + fechar
+    const top = document.createElement('div')
+    top.style.cssText = 'display:flex;align-items:center;gap:10px;'
+
+    const icon = document.createElement('div')
+    icon.style.cssText = [
+      'width:36px', 'height:36px', 'border-radius:10px', 'flex-shrink:0',
+      'background:#be123c', 'display:flex', 'align-items:center', 'justify-content:center',
+    ].join(';')
+    icon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0 0 20.49 15"/></svg>`
+
+    const texts = document.createElement('div')
+    texts.style.cssText = 'flex:1;min-width:0;'
+
+    const title = document.createElement('div')
+    title.style.cssText = 'color:#fff;font-size:14px;font-weight:800;'
+    title.textContent = 'Atualização disponível'
+
+    const sub = document.createElement('div')
+    sub.style.cssText = 'color:rgba(255,255,255,0.55);font-size:12px;font-weight:600;margin-top:1px;'
+    sub.textContent = 'Uma nova versão do app está pronta.'
+
+    texts.appendChild(title)
+    texts.appendChild(sub)
+
+    const closeBtn = document.createElement('button')
+    closeBtn.style.cssText = [
+      'background:none', 'border:none', 'color:rgba(255,255,255,0.4)',
+      'cursor:pointer', 'padding:4px', 'flex-shrink:0', 'line-height:1',
+    ].join(';')
+    closeBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+    closeBtn.onclick = () => banner.remove()
+
+    top.appendChild(icon)
+    top.appendChild(texts)
+    top.appendChild(closeBtn)
+
+    // Botão de atualizar
     const btn = document.createElement('button')
-    btn.textContent = 'Atualizar'
     btn.style.cssText = [
-      'background:#be123c', 'color:#fff', 'border:none', 'border-radius:10px',
-      'padding:6px 14px', 'font-size:13px', 'font-weight:800', 'cursor:pointer',
+      'width:100%', 'padding:13px', 'border:none', 'border-radius:14px',
+      'background:linear-gradient(135deg,#9f1239,#be123c)',
+      'color:#fff', 'font-size:15px', 'font-weight:800', 'cursor:pointer',
+      'box-shadow:0 4px 16px rgba(190,18,60,0.45)',
+      'letter-spacing:0.01em',
     ].join(';')
+    btn.textContent = '🔄 Atualizar agora'
     btn.onclick = () => window.location.reload()
-    banner.appendChild(btn)
 
+    banner.appendChild(top)
+    banner.appendChild(btn)
     document.body.appendChild(banner)
   })
 }

@@ -16,13 +16,13 @@
       "purpose": "any"
     },
     {
-      "src": "/branding/app-icon.png",
+      "src": "/branding/app-icon-any.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/branding/app-icon.png",
+      "src": "/branding/app-icon-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -35,7 +35,7 @@
       "url": "/checklist",
       "icons": [
         {
-          "src": "/branding/app-icon.png",
+          "src": "/branding/app-icon-any.png",
           "sizes": "512x512",
           "type": "image/png"
         }

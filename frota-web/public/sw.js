@@ -1,10 +1,11 @@
-const CACHE_NAME = 'frota-checklists-v9'
+const CACHE_NAME = 'frota-checklists-v10'
 const BACKGROUND_SYNC_TAG = 'frota-sync-checklists'
 
 // Apenas o shell estático que raramente muda
 const APP_SHELL = [
   '/manifest.webmanifest',
-  '/branding/app-icon.png',
+  '/branding/app-icon-any.png',
+  '/branding/app-icon-maskable.png',
   '/branding/favicon.png',
   '/branding/cgb-logo-on-light.svg',
   '/branding/cgb-logo-on-dark.svg',
