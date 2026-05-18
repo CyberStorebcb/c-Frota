@@ -77,7 +77,9 @@ export function getVehicleOperationalStatusRowsWithLocals(
 
 export type VehicleOperationalStatusRow = ReturnType<typeof getVehicleOperationalStatusRows>[number]
 
-export function getVehicleOperationalStatusSummary(rowsParam?: VehicleOperationalStatusRow[]) {
+export type VehicleOperationalStatusRowMin = Pick<VehicleOperationalStatusRow, 'placa' | 'prefixo' | 'base' | 'processo' | 'statusOperacional'>
+
+export function getVehicleOperationalStatusSummary(rowsParam?: VehicleOperationalStatusRowMin[]) {
   const rows = rowsParam ?? getVehicleOperationalStatusRows()
   return VEHICLE_OPERATIONAL_STATUS_LABELS.map((label) => {
     const vehicles =
