@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Navigate } from 'react-router-dom'
 import {
@@ -33,7 +33,7 @@ const CHECKLIST_PAGE_BG =
   'bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.14),transparent_34%),linear-gradient(180deg,#fff7f9_0%,#f8fafc_34%,#eef2f7_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.24),transparent_35%),linear-gradient(180deg,#090d18_0%,#020617_58%,#01040b_100%)]'
 
 const CGB_CARD =
-  'border border-white/70 bg-white/[0.92] shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-slate-950/[0.88] dark:shadow-black/30'
+  'border border-slate-200/80 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.07)] dark:border-white/10 dark:bg-slate-950 dark:shadow-black/30'
 
 const CGB_SECTION_HEADER =
   'border-b border-[#7f1022]/10 bg-gradient-to-r from-[#7f1022] via-[#9f1239] to-[#101827] px-4 py-3 text-white dark:border-white/10'
@@ -617,6 +617,110 @@ function SupervisorField({ value, onChange }: { value: string; onChange: (v: str
 }
 
 // ---------------------------------------------------------------------------
+// Item de checklist — memoizado para evitar re-render ao responder outros itens
+// ---------------------------------------------------------------------------
+type RespostaVal = 'c' | 'nc' | 'na' | null
+
+const ItemChecklist = memo(function ItemChecklist({
+  item,
+  numero,
+  isLast,
+  resp,
+  obs,
+  fotos,
+  destacado,
+  onResposta,
+  onObs,
+  onAddFoto,
+  onRemoveFoto,
+  itemRef,
+}: {
+  item: { id: string; label: string; imperativo?: boolean }
+  numero: number
+  isLast: boolean
+  resp: RespostaVal
+  obs: string
+  fotos: File[]
+  destacado: boolean
+  onResposta: (id: string, valor: RespostaVal) => void
+  onObs: (id: string, valor: string) => void
+  onAddFoto: (id: string, files: File[]) => void
+  onRemoveFoto: (id: string, idx: number) => void
+  itemRef: (el: HTMLDivElement | null) => void
+}) {
+  const bgClass =
+    destacado     ? 'bg-rose-50 dark:bg-rose-900/20' :
+    resp === 'nc' ? 'bg-rose-50/70 dark:bg-rose-900/15' :
+    resp === 'c'  ? 'bg-emerald-50/50 dark:bg-emerald-900/[0.08]' :
+    resp === 'na' ? 'bg-slate-50/80 dark:bg-slate-900/20' :
+    ''
+
+  return (
+    <div
+      ref={itemRef}
+      className={`px-4 py-3 transition-colors duration-300 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800/80' : ''} ${bgClass}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2 pt-0.5">
+          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-extrabold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            {numero}
+          </span>
+          {item.imperativo && (
+            <span className="shrink-0 text-sm leading-tight" title="Item impeditivo — NC impede condução">🚫</span>
+          )}
+          <span className="text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
+            {item.label}
+          </span>
+        </div>
+
+        <div className="flex shrink-0 gap-1.5">
+          {([
+            { valor: 'c'  as const, label: 'C',  activeClass: 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-200 shadow-sm' },
+            { valor: 'nc' as const, label: 'NC', activeClass: 'bg-rose-500 border-rose-500 text-white shadow-rose-200 shadow-sm' },
+            { valor: 'na' as const, label: 'NA', activeClass: 'bg-[#7f1022] border-[#7f1022] text-white shadow-sm' },
+          ] as const).map(({ valor, label, activeClass }) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => onResposta(item.id, valor)}
+              className={`flex h-11 w-14 items-center justify-center rounded-xl border-2 text-xs font-extrabold transition-all active:scale-95 sm:w-16 ${
+                resp === valor
+                  ? activeClass
+                  : 'border-slate-200 bg-white/70 text-slate-400 hover:border-[#b51649]/40 hover:text-[#7f1022] dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-500 dark:hover:border-rose-400/40 dark:hover:text-rose-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {resp === 'nc' && (
+        <div className="mt-3 ml-7 space-y-3">
+          <div>
+            <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-rose-500">
+              Descreva o problema *
+            </label>
+            <textarea
+              rows={2}
+              value={obs}
+              onChange={(e) => onObs(item.id, e.target.value)}
+              placeholder="O que foi encontrado de errado? Seja específico..."
+              className="w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 dark:border-rose-800/60 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:ring-rose-900/30"
+            />
+          </div>
+          <FotosItem
+            fotos={fotos}
+            onAdd={(novos) => onAddFoto(item.id, novos)}
+            onRemove={(i) => onRemoveFoto(item.id, i)}
+          />
+        </div>
+      )}
+    </div>
+  )
+})
+
+// ---------------------------------------------------------------------------
 // Formulário principal
 // ---------------------------------------------------------------------------
 const FORM_SESSION_KEY = 'frota.checklist.form'
@@ -685,6 +789,7 @@ function FormularioChecklist({
   const [localidadeCoords, setLocalidadeCoords] = useState<{ lat: number; lng: number } | null>(draft?.localidadeCoords ?? null)
   const [gpsPermissao, setGpsPermissao] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking')
   const [gpsGuiaAberto, setGpsGuiaAberto] = useState(false)
+  const [gpsErroCodigo, setGpsErroCodigo] = useState<1 | 2 | 3 | null>(null)
   const [dataInspecao, setDataInspecao]   = useState(draft?.dataInspecao ?? new Date().toISOString().split('T')[0] ?? '')
   const [problemas, setProblemas]         = useState(draft?.problemas ?? '')
   const [descricaoProblema, setDescricaoProblema] = useState(draft?.descricaoProblema ?? '')
@@ -713,13 +818,16 @@ function FormularioChecklist({
   const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
   const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
 
-  // Auto-save do rascunho no sessionStorage a cada mudança relevante
+  // Auto-save com debounce de 600ms para não salvar a cada keystroke
   useEffect(() => {
-    if (concluido) return // não salva após concluir
-    saveFormDraft(schema.id, {
-      respostas, observacoes, dadosVeiculo,
-      dataInspecao, supervisor, problemas, descricaoProblema, localidadeCoords,
-    })
+    if (concluido) return
+    const t = setTimeout(() => {
+      saveFormDraft(schema.id, {
+        respostas, observacoes, dadosVeiculo,
+        dataInspecao, supervisor, problemas, descricaoProblema, localidadeCoords,
+      })
+    }, 600)
+    return () => clearTimeout(t)
   }, [schema.id, respostas, observacoes, dadosVeiculo, dataInspecao, supervisor, problemas, descricaoProblema, localidadeCoords, concluido])
 
   // Verifica permissão de GPS ao carregar e monitora mudanças
@@ -829,23 +937,33 @@ function FormularioChecklist({
     })
   }, [fleetByPlaca, setDadosVeiculo])
 
-  const respondidos   = Object.values(respostas).filter((v) => v !== null).length
-  const ncCount       = Object.values(respostas).filter((v) => v === 'nc').length
-  const ncImperativos = todosItens.filter((it) => it.imperativo && respostas[it.id] === 'nc').length
-  const progresso     = totalItens > 0 ? Math.round((respondidos / totalItens) * 100) : 0
-  const tudo100       = progresso === 100
+  const { respondidos, ncCount, ncImperativos, progresso, tudo100 } = useMemo(() => {
+    const vals = Object.values(respostas)
+    const respondidos   = vals.filter((v) => v !== null).length
+    const ncCount       = vals.filter((v) => v === 'nc').length
+    const ncImperativos = todosItens.filter((it) => it.imperativo && respostas[it.id] === 'nc').length
+    const progresso     = totalItens > 0 ? Math.round((respondidos / totalItens) * 100) : 0
+    return { respondidos, ncCount, ncImperativos, progresso, tudo100: progresso === 100 }
+  }, [respostas, todosItens, totalItens])
 
-  const camposObrigatorios = schema.camposExtras?.filter((c) => c.obrigatorio) ?? []
-  const camposPreenchidos  = camposObrigatorios.every((c) => (dadosVeiculo[c.id] ?? '').trim() !== '')
+  const camposPreenchidos = useMemo(
+    () => (schema.camposExtras?.filter((c) => c.obrigatorio) ?? []).every((c) => (dadosVeiculo[c.id] ?? '').trim() !== ''),
+    [schema.camposExtras, dadosVeiculo],
+  )
   const evidenciaNr12Ok = !schema.temEvidencia || arquivos.length > 0
   const podEnviar = tudo100 && camposPreenchidos && evidenciaNr12Ok
 
-  // Número sequencial global de cada item
-  const numeroItem = (grupoIdx: number, itemIdx: number) => {
+  // Mapa: itemId → número sequencial global (calculado uma vez)
+  const numeroItemMap = useMemo(() => {
+    const map: Record<string, number> = {}
     let n = 0
-    for (let g = 0; g < grupoIdx; g++) n += schema.grupos[g]!.itens.length
-    return n + itemIdx + 1
-  }
+    for (const grupo of schema.grupos) {
+      for (const item of grupo.itens) {
+        map[item.id] = ++n
+      }
+    }
+    return map
+  }, [schema.grupos])
 
   const setResposta = useCallback((id: string, valor: Resposta) => {
     setRespostas((prev) => {
@@ -878,6 +996,8 @@ function FormularioChecklist({
 
   const pedirLocalizacao = useCallback(() => {
     setLocalidadeGeoErro('')
+    setGpsErroCodigo(null)
+    setGpsGuiaAberto(false)
     if (!navigator.geolocation) {
       setLocalidadeGeoErro('Geolocalização não disponível neste navegador.')
       return
@@ -956,22 +1076,31 @@ function FormularioChecklist({
         settled = true
         navigator.geolocation.clearWatch(watchState.id)
         setLocalidadeGeoLoading(false)
-        if (err.code === 1) {
-          setGpsPermissao('denied')
-          setGpsGuiaAberto(true)
-        }
+        setGpsErroCodigo(err.code as 1 | 2 | 3)
+        setGpsGuiaAberto(true)
+        if (err.code === 1) setGpsPermissao('denied')
         const msg =
           err.code === 1 ? 'GPS bloqueado — ou digite o endereço manualmente.'
-          : err.code === 2 ? 'Posição indisponível — verifique se o GPS do celular está ativado nas configurações do sistema (não do navegador).'
-          : `Tempo esgotado (erro ${err.code}). Tente em área aberta ou digite o endereço manualmente.`
+          : err.code === 2 ? 'GPS desligado — ou digite o endereço manualmente.'
+          : 'Sem sinal de GPS — ou digite o endereço manualmente.'
         setLocalidadeGeoErro(msg)
       },
       { enableHighAccuracy: true, maximumAge: 0 },
     )
   }, [setDadosVeiculo, setLocalidadeCoords, setLocalidadeGeoErro, setLocalidadeGeoLoading])
 
-  const addFotoItem  = (id: string, novos: File[]) =>
+  const addFotoItem = useCallback((id: string, novos: File[]) =>
     setFotosItem((prev) => ({ ...prev, [id]: [...(prev[id] ?? []), ...novos].slice(0, 3) }))
+  , [])
+
+  const removeFotoItemCb = useCallback((id: string, idx: number) =>
+    setFotosItem((prev) => ({ ...prev, [id]: (prev[id] ?? []).filter((_, i) => i !== idx) }))
+  , [])
+
+  const setObservacaoCb = useCallback((id: string, valor: string) =>
+    setObservacoes((prev) => ({ ...prev, [id]: valor }))
+  , [])
+
 
   const handleArquivos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target
@@ -993,9 +1122,6 @@ function FormularioChecklist({
 
   const removerArquivo = (idx: number) =>
     setArquivos((prev) => prev.filter((_, i) => i !== idx))
-
-  const removeFotoItem = (id: string, idx: number) =>
-    setFotosItem((prev) => ({ ...prev, [id]: (prev[id] ?? []).filter((_, i) => i !== idx) }))
 
   const uploadFile = async (file: File, path: string): Promise<string | null> =>
     uploadChecklistEvidenceFile(file, path)
@@ -1151,7 +1277,7 @@ function FormularioChecklist({
     <div className={`min-h-dvh ${CHECKLIST_PAGE_BG}`} style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
 
       {/* ── Header fixo ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1020]/95 px-4 py-3 text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1020] px-4 py-3 text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] dark:bg-slate-950">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <CollapsedNavMark size="md" className="ring-1 ring-white/15" />
           <div className="min-w-0 flex-1">
@@ -1341,6 +1467,7 @@ function FormularioChecklist({
                         value={dadosVeiculo.localidade ?? ''}
                         onChange={(e) => {
                           setLocalidadeGeoErro('')
+                          setGpsErroCodigo(null)
                           setDado('localidade', e.target.value)
                         }}
                         placeholder="Endereço ou use o GPS"
@@ -1360,64 +1487,91 @@ function FormularioChecklist({
                         GPS
                       </button>
                     </div>
-                    {localidadeGeoErro ? (
-                      localidadeGeoErro.startsWith('GPS bloqueado') ? (
-                        <div className="overflow-hidden rounded-xl border border-rose-300 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-950/40">
-                          {/* Cabeçalho sempre visível */}
-                          <button
-                            type="button"
-                            onClick={() => setGpsGuiaAberto((v) => !v)}
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
-                          >
-                            <MapPin className="size-4 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
-                            <span className="flex-1 text-xs font-bold text-rose-700 dark:text-rose-300">
-                              GPS bloqueado — toque para ver como liberar
-                            </span>
-                            <ChevronDown
-                              className={`size-4 shrink-0 text-rose-500 transition-transform duration-200 ${gpsGuiaAberto ? 'rotate-180' : ''}`}
-                              aria-hidden
-                            />
-                          </button>
+                    {localidadeGeoErro && gpsErroCodigo ? (
+                      <div className="overflow-hidden rounded-xl border border-rose-300 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-950/40">
+                        {/* Cabeçalho sempre visível */}
+                        <button
+                          type="button"
+                          onClick={() => setGpsGuiaAberto((v) => !v)}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+                        >
+                          <MapPin className="size-4 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
+                          <span className="flex-1 text-xs font-bold text-rose-700 dark:text-rose-300">
+                            {localidadeGeoErro}
+                          </span>
+                          <ChevronDown
+                            className={`size-4 shrink-0 text-rose-500 transition-transform duration-200 ${gpsGuiaAberto ? 'rotate-180' : ''}`}
+                            aria-hidden
+                          />
+                        </button>
 
-                          {/* Instruções dobráveis */}
-                          {gpsGuiaAberto && (
-                            <div className="border-t border-rose-200 px-3 pb-3 pt-2 dark:border-rose-800/40">
-                              <ol className="space-y-2">
-                                {[
-                                  { n: '1', texto: <>Toque nos <strong>3 pontos ⋮</strong> no canto superior direito do navegador</> },
-                                  { n: '2', texto: <>Toque em <strong>Configurações</strong></> },
-                                  { n: '3', texto: <>Toque em <strong>Configurações do site</strong></> },
-                                  { n: '4', texto: <>Toque em <strong>Localização</strong></> },
-                                  { n: '5', texto: <>Encontre <strong>c-frota.vercel.app</strong> em "Bloqueados" e toque para <strong>Permitir</strong></> },
-                                  { n: '6', texto: <>Volte aqui e toque em <strong>Tentar novamente</strong></> },
-                                ].map(({ n, texto }) => (
-                                  <li key={n} className="flex items-start gap-2">
-                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-200 text-[10px] font-black text-rose-700 dark:bg-rose-900 dark:text-rose-300">
-                                      {n}
-                                    </span>
-                                    <span className="text-xs font-semibold leading-relaxed text-rose-700 dark:text-rose-300">
-                                      {texto}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ol>
-                              <button
-                                type="button"
-                                onClick={pedirLocalizacao}
-                                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-extrabold text-white hover:bg-rose-700 active:scale-95 dark:bg-rose-700 dark:hover:bg-rose-600"
-                              >
-                                <MapPin className="size-3.5 shrink-0" aria-hidden />
-                                Tentar novamente
-                              </button>
-                              <p className="mt-2 text-center text-[11px] text-rose-500 dark:text-rose-400">
-                                ou digite o endereço manualmente no campo acima
+                        {/* Instruções dobráveis */}
+                        {gpsGuiaAberto && (
+                          <div className="border-t border-rose-200 px-3 pb-3 pt-2 dark:border-rose-800/40">
+                            {gpsErroCodigo === 2 ? (
+                              /* GPS do sistema desligado */
+                              <>
+                                <p className="mb-2 text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                                  Ative o GPS do celular:
+                                </p>
+                                <ol className="space-y-2">
+                                  {[
+                                    { n: '1', texto: <>Abra as <strong>Configurações</strong> do celular</> },
+                                    { n: '2', texto: <>Toque em <strong>Localização</strong></> },
+                                    { n: '3', texto: <>Ative a chave de <strong>Localização</strong></> },
+                                    { n: '4', texto: <>Volte aqui e toque em <strong>Tentar novamente</strong></> },
+                                  ].map(({ n, texto }) => (
+                                    <li key={n} className="flex items-start gap-2">
+                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-200 text-[10px] font-black text-rose-700 dark:bg-rose-900 dark:text-rose-300">{n}</span>
+                                      <span className="text-xs font-semibold leading-relaxed text-rose-700 dark:text-rose-300">{texto}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </>
+                            ) : gpsErroCodigo === 1 ? (
+                              /* Permissão negada no navegador */
+                              <>
+                                <p className="mb-2 text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                                  Libere a permissão no Chrome:
+                                </p>
+                                <ol className="space-y-2">
+                                  {[
+                                    { n: '1', texto: <>Toque nos <strong>3 pontos ⋮</strong> no canto superior direito</> },
+                                    { n: '2', texto: <>Toque em <strong>Configurações</strong></> },
+                                    { n: '3', texto: <>Toque em <strong>Configurações do site</strong></> },
+                                    { n: '4', texto: <>Toque em <strong>Localização</strong></> },
+                                    { n: '5', texto: <>Encontre <strong>c-frota.vercel.app</strong> em "Bloqueados" e toque para <strong>Permitir</strong></> },
+                                    { n: '6', texto: <>Volte aqui e toque em <strong>Tentar novamente</strong></> },
+                                  ].map(({ n, texto }) => (
+                                    <li key={n} className="flex items-start gap-2">
+                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-200 text-[10px] font-black text-rose-700 dark:bg-rose-900 dark:text-rose-300">{n}</span>
+                                      <span className="text-xs font-semibold leading-relaxed text-rose-700 dark:text-rose-300">{texto}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </>
+                            ) : (
+                              /* Timeout / sem sinal */
+                              <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+                                Vá para um local com melhor sinal e tente novamente, ou digite o endereço manualmente.
                               </p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-xs font-semibold text-rose-500 dark:text-rose-400">{localidadeGeoErro}</p>
-                      )
+                            )}
+                            <button
+                              type="button"
+                              onClick={pedirLocalizacao}
+                              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-extrabold text-white hover:bg-rose-700 active:scale-95 dark:bg-rose-700 dark:hover:bg-rose-600"
+                            >
+                              <MapPin className="size-3.5 shrink-0" aria-hidden />
+                              Tentar novamente
+                            </button>
+                            <p className="mt-2 text-center text-[11px] text-rose-500 dark:text-rose-400">
+                              ou digite o endereço manualmente no campo acima
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : localidadeGeoErro ? (
+                      <p className="text-xs font-semibold text-rose-500 dark:text-rose-400">{localidadeGeoErro}</p>
                     ) : null}
                     {localidadeCoords && !localidadeGeoLoading ? (
                       <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
@@ -1518,91 +1672,23 @@ function FormularioChecklist({
                 </div>
               </div>
 
-              {grupo.itens.map((item, itemIdx) => {
-                const resp      = respostas[item.id] ?? null
-                const obs       = observacoes[item.id] ?? ''
-                const fotos     = fotosItem[item.id] ?? []
-                const isLast    = itemIdx === grupo.itens.length - 1
-                const numero    = numeroItem(grupoIdx, itemIdx)
-                const destacado = itemDestacado === item.id
-
-                const bgClass =
-                  destacado   ? 'bg-rose-50 dark:bg-rose-900/20' :
-                  resp === 'nc' ? 'bg-rose-50/70 dark:bg-rose-900/15' :
-                  resp === 'c'  ? 'bg-emerald-50/50 dark:bg-emerald-900/[0.08]' :
-                  resp === 'na' ? 'bg-slate-50/80 dark:bg-slate-900/20' :
-                  ''
-
-                return (
-                  <div
-                    key={item.id}
-                    ref={(el) => { itemRefs.current[item.id] = el }}
-                    className={`px-4 py-3 transition-colors duration-300 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800/80' : ''} ${bgClass}`}
-                  >
-                    {/* Linha principal: número + label + botões */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-start gap-2 pt-0.5">
-                        {/* Número do item */}
-                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-extrabold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                          {numero}
-                        </span>
-                        {/* 🚫 imperativo */}
-                        {item.imperativo && (
-                          <span className="shrink-0 text-sm leading-tight" title="Item impeditivo — NC impede condução">🚫</span>
-                        )}
-                        <span className="text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
-                          {item.label}
-                        </span>
-                      </div>
-
-                      {/* Botões C / NC / NA */}
-                      <div className="flex shrink-0 gap-1.5">
-                        {[
-                          { valor: 'c'  as const, label: 'C',  activeClass: 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-200 shadow-sm' },
-                          { valor: 'nc' as const, label: 'NC', activeClass: 'bg-rose-500 border-rose-500 text-white shadow-rose-200 shadow-sm' },
-                          { valor: 'na' as const, label: 'NA', activeClass: 'bg-[#7f1022] border-[#7f1022] text-white shadow-sm' },
-                        ].map(({ valor, label, activeClass }) => (
-                          <button
-                            key={valor}
-                            type="button"
-                            onClick={() => setResposta(item.id, valor)}
-                            className={`flex h-11 w-14 items-center justify-center rounded-xl border-2 text-xs font-extrabold transition-all active:scale-95 sm:w-16 ${
-                              resp === valor
-                                ? activeClass
-                                : 'border-slate-200 bg-white/70 text-slate-400 hover:border-[#b51649]/40 hover:text-[#7f1022] dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-500 dark:hover:border-rose-400/40 dark:hover:text-rose-200'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Área expandida quando NC */}
-                    {resp === 'nc' && (
-                      <div className="mt-3 ml-7 space-y-3">
-                        <div>
-                          <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-rose-500">
-                            Descreva o problema *
-                          </label>
-                          <textarea
-                            rows={2}
-                            value={obs}
-                            onChange={(e) => setObservacoes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                            placeholder="O que foi encontrado de errado? Seja específico..."
-                            className="w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 dark:border-rose-800/60 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:ring-rose-900/30"
-                          />
-                        </div>
-                        <FotosItem
-                          fotos={fotos}
-                          onAdd={(novos) => addFotoItem(item.id, novos)}
-                          onRemove={(i) => removeFotoItem(item.id, i)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+              {grupo.itens.map((item, itemIdx) => (
+                <ItemChecklist
+                  key={item.id}
+                  item={item}
+                  numero={numeroItemMap[item.id] ?? itemIdx + 1}
+                  isLast={itemIdx === grupo.itens.length - 1}
+                  resp={respostas[item.id] ?? null}
+                  obs={observacoes[item.id] ?? ''}
+                  fotos={fotosItem[item.id] ?? []}
+                  destacado={itemDestacado === item.id}
+                  onResposta={setResposta}
+                  onObs={setObservacaoCb}
+                  onAddFoto={addFotoItem}
+                  onRemoveFoto={removeFotoItemCb}
+                  itemRef={(el) => { itemRefs.current[item.id] = el }}
+                />
+              ))}
             </div>
           )
         })}
@@ -1719,7 +1805,7 @@ function FormularioChecklist({
       </div>
 
       {/* ── Barra de envio fixa ──────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-[#0b1020]/95 px-4 pt-3 text-white shadow-[0_-18px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:bg-slate-950/95" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-[#0b1020] px-4 pt-3 text-white shadow-[0_-18px_45px_rgba(15,23,42,0.18)] dark:bg-slate-950" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div className="min-w-0">
             {erroEnvio ? (
