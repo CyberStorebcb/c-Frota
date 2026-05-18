@@ -350,7 +350,7 @@ function TelaConclusao({
                 📡 Sem internet — as fotos serão sincronizadas depois. A mensagem de texto pode ser enviada agora normalmente.
               </p>
             )}
-            <
+            <a
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
