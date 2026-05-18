@@ -37,6 +37,8 @@ export type Apontamento = {
   coordenador: string
   responsavel: string
   ncFotos: string[]
+  problemasAdicionais: string
+  descricaoProblema: string
 }
 
 export type NovoApontamento = Omit<
@@ -117,11 +119,13 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     reparoDescricao: res?.reparoDescricao ?? null,
     reparoImagens:   res?.reparoImagens   ?? [],
     osArquivo:       res?.osArquivo       ?? null,
-    processo:        'Checklist',
-    base:            dv.localidade ?? '',
-    coordenador:     cl.nome_supervisor ?? '',
-    responsavel:     cl.nome_operador,
+    processo:             'Checklist',
+    base:                 dv.localidade ?? '',
+    coordenador:          cl.nome_supervisor ?? '',
+    responsavel:          cl.nome_operador,
     ncFotos,
+    problemasAdicionais:  cl.problemas ?? '',
+    descricaoProblema:    cl.descricao_problema ?? '',
   }
 }
 

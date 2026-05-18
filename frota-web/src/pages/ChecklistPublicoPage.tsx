@@ -255,6 +255,8 @@ function TelaConclusao({
   operador,
   fotosPreview,
   fotosUrls,
+  problemas,
+  descricaoProblema,
 }: {
   ncImperativos: number
   ncCount: number
@@ -265,22 +267,26 @@ function TelaConclusao({
   operador: string
   fotosPreview: string[]
   fotosUrls: string[]
+  problemas: string
+  descricaoProblema: string
 }) {
   const { theme } = useTheme()
   const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
   const bloqueado = ncImperativos > 0
   const comNc = ncCount > 0
 
-  const whatsappLink = comNc && nomeSupervisor
+  const whatsappLink = comNc
     ? buildWhatsappLink({
-        numero: getSupervisorWhatsapp(nomeSupervisor) ?? '',
-        nomeSupervisor,
+        numero: nomeSupervisor ? (getSupervisorWhatsapp(nomeSupervisor) ?? '') : '',
+        nomeSupervisor: nomeSupervisor || 'Supervisor',
         operador,
         veiculo,
         ncCount,
         ncImperativos,
         itensNc,
         fotosUrls,
+        problemas,
+        descricaoProblema,
       })
     : null
 
@@ -339,7 +345,12 @@ function TelaConclusao({
                 ? 'Itens impeditivos foram encontrados. Notifique o supervisor imediatamente antes de qualquer movimentação do veículo.'
                 : 'Foram encontrados itens não conformes. Clique abaixo para notificar o supervisor via WhatsApp.'}
             </p>
-            <a
+            {offline && (
+              <p className="mb-3 rounded-lg bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                📡 Sem internet — as fotos serão sincronizadas depois. A mensagem de texto pode ser enviada agora normalmente.
+              </p>
+            )}
+            <
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
@@ -807,7 +818,9 @@ function FormularioChecklist({
     nomeSupervisor: string
     veiculo: string
     fotosPreview: string[]
-    fotosUrls: string[]  // URLs reais do Supabase Storage (para WhatsApp)
+    fotosUrls: string[]
+    problemas: string
+    descricaoProblema: string
   } | null>(null)
   // highlight do item atual após scroll
   const [itemDestacado, setItemDestacado] = useState<string | null>(null)
@@ -1186,7 +1199,7 @@ function FormularioChecklist({
         .filter((it) => respostas[it.id] === 'nc')
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
       const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [] })
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema })
       clearFormDraft()
       onConcluido?.()
       setConcluido(true)
@@ -1243,7 +1256,7 @@ function FormularioChecklist({
       .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
     const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls })
+    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema })
     clearFormDraft()
     onConcluido?.()
     setConcluido(true)
@@ -1262,6 +1275,8 @@ function FormularioChecklist({
         operador={operador}
         fotosPreview={resultadoFinal.fotosPreview}
         fotosUrls={resultadoFinal.fotosUrls}
+        problemas={resultadoFinal.problemas}
+        descricaoProblema={resultadoFinal.descricaoProblema}
       />
     )
   }

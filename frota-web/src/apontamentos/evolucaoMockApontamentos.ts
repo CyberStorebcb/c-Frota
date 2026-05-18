@@ -40,7 +40,9 @@ function mk(
     responsavel: 'Resp. Mock',
     checklistId: `mock-cl-${sid}`,
     ncItemId:    `mock-item-${sid}`,
-    ncFotos:     [],
+    ncFotos:              [],
+    problemasAdicionais:  '',
+    descricaoProblema:    '',
   }
 }
 

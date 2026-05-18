@@ -66,8 +66,10 @@ export function buildWhatsappLink(params: {
   ncImperativos: number
   itensNc: { label: string; imperativo: boolean }[]
   fotosUrls?: string[]
+  problemas?: string
+  descricaoProblema?: string
 }): string {
-  const { numero, nomeSupervisor, operador, veiculo, ncCount, ncImperativos, itensNc, fotosUrls = [] } = params
+  const { numero, nomeSupervisor, operador, veiculo, ncCount, ncImperativos, itensNc, fotosUrls = [], problemas = '', descricaoProblema = '' } = params
   const bloqueado = ncImperativos > 0
   const status = bloqueado ? '🚫 VEICULO IMPEDIDO' : '⚠️ NC REGISTRADO'
 
@@ -85,6 +87,7 @@ export function buildWhatsappLink(params: {
     '',
     '*Itens com NC:*',
     listaItens,
+    ...(problemas ? ['', `📋 *Problemas adicionais:* ${problemas}`, ...(descricaoProblema ? [`   Local/detalhe: ${descricaoProblema}`] : [])] : []),
     ...(fotosUrls.length > 0
       ? ['', `📷 *${fotosUrls.length} foto(s) registrada(s):*`, ...fotosUrls]
       : []),

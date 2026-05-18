@@ -776,6 +776,22 @@ export function ManagePage() {
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+              {/* Problemas adicionais reportados no checklist */}
+              {currentResolve?.problemasAdicionais && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-950/20">
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                    Problemas adicionais reportados
+                  </p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    {currentResolve.problemasAdicionais}
+                  </p>
+                  {currentResolve.descricaoProblema && (
+                    <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Local/detalhe: {currentResolve.descricaoProblema}
+                    </p>
+                  )}
+                </div>
+              )}
               {/* Fotos da NC de origem (quando apontamento vem de checklist) */}
               {currentResolve?.ncFotos && currentResolve.ncFotos.length > 0 && (
                 <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
