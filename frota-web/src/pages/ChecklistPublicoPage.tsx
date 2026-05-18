@@ -962,8 +962,8 @@ function FormularioChecklist({
         }
         const msg =
           err.code === 1 ? 'GPS bloqueado — ou digite o endereço manualmente.'
-          : err.code === 2 ? 'Posição indisponível. Verifique se o GPS está ativado.'
-          : 'Tempo esgotado. Tente novamente em área aberta.'
+          : err.code === 2 ? 'Posição indisponível — verifique se o GPS do celular está ativado nas configurações do sistema (não do navegador).'
+          : `Tempo esgotado (erro ${err.code}). Tente em área aberta ou digite o endereço manualmente.`
         setLocalidadeGeoErro(msg)
       },
       { enableHighAccuracy: true, maximumAge: 0 },
@@ -1384,10 +1384,12 @@ function FormularioChecklist({
                             <div className="border-t border-rose-200 px-3 pb-3 pt-2 dark:border-rose-800/40">
                               <ol className="space-y-2">
                                 {[
-                                  { n: '1', texto: <>Toque no <strong>cadeado 🔒</strong> na barra de endereço do navegador</> },
-                                  { n: '2', texto: <>Toque em <strong>Permissões</strong> ou <strong>Configurações do site</strong></> },
-                                  { n: '3', texto: <>Em <strong>Localização</strong>, selecione <strong>Permitir</strong></> },
-                                  { n: '4', texto: <>Volte aqui e toque em <strong>Tentar novamente</strong></> },
+                                  { n: '1', texto: <>Toque nos <strong>3 pontos ⋮</strong> no canto superior direito do navegador</> },
+                                  { n: '2', texto: <>Toque em <strong>Configurações</strong></> },
+                                  { n: '3', texto: <>Toque em <strong>Configurações do site</strong></> },
+                                  { n: '4', texto: <>Toque em <strong>Localização</strong></> },
+                                  { n: '5', texto: <>Encontre <strong>c-frota.vercel.app</strong> em "Bloqueados" e toque para <strong>Permitir</strong></> },
+                                  { n: '6', texto: <>Volte aqui e toque em <strong>Tentar novamente</strong></> },
                                 ].map(({ n, texto }) => (
                                   <li key={n} className="flex items-start gap-2">
                                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-200 text-[10px] font-black text-rose-700 dark:bg-rose-900 dark:text-rose-300">
