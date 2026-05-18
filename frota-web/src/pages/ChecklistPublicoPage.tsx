@@ -787,6 +787,7 @@ function FormularioChecklist({
   const [localidadeGeoLoading, setLocalidadeGeoLoading] = useState(false)
   const [localidadeGeoErro, setLocalidadeGeoErro] = useState('')
   const [localidadeCoords, setLocalidadeCoords] = useState<{ lat: number; lng: number } | null>(draft?.localidadeCoords ?? null)
+  const [localidadeAccuracy, setLocalidadeAccuracy] = useState<number | null>(null)
   const [gpsPermissao, setGpsPermissao] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking')
   const [gpsGuiaAberto, setGpsGuiaAberto] = useState(false)
   const [gpsErroCodigo, setGpsErroCodigo] = useState<1 | 2 | 3 | null>(null)
@@ -1011,11 +1012,12 @@ function FormularioChecklist({
     const watchState = { id: 0 }
     let settled = false
 
-    const finish = async (lat: number, lng: number) => {
+    const finish = async (lat: number, lng: number, accuracy: number) => {
       if (settled) return
       settled = true
       navigator.geolocation.clearWatch(watchState.id)
       setLocalidadeCoords({ lat, lng })
+      setLocalidadeAccuracy(Math.round(accuracy))
 
       const coordsStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
 
@@ -1053,7 +1055,7 @@ function FormularioChecklist({
     // Fallback: usa a melhor posição obtida até aqui após MAX_WAIT_MS
     let bestPos: GeolocationPosition | null = null
     const fallbackTimer = setTimeout(() => {
-      if (!settled && bestPos) void finish(bestPos.coords.latitude, bestPos.coords.longitude)
+      if (!settled && bestPos) void finish(bestPos.coords.latitude, bestPos.coords.longitude, bestPos.coords.accuracy)
       else if (!settled) {
         settled = true
         navigator.geolocation.clearWatch(watchState.id)
@@ -1067,7 +1069,7 @@ function FormularioChecklist({
         bestPos = pos
         if (pos.coords.accuracy <= ACCURACY_TARGET) {
           clearTimeout(fallbackTimer)
-          void finish(pos.coords.latitude, pos.coords.longitude)
+          void finish(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy)
         }
       },
       (err) => {
@@ -1573,32 +1575,50 @@ function FormularioChecklist({
                     ) : localidadeGeoErro ? (
                       <p className="text-xs font-semibold text-rose-500 dark:text-rose-400">{localidadeGeoErro}</p>
                     ) : null}
-                    {localidadeCoords && !localidadeGeoLoading ? (
-                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                        {navigator.onLine ? (
-                          <iframe
-                            title="Mapa da localização"
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${localidadeCoords.lng - 0.005},${localidadeCoords.lat - 0.005},${localidadeCoords.lng + 0.005},${localidadeCoords.lat + 0.005}&layer=mapnik&marker=${localidadeCoords.lat},${localidadeCoords.lng}`}
-                            className="h-44 w-full border-0"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="flex h-44 flex-col items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800">
-                            <MapPin className="size-8 text-slate-400 dark:text-slate-500" />
-                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Mapa indisponível offline</p>
-                            <p className="font-mono text-xs text-slate-400 dark:text-slate-500">
-                              {localidadeCoords.lat.toFixed(6)}, {localidadeCoords.lng.toFixed(6)}
-                            </p>
+                    {localidadeCoords && !localidadeGeoLoading ? (() => {
+                      const isCoords = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(dadosVeiculo.localidade ?? '')
+                      const [latStr, lngStr] = (dadosVeiculo.localidade ?? '').split(',')
+                      const latDMS = isCoords ? `${Math.abs(parseFloat(latStr ?? '0')).toFixed(4)}° ${parseFloat(latStr ?? '0') >= 0 ? 'N' : 'S'}` : null
+                      const lngDMS = isCoords ? `${Math.abs(parseFloat(lngStr ?? '0')).toFixed(4)}° ${parseFloat(lngStr ?? '0') >= 0 ? 'L' : 'O'}` : null
+                      return (
+                        <div className="overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-950/30">
+                          <div className="flex items-center gap-3 px-3 py-2.5">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 shadow-sm">
+                              <MapPin className="size-4 text-white" aria-hidden />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] font-extrabold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                                Localização capturada{localidadeAccuracy ? ` · ±${localidadeAccuracy}m` : ''}
+                              </p>
+                              {isCoords ? (
+                                <p className="mt-0.5 font-mono text-xs font-bold text-slate-700 dark:text-slate-200">
+                                  {latDMS} &nbsp;{lngDMS}
+                                </p>
+                              ) : (
+                                <p className="mt-0.5 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                  {dadosVeiculo.localidade}
+                                </p>
+                              )}
+                            </div>
+                            <a
+                              href={`https://www.google.com/maps?q=${localidadeCoords.lat},${localidadeCoords.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-[11px] font-extrabold text-emerald-700 hover:bg-emerald-50 active:scale-95 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            >
+                              Ver mapa
+                            </a>
                           </div>
-                        )}
-                        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 dark:bg-slate-800">
-                          <MapPin className="size-3.5 shrink-0 text-[#7f1022] dark:text-rose-400" aria-hidden />
-                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                            {dadosVeiculo.localidade}
-                          </span>
+                          {isCoords && (
+                            <div className="border-t border-emerald-100 bg-emerald-100/60 px-3 py-1.5 dark:border-emerald-800/40 dark:bg-emerald-900/20">
+                              <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                📡 Sem internet — endereço será registrado ao reconectar
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ) : null}
+                      )
+                    })() : null}
                   </div>
                 ) : campo.tipo === 'select' && campo.opcoes && campo.opcoes.length > 0 ? (
                   <select
