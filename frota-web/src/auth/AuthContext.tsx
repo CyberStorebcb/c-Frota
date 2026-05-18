@@ -22,12 +22,15 @@ async function fetchRole(userId: string, email: string): Promise<'admin' | 'user
   if (adminEmail && email.trim().toLowerCase() === adminEmail) {
     return 'admin'
   }
-  const { data } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single()
-  return (data?.role === 'admin') ? 'admin' : 'user'
+  try {
+    const { data } = await Promise.race([
+      supabase.from('profiles').select('role').eq('id', userId).single(),
+      new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 4000)),
+    ])
+    return (data?.role === 'admin') ? 'admin' : 'user'
+  } catch {
+    return 'user'
+  }
 }
 
 function toAuthUser(supabaseUser: User, role: 'admin' | 'user'): AuthUser {
