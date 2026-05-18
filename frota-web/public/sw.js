@@ -1,4 +1,4 @@
-const CACHE_NAME = 'frota-checklists-v10'
+const CACHE_NAME = 'frota-checklists-v11'
 const BACKGROUND_SYNC_TAG = 'frota-sync-checklists'
 
 // Apenas o shell estático que raramente muda
@@ -101,7 +101,10 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
         return response
       })
-      .catch(() => caches.match(request)),
+      .catch(async () => {
+        const cached = await caches.match(request)
+        return cached || new Response('Offline', { status: 503 })
+      }),
   )
 })
 
