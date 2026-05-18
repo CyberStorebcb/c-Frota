@@ -5,6 +5,7 @@
         "origins": [
           "http://localhost:5173",
           "http://localhost:3000",
+          "https://cgb-frota.vercel.app",
           "https://c-frota.vercel.app"
         ],
         "methods": ["GET", "PUT", "HEAD"],
