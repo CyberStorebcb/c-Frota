@@ -1208,22 +1208,27 @@ function FormularioChecklist({
     }
 
     const ts = Date.now()
-    const evidenciaUrls: string[] = []
 
-    for (const file of arquivos) {
-      const url = await uploadFile(file, `${schema.id}/${ts}-${file.name.replace(/\s+/g, '_')}`)
-      if (url) evidenciaUrls.push(url)
-    }
+    const evidenciaUrlsGerais = await Promise.all(
+      arquivos.map((file) =>
+        uploadFile(file, `${schema.id}/${ts}-${file.name.replace(/\s+/g, '_')}`)
+      )
+    )
+    const evidenciaUrls: string[] = evidenciaUrlsGerais.filter(Boolean) as string[]
 
     const fotasUrls: Record<string, string[]> = {}
-    for (const [itemId, fotos] of Object.entries(fotosItem)) {
-      fotasUrls[itemId] = []
-      for (const [i, file] of fotos.entries()) {
-        const ext = file.name.split('.').pop() ?? 'jpg'
-        const url = await uploadFile(file, `${schema.id}/item-${itemId}-${ts}-${i}.${ext}`)
-        if (url) { fotasUrls[itemId].push(url); evidenciaUrls.push(url) }
-      }
-    }
+    await Promise.all(
+      Object.entries(fotosItem).map(async ([itemId, fotos]) => {
+        const urls = await Promise.all(
+          fotos.map((file, i) => {
+            const ext = file.name.split('.').pop() ?? 'jpg'
+            return uploadFile(file, `${schema.id}/item-${itemId}-${ts}-${i}.${ext}`)
+          })
+        )
+        fotasUrls[itemId] = urls.filter(Boolean) as string[]
+        evidenciaUrls.push(...(fotasUrls[itemId]))
+      })
+    )
 
     const observacoesFinais = { ...observacoes }
     for (const [itemId, urls] of Object.entries(fotasUrls)) {

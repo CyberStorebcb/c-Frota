@@ -1,5 +1,5 @@
 /** Limite de tamanho das imagens de checklist (bytes). */
-export const CHECKLIST_IMAGE_MAX_BYTES = 155 * 1024
+export const CHECKLIST_IMAGE_MAX_BYTES = 800 * 1024
 
 function isCompressibleRasterImage(file: File): boolean {
   if (!file.type.startsWith('image/')) return false
@@ -70,8 +70,8 @@ export async function compressChecklistImageIfNeeded(file: File): Promise<File> 
       const ctx = canvas.getContext('2d')
       if (!ctx) return file
 
-      let maxDimension = 2048
-      const minDimension = 360
+      let maxDimension = 1920
+      const minDimension = 480
 
       while (maxDimension >= minDimension) {
         const scale = Math.min(1, maxDimension / Math.max(iw, ih))
@@ -81,7 +81,7 @@ export async function compressChecklistImageIfNeeded(file: File): Promise<File> 
         ctx.fillRect(0, 0, canvas.width, canvas.height)
         ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
 
-        for (let q = 0.92; q >= 0.28; q -= 0.05) {
+        for (let q = 0.85; q >= 0.4; q -= 0.1) {
           const blob = await canvasToJpegBlob(canvas, q)
           if (blob.size <= CHECKLIST_IMAGE_MAX_BYTES) {
             return new File([blob], outputFileName(file.name), {
@@ -90,7 +90,7 @@ export async function compressChecklistImageIfNeeded(file: File): Promise<File> 
             })
           }
         }
-        maxDimension = Math.floor(maxDimension * 0.78)
+        maxDimension = Math.floor(maxDimension * 0.75)
       }
 
       let blob = await canvasToJpegBlob(canvas, 0.22)
