@@ -1637,7 +1637,7 @@ function FormularioChecklist({
         )}
 
         {/* ── Grupos de itens ──────────────────────────────────────── */}
-        {schema.grupos.map((grupo, grupoIdx) => {
+        {schema.grupos.map((grupo) => {
           const respondidosGrupo = grupo.itens.filter((it) => respostas[it.id] != null).length
           const grupoCompleto    = respondidosGrupo === grupo.itens.length
 
