@@ -36,9 +36,10 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     })
   })
 
-  // Quando o SW ativa uma nova versão, exibe banner para o usuário atualizar
+  // Quando o SW ativa uma nova versão, exibe banner apenas para usuários do checklist
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data?.type !== 'SW_UPDATED') return
+    if (!window.location.pathname.startsWith('/checklist')) return
     if (document.getElementById('pwa-update-banner')) return
 
     const banner = document.createElement('div')
