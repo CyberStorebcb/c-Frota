@@ -1187,85 +1187,87 @@ function FormularioChecklist({
     setEnviando(true)
     setErroEnvio('')
 
-    if (!navigator.onLine) {
-      try {
-        await enqueueChecklist(buildChecklistPayload({ ...observacoes }, []), buildOfflineFiles())
-      } catch {
-        setErroEnvio('Sem internet e não foi possível salvar offline. Verifique o armazenamento do dispositivo.')
+    try {
+      if (!navigator.onLine) {
+        try {
+          await enqueueChecklist(buildChecklistPayload({ ...observacoes }, []), buildOfflineFiles())
+        } catch {
+          setErroEnvio('Sem internet e não foi possível salvar offline. Verifique o armazenamento do dispositivo.')
+          setEnviando(false)
+          return
+        }
+        const itensNc = todosItens
+          .filter((it) => respostas[it.id] === 'nc')
+          .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
+        const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
+        setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema })
+        clearFormDraft()
+        onConcluido?.()
+        setConcluido(true)
         setEnviando(false)
         return
       }
+
+      const ts = Date.now()
+
+      const evidenciaUrlsGerais = await Promise.all(
+        arquivos.map((file) =>
+          uploadFile(file, `${schema.id}/${ts}-${file.name.replace(/\s+/g, '_')}`)
+        )
+      )
+      const evidenciaUrls: string[] = evidenciaUrlsGerais.filter(Boolean) as string[]
+
+      const fotasUrls: Record<string, string[]> = {}
+      await Promise.all(
+        Object.entries(fotosItem).map(async ([itemId, fotos]) => {
+          const urls = await Promise.all(
+            fotos.map((file, i) => {
+              const ext = file.name.split('.').pop() ?? 'jpg'
+              return uploadFile(file, `${schema.id}/item-${itemId}-${ts}-${i}.${ext}`)
+            })
+          )
+          fotasUrls[itemId] = urls.filter(Boolean) as string[]
+          evidenciaUrls.push(...(fotasUrls[itemId]))
+        })
+      )
+
+      const observacoesFinais = { ...observacoes }
+      for (const [itemId, urls] of Object.entries(fotasUrls)) {
+        if (urls.length > 0) {
+          const t = observacoesFinais[itemId] ?? ''
+          observacoesFinais[itemId] = t
+            ? `${t}\n__fotos__:${urls.join('|')}`
+            : `__fotos__:${urls.join('|')}`
+        }
+      }
+
+      const payload = buildChecklistPayload(observacoesFinais, evidenciaUrls)
+      const { error } = await supabase.from('checklists').insert(payload)
+
+      if (error) {
+        try {
+          await enqueueChecklist(buildChecklistPayload(observacoesFinais, evidenciaUrls), buildOfflineFiles())
+        } catch {
+          setErroEnvio('Erro ao enviar e salvar offline. Verifique o armazenamento do dispositivo.')
+          setEnviando(false)
+          return
+        }
+      }
+
       const itensNc = todosItens
         .filter((it) => respostas[it.id] === 'nc')
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
-      const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema })
+
+      const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema })
       clearFormDraft()
       onConcluido?.()
       setConcluido(true)
+    } catch {
+      setErroEnvio('Erro inesperado ao enviar. Tente novamente.')
+    } finally {
       setEnviando(false)
-      return
     }
-
-    const ts = Date.now()
-
-    const evidenciaUrlsGerais = await Promise.all(
-      arquivos.map((file) =>
-        uploadFile(file, `${schema.id}/${ts}-${file.name.replace(/\s+/g, '_')}`)
-      )
-    )
-    const evidenciaUrls: string[] = evidenciaUrlsGerais.filter(Boolean) as string[]
-
-    const fotasUrls: Record<string, string[]> = {}
-    await Promise.all(
-      Object.entries(fotosItem).map(async ([itemId, fotos]) => {
-        const urls = await Promise.all(
-          fotos.map((file, i) => {
-            const ext = file.name.split('.').pop() ?? 'jpg'
-            return uploadFile(file, `${schema.id}/item-${itemId}-${ts}-${i}.${ext}`)
-          })
-        )
-        fotasUrls[itemId] = urls.filter(Boolean) as string[]
-        evidenciaUrls.push(...(fotasUrls[itemId]))
-      })
-    )
-
-    const observacoesFinais = { ...observacoes }
-    for (const [itemId, urls] of Object.entries(fotasUrls)) {
-      if (urls.length > 0) {
-        const t = observacoesFinais[itemId] ?? ''
-        // Salva as URLs reais separadas por \n após o texto da observação
-        observacoesFinais[itemId] = t
-          ? `${t}\n__fotos__:${urls.join('|')}`
-          : `__fotos__:${urls.join('|')}`
-      }
-    }
-
-    const payload = buildChecklistPayload(observacoesFinais, evidenciaUrls)
-    const { error } = await supabase.from('checklists').insert(payload)
-
-    if (error) {
-      try {
-        // Usa observacoesFinais (com URLs de fotos já embutidas) no fallback offline
-        await enqueueChecklist(buildChecklistPayload(observacoesFinais, evidenciaUrls), buildOfflineFiles())
-      } catch {
-        setErroEnvio('Erro ao enviar e salvar offline. Verifique o armazenamento do dispositivo.')
-        setEnviando(false)
-        return
-      }
-    }
-
-    // Monta lista de itens NC para a tela de conclusão
-    const itensNc = todosItens
-      .filter((it) => respostas[it.id] === 'nc')
-      .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
-
-    const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-    setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema })
-    clearFormDraft()
-    onConcluido?.()
-    setConcluido(true)
-    setEnviando(false)
   }
 
   if (concluido && resultadoFinal) {
