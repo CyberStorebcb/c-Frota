@@ -128,7 +128,7 @@ function StatPill({
 export function ManagePage() {
   const { rows, carregando, marcarResolvido, checklistsRealizadosTotal } = useApontamentos()
   const { user } = useAuth()
-  const canMarkResolved = user?.role === 'admin'
+  const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')

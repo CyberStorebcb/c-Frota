@@ -728,7 +728,7 @@ function calcSemanas(rows: ChecklistRow[], n = 8) {
 
 export function ChecklistResultadosPage() {
   const { user } = useAuth()
-  const podeGerenciar = user?.role === 'admin'
+  const podeGerenciar = user?.role === 'admin' || user?.role === 'super_admin'
 
   const [capturando, setCapturando]   = useState(false)
   const [rows, setRows]               = useState<ChecklistRow[]>([])

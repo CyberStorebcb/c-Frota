@@ -577,7 +577,7 @@ export function RegistroVeiculosPage() {
 
   const navigate = useNavigate()
   const { user } = useAuth()
-  const canRegisterVehicle = user?.role === 'admin'
+  const canRegisterVehicle = user?.role === 'admin' || user?.role === 'super_admin'
 
   const goToGerenciarVeiculo = (vehicle: FleetVehicle) => {
     const veiculoId = apontamentoVeiculoIdFromPlaca(vehicle.placa)
