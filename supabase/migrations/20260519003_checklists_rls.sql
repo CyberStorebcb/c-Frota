@@ -1,13 +1,23 @@
--- Habilita RLS na tabela checklists e permite inserção anônima (motoristas sem login)
+-- Habilita RLS na tabela checklists e permite inserção anônima e autenticada
 alter table public.checklists enable row level security;
 
--- Motoristas (anon) podem inserir checklists
+grant usage on schema public to anon;
+grant insert on public.checklists to anon;
+grant insert on public.checklists to authenticated;
+
+-- Motoristas sem login (anon) podem inserir checklists
 create policy "Anon pode inserir checklists"
   on public.checklists for insert
   to anon
   with check (true);
 
--- Usuários autenticados (admins/supervisores) podem ler todos os checklists
+-- Usuários logados (admins/supervisores) também podem inserir checklists
+create policy "Autenticados podem inserir checklists"
+  on public.checklists for insert
+  to authenticated
+  with check (true);
+
+-- Usuários autenticados podem ler todos os checklists
 create policy "Autenticados podem ler checklists"
   on public.checklists for select
   to authenticated using (true);
