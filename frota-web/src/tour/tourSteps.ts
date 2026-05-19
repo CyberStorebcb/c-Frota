@@ -1,24 +1,9 @@
-/**
- * Definição dos passos do tour guiado.
- *
- * Cada passo pode:
- * - Ter um `selector` CSS para destacar elemento específico (spotlight)
- * - Não ter selector → exibe modal centralizado explicativo
- * - Mudar de rota via `path` (navegação automática)
- */
-
 export type TourStep = {
-  /** Rota a navegar antes de mostrar o passo. */
   path: string
-  /** Seletor CSS do elemento a destacar. Se omitido, exibe modal centralizado. */
   selector?: string
-  /** Título do balão/modal. */
   title: string
-  /** Conteúdo explicativo. */
   content: string
-  /** Posição preferida do tooltip (auto se omitido). */
   placement?: 'top' | 'bottom' | 'left' | 'right' | 'center'
-  /** Aguarda em ms antes de mostrar (para esperar carregamentos). */
   waitMs?: number
 }
 
@@ -28,97 +13,94 @@ export const TOUR_STEPS: TourStep[] = [
     path: '/',
     title: '👋 Bem-vindo ao CGB Frota!',
     content:
-      'Este é o sistema de gestão completa da frota. Vou te apresentar todas as funcionalidades em poucos minutos. Use os botões ▶ Próximo / ◀ Voltar para navegar, ou Pular para finalizar.',
-    placement: 'center',
-    waitMs: 500,
+      'Este é o sistema de gestão completa da frota da CGB Energia. Vou te apresentar todas as funcionalidades em poucos minutos. Use ▶ Próximo / ◀ Voltar para navegar, ou Pular para sair.',
+    waitMs: 600,
   },
 
-  // ─── Dashboard ──────────────────────────────────────────────────────────
+  // ─── Sidebar ────────────────────────────────────────────────────────────
   {
     path: '/',
     selector: '[data-tour="sidebar"]',
     title: '📍 Menu de Navegação',
     content:
-      'Este é o menu lateral. Por aqui você acessa Dashboard, Gerenciar, Registro, Checklists e (para super admin) Usuários.',
+      'Este é o menu lateral. Por aqui você acessa todas as áreas: Dashboard, Gerenciar, Registro, Checklists e (para super admin) Usuários.',
     placement: 'right',
   },
+
+  // ─── Dashboard ──────────────────────────────────────────────────────────
   {
     path: '/',
-    title: '📊 Dashboard',
+    title: '📊 Dashboard — Visão Geral',
     content:
-      'O Dashboard mostra a visão geral da frota: KPIs principais, checklists realizados, pendências, evolução e ranking. É a tela inicial de todo o sistema.',
-    placement: 'center',
+      'Observe a tela acima: aqui ficam os KPIs principais da frota — total de veículos, checklists do dia, pendências e evolução mensal. É a primeira tela ao entrar no sistema.',
+    waitMs: 400,
   },
 
   // ─── Gerenciar ──────────────────────────────────────────────────────────
   {
     path: '/gerenciar',
-    title: '🛠️ Página Gerenciar',
+    title: '🛠️ Gerenciar — Apontamentos de Defeitos',
     content:
-      'Aqui você gerencia todos os apontamentos de defeitos da frota. Cada NC (Não Conformidade) de checklist vira um apontamento que pode ser acompanhado, marcado como resolvido e ter sua resolução documentada.',
-    placement: 'center',
-    waitMs: 800,
+      'Veja a tela acima: cada NC (Não Conformidade) encontrada nos checklists vira um apontamento aqui. Admins acompanham, documentam a resolução e encerram cada ocorrência.',
+    waitMs: 900,
   },
   {
     path: '/gerenciar',
     selector: '[data-tour="manage-stats"]',
-    title: '📈 KPIs do período',
+    title: '📈 KPIs do Período',
     content:
-      'Os cartões superiores mostram totais de Apontamentos, Pendentes, Resolvidos e Defeitos Entrantes (apontados hoje). Clique em cada cartão para filtrar a tabela.',
+      'Os cartões mostram totais de Apontamentos, Pendentes, Resolvidos e Defeitos Entrantes (de hoje). Clique em qualquer cartão para filtrar automaticamente a tabela abaixo.',
     placement: 'bottom',
   },
   {
     path: '/gerenciar',
     selector: '[data-tour="manage-filtros"]',
-    title: '🔍 Filtros poderosos',
+    title: '🔍 Filtros Avançados',
     content:
-      'Filtre por veículo, base, processo, supervisor, gerência, data e mais. Os filtros são salvos automaticamente.',
+      'Filtre por veículo, base, processo, supervisor, gerência e intervalo de datas. Os filtros ativos são destacados e podem ser limpos individualmente.',
     placement: 'bottom',
   },
   {
     path: '/gerenciar',
     selector: '[data-tour="manage-table"]',
-    title: '📋 Tabela de apontamentos',
+    title: '📋 Tabela de Apontamentos',
     content:
-      'Cada linha representa um defeito. Veja veículo, processo, defeito, data e status. Admin/super admin podem marcar como resolvido diretamente aqui.',
+      'Cada linha é um defeito: veículo, processo, descrição, data e status. Admins podem marcar como resolvido, adicionar evidências de resolução e acompanhar prazos.',
     placement: 'top',
   },
 
   // ─── Evolução ──────────────────────────────────────────────────────────
   {
     path: '/gerenciar/evolucao',
-    title: '📉 Evolução temporal',
+    title: '📉 Evolução — Análise Temporal',
     content:
-      'Esta página mostra a evolução de defeitos ao longo do tempo: aberturas vs. resoluções, tempo médio de resolução, tendências por mês. Útil para análise estratégica.',
-    placement: 'center',
-    waitMs: 600,
+      'Veja o gráfico acima: mostra aberturas vs. resoluções ao longo do tempo, tempo médio de resolução e tendências mensais. Ferramenta essencial para análise estratégica da frota.',
+    waitMs: 800,
   },
 
   // ─── Histórico ──────────────────────────────────────────────────────────
   {
     path: '/gerenciar/historico',
-    title: '📜 Histórico de Resoluções',
+    title: '📜 Histórico — Manutenções Concluídas',
     content:
-      'Histórico completo de todas as manutenções corretivas concluídas, com evidências fotográficas do antes/depois e geração de relatórios em PDF.',
-    placement: 'center',
-    waitMs: 600,
+      'Todas as manutenções corretivas já encerradas ficam aqui, com fotos do antes/depois e descrição da resolução. É possível gerar relatórios em PDF de qualquer registro.',
+    waitMs: 800,
   },
 
   // ─── Checklists ──────────────────────────────────────────────────────────
   {
     path: '/gerenciar/checklists',
-    title: '✅ Checklists',
+    title: '✅ Checklists — Controle Diário',
     content:
-      'Aqui você acompanha quais veículos realizaram (ou não) os checklists do dia. É a ponte entre o operador no campo e a gestão da frota.',
-    placement: 'center',
-    waitMs: 600,
+      'Veja na tela acima quais veículos realizaram (ou não) o checklist do dia. É a ponte entre o operador no campo e a gestão central da frota.',
+    waitMs: 800,
   },
   {
     path: '/gerenciar/checklists',
     selector: '[data-tour="checklists-actions"]',
-    title: '🔗 Link público do checklist',
+    title: '🔗 Link Público do Checklist',
     content:
-      'Os operadores acessam um link único (/checklist) para preencher o checklist diário do veículo. Pode ser enviado por WhatsApp.',
+      'Os operadores acessam um link único (/checklist) para preencher o checklist do veículo sem precisar de login. Esse link pode ser enviado por WhatsApp ou QR Code.',
     placement: 'bottom',
   },
 
@@ -127,50 +109,46 @@ export const TOUR_STEPS: TourStep[] = [
     path: '/gerenciar/checklists/resultados',
     title: '📊 Resultados dos Checklists',
     content:
-      'Veja todos os checklists já enviados pelos operadores. Filtre por tipo de veículo, busque, edite (admin), exporte CSV ou veja os detalhes completos com fotos.',
-    placement: 'center',
-    waitMs: 600,
+      'Todos os checklists enviados pelos operadores aparecem aqui. Filtre por tipo de veículo, veja os detalhes completos com fotos, edite (admin) ou exporte em CSV.',
+    waitMs: 800,
   },
 
   // ─── Registro ──────────────────────────────────────────────────────────
   {
     path: '/registro',
-    title: '🚗 Registro de Veículos',
+    title: '🚗 Registro — Cadastro da Frota',
     content:
-      'Cadastro mestre da frota. Usuários autorizados podem adicionar veículos manualmente ou importar planilhas Excel inteiras de uma vez.',
-    placement: 'center',
-    waitMs: 600,
+      'Veja a lista de veículos acima: este é o cadastro mestre da frota. Usuários autorizados adicionam veículos manualmente ou importam planilhas Excel de uma só vez.',
+    waitMs: 800,
   },
   {
     path: '/registro',
     selector: '[data-tour="registro-actions"]',
-    title: '➕ Importação e cadastro',
+    title: '➕ Importação e Cadastro',
     content:
-      'Os botões "Importar Excel" e "Novo veículo" aparecem apenas para os usuários autorizados a modificar a base. Para os demais, a página é só de consulta.',
+      'Os botões "Importar Excel" e "Novo veículo" aparecem apenas para os usuários com permissão de modificar a base. Para os demais, a página é somente leitura.',
     placement: 'bottom',
   },
 
   // ─── Usuários ──────────────────────────────────────────────────────────
   {
     path: '/usuarios',
-    title: '👥 Gestão de Usuários',
+    title: '👥 Usuários — Gestão de Acessos',
     content:
-      'Apenas super admins acessam esta página. Aqui você cria novos usuários, define roles (admin/user), reseta senhas e gerencia acessos.',
-    placement: 'center',
-    waitMs: 600,
+      'Apenas super admins acessam esta área. Aqui você cria novos usuários, define perfis (admin/usuário), reseta senhas e gerencia quem tem acesso ao sistema.',
+    waitMs: 800,
   },
 
   // ─── Encerramento ──────────────────────────────────────────────────────
   {
     path: '/',
-    title: '🎉 Tour concluído!',
+    title: '🎉 Tour Concluído!',
     content:
-      'Você conheceu as principais áreas do sistema. Boa gestão da frota! Você pode reiniciar este tour a qualquer momento clicando no botão de ajuda no canto inferior direito.',
-    placement: 'center',
+      'Você conheceu todas as áreas do sistema. Boa gestão da frota! Para rever o tour a qualquer momento, clique no botão "?" no canto inferior direito da tela.',
+    waitMs: 400,
   },
 ]
 
-/** E-mails que disparam o tour automaticamente ao fazer login. */
 export const TOUR_AUTOSTART_EMAILS = [
   'demo@cgbengenharia.com.br',
 ]

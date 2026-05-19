@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom'
 
 type Rect = { top: number; left: number; width: number; height: number }
 
-const PAD = 8 // padding em torno do elemento destacado
+const PAD = 10
 
 export function TourOverlay() {
   const { active, step, stepIndex, total, next, prev, stop } = useTour()
@@ -20,7 +20,7 @@ export function TourOverlay() {
     if (!active || !step) return
     if (location.pathname !== step.path) return
 
-    const waitMs = step.waitMs ?? 250
+    const waitMs = step.waitMs ?? 300
     const timer = window.setTimeout(() => setReady(true), waitMs)
     return () => window.clearTimeout(timer)
   }, [active, step, location.pathname, stepIndex])
@@ -34,7 +34,6 @@ export function TourOverlay() {
       const el = document.querySelector(step.selector!) as HTMLElement | null
       if (!el) { setRect(null); return }
       el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
-      // pequeno delay para terminar scroll
       window.setTimeout(() => {
         const r = el.getBoundingClientRect()
         setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
@@ -52,47 +51,41 @@ export function TourOverlay() {
 
   if (!active || !step) return null
 
+  const hasSpotlight = !!step.selector && rect !== null
+  // Centered = sem selector OU selector não encontrado na tela
   const isCentered = !step.selector || !rect
-  const hasSpotlight = !isCentered && rect !== null
 
-  // ── Posição do tooltip ──────────────────────────────────────────────────
+  // ── Posição do tooltip para spotlight ──────────────────────────────────
   let tooltipStyle: React.CSSProperties = {}
   if (hasSpotlight && rect) {
     const placement = step.placement ?? 'auto'
     const TOOLTIP_W = 360
-    const TOOLTIP_H = 200
+    const TOOLTIP_H = 220
     const vh = window.innerHeight
     const vw = window.innerWidth
 
     let top = 0
     let left = 0
-    let actual: 'top' | 'bottom' | 'left' | 'right' = 'bottom'
 
     if (placement === 'top' || (placement === 'auto' && rect.top > vh / 2)) {
       top = rect.top - TOOLTIP_H - PAD - 12
       left = rect.left + rect.width / 2 - TOOLTIP_W / 2
-      actual = 'top'
     } else if (placement === 'left') {
       top = rect.top + rect.height / 2 - TOOLTIP_H / 2
       left = rect.left - TOOLTIP_W - PAD - 12
-      actual = 'left'
     } else if (placement === 'right') {
       top = rect.top + rect.height / 2 - TOOLTIP_H / 2
       left = rect.left + rect.width + PAD + 12
-      actual = 'right'
     } else {
       // bottom (default / auto)
       top = rect.top + rect.height + PAD + 12
       left = rect.left + rect.width / 2 - TOOLTIP_W / 2
-      actual = 'bottom'
     }
 
-    // clamp dentro da viewport
     left = Math.max(12, Math.min(vw - TOOLTIP_W - 12, left))
     top = Math.max(12, Math.min(vh - TOOLTIP_H - 12, top))
 
     tooltipStyle = { top, left, width: TOOLTIP_W, position: 'fixed' }
-    void actual // posição de seta ficaria aqui no futuro
   }
 
   const isLast = stepIndex === total - 1
@@ -101,27 +94,21 @@ export function TourOverlay() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[9999]">
-      {/* ── Overlay escuro ─────────────────────────────────────────────── */}
-      {isCentered ? (
-        <div className="pointer-events-auto absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      ) : hasSpotlight && rect ? (
+
+      {/* ── Overlay: SPOTLIGHT = buraco no escuro | CENTERED = sem overlay ── */}
+      {hasSpotlight && rect ? (
         <>
-          {/* 4 retângulos formando o "buraco" ao redor do elemento */}
+          {/* 4 retângulos escuros formando o "buraco" */}
           <div
-            className="pointer-events-auto absolute bg-black/70 backdrop-blur-[2px] transition-all"
+            className="pointer-events-auto absolute bg-black/65 backdrop-blur-[2px] transition-all duration-300"
             style={{ top: 0, left: 0, right: 0, height: Math.max(0, rect.top - PAD) }}
           />
           <div
-            className="pointer-events-auto absolute bg-black/70 backdrop-blur-[2px] transition-all"
-            style={{
-              top: rect.top + rect.height + PAD,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
+            className="pointer-events-auto absolute bg-black/65 backdrop-blur-[2px] transition-all duration-300"
+            style={{ top: rect.top + rect.height + PAD, left: 0, right: 0, bottom: 0 }}
           />
           <div
-            className="pointer-events-auto absolute bg-black/70 backdrop-blur-[2px] transition-all"
+            className="pointer-events-auto absolute bg-black/65 backdrop-blur-[2px] transition-all duration-300"
             style={{
               top: Math.max(0, rect.top - PAD),
               left: 0,
@@ -130,7 +117,7 @@ export function TourOverlay() {
             }}
           />
           <div
-            className="pointer-events-auto absolute bg-black/70 backdrop-blur-[2px] transition-all"
+            className="pointer-events-auto absolute bg-black/65 backdrop-blur-[2px] transition-all duration-300"
             style={{
               top: Math.max(0, rect.top - PAD),
               left: rect.left + rect.width + PAD,
@@ -138,32 +125,48 @@ export function TourOverlay() {
               height: rect.height + PAD * 2,
             }}
           />
-          {/* Borda animada em torno do elemento */}
+          {/* Borda pulsante em torno do elemento */}
           <div
-            className="pointer-events-none absolute rounded-2xl ring-4 ring-brand-400 transition-all"
+            className="pointer-events-none absolute rounded-2xl ring-2 ring-brand-400/80 transition-all duration-300"
             style={{
               top: rect.top - PAD,
               left: rect.left - PAD,
               width: rect.width + PAD * 2,
               height: rect.height + PAD * 2,
-              boxShadow: '0 0 0 9999px rgba(0,0,0,0)',
               animation: 'tour-pulse 2s ease-in-out infinite',
             }}
           />
         </>
+      ) : isCentered ? (
+        <>
+          {/* Sem overlay escuro — apenas vinheta sutil nas bordas para focar atenção */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.35) 100%)',
+            }}
+          />
+          {/* Gradiente na base onde o card aparece */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/50 to-transparent" />
+        </>
       ) : null}
 
-      {/* ── Tooltip / Modal ─────────────────────────────────────────────── */}
+      {/* ── Tooltip / Card ──────────────────────────────────────────────────── */}
       <div
-        className={`pointer-events-auto rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl ${
-          isCentered ? 'fixed left-1/2 top-1/2 w-[90%] max-w-md -translate-x-1/2 -translate-y-1/2' : ''
-        }`}
+        className={[
+          'pointer-events-auto rounded-2xl border shadow-2xl',
+          'border-slate-700/80 bg-slate-900/95 backdrop-blur-md',
+          isCentered
+            ? 'fixed bottom-6 left-1/2 w-[92%] max-w-lg -translate-x-1/2'
+            : '',
+        ].join(' ')}
         style={isCentered ? undefined : tooltipStyle}
       >
         {/* Barra de progresso */}
         <div className="h-1 overflow-hidden rounded-t-2xl bg-slate-800">
           <div
-            className="h-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all"
+            className="h-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -222,10 +225,9 @@ export function TourOverlay() {
         </div>
       </div>
 
-      {/* Keyframes da pulsação */}
       <style>{`
         @keyframes tour-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(56,189,248,0.55); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(56,189,248,0.6); }
           50%       { box-shadow: 0 0 0 8px rgba(56,189,248,0); }
         }
       `}</style>
