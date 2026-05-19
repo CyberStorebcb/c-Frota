@@ -365,13 +365,25 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
               <span>Enviado em {formatDateTimeBR(row.created_at)}</span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {row.nc_count > 0 && (
+              <Link
+                to={`/gerenciar?placa=${encodeURIComponent(normalizePlaca(row.dados_veiculo?.placa ?? ''))}&checklist=${row.id}`}
+                onClick={onClose}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-extrabold text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/30"
+              >
+                <ExternalLink size={13} />
+                Ver no Gerenciar
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* resumo */}

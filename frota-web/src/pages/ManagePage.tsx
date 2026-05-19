@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardList,
+  ExternalLink,
   History,
   Inbox,
   Loader2,
@@ -155,6 +156,7 @@ export function ManagePage() {
   const syncedVehicleFromUrlRef = useRef<string | null>(null)
   const urlPlaca = searchParams.get('placa')
   const urlPrefixo = searchParams.get('prefixo')
+  const urlChecklist = searchParams.get('checklist')
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 60_000)
@@ -240,6 +242,7 @@ export function ManagePage() {
   /** Filtros da página (veículo, data, busca, etc.) sem recorte por visão Pendentes/Resolvidos — usado nos KPIs e como base da tabela. */
   const rowsMatchingFiltros = useMemo(() => {
     let list = rows
+    if (urlChecklist) list = list.filter((r) => r.checklistId === urlChecklist)
     if (vehicleId !== 'todos') list = list.filter((r) => apontamentoMatchesVehicleFilter(r, vehicleFilter))
     if (processo !== 'todos') list = list.filter((r) => matchesProcessoFilter(r.processo, processo))
     if (base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, base))
@@ -288,7 +291,7 @@ export function ManagePage() {
       (a, b) =>
         dir * (new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime()),
     )
-  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, supervisor, prefixo, data, query, dataOrdem])
+  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, supervisor, prefixo, data, query, dataOrdem, urlChecklist])
 
   const sortedFiltered = useMemo(() => {
     let list = rowsMatchingFiltros
@@ -615,6 +618,21 @@ export function ManagePage() {
           <div className="mt-4 flex items-center justify-center gap-2 py-10 text-sm font-semibold text-slate-500 dark:text-slate-400">
             <Loader2 size={18} className="animate-spin" />
             Carregando apontamentos...
+          </div>
+        )}
+        {urlChecklist && (
+          <div className="mt-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-900/20">
+            <ExternalLink size={15} className="shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="flex-1 text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Exibindo apenas os defeitos do checklist selecionado.
+            </p>
+            <Link
+              to="/gerenciar"
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-extrabold text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-400 dark:hover:bg-slate-800"
+            >
+              <X size={12} />
+              Limpar filtro
+            </Link>
           </div>
         )}
         <div
