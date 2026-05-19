@@ -27,7 +27,7 @@ export const SUPERVISOR_WHATSAPP: Record<string, string> = {
 }
 
 /** Número de fallback quando o supervisor não for encontrado no mapeamento. */
-export const SUPERVISOR_WHATSAPP_FALLBACK = ''
+export const SUPERVISOR_WHATSAPP_FALLBACK = '5599984491810'
 
 function norm(s: string): string {
   return s
