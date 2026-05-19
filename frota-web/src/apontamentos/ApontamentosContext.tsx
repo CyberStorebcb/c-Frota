@@ -222,7 +222,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       while (true) {
         const { data, error } = await supabase
           .from('checklists')
-          .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, dados_veiculo, respostas, observacoes')
+          .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
           .eq('progresso', 100)
           .order('data_inspecao', { ascending: true })
           .range(from, from + pageSize - 1)
