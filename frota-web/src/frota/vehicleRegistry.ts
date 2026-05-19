@@ -8,6 +8,8 @@ const STORAGE_KEY = 'frota.vehicles.registry'
 export const FLEET_STATUS_BY_PLACA_STORAGE_KEY = 'frota.vehicles.statusByPlaca'
 /** Flag de manutenção independente (por placa, para catálogo e locais). */
 export const FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY = 'frota.vehicles.manutencaoByPlaca'
+/** Campos editados por placa no catálogo embebido (overlay em localStorage). */
+export const FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY = 'frota.vehicles.overrideByPlaca'
 
 export type VehicleStatus = 'ATIVO' | 'INATIVO'
 
@@ -40,6 +42,12 @@ export type AddFleetVehicleInput = {
   base: string
   ano: string
 }
+
+export type UpdateFleetVehicleInput = AddFleetVehicleInput
+
+type FleetCatalogFieldOverride = Partial<
+  Pick<FleetVehicle, 'modelo' | 'tipo' | 'prefixo' | 'responsavel' | 'supervisor' | 'coordenador' | 'base' | 'ano'>
+>
 
 function parseStatusValue(raw: unknown): VehicleStatus {
   const s = String(raw ?? 'ATIVO').toUpperCase()
@@ -91,6 +99,49 @@ function readManutencaoByPlaca(): Record<string, boolean> {
   } catch {
     return {}
   }
+}
+
+function readOverrideByPlaca(): Record<string, FleetCatalogFieldOverride> {
+  try {
+    const raw = localStorage.getItem(FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return {}
+    const out: Record<string, FleetCatalogFieldOverride> = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      const p = normalizePlaca(k)
+      if (!p || !v || typeof v !== 'object') continue
+      const row = v as Record<string, unknown>
+      const ov: FleetCatalogFieldOverride = {}
+      if (typeof row.modelo === 'string' && row.modelo.trim()) ov.modelo = row.modelo.trim().toUpperCase()
+      if (typeof row.tipo === 'string' && isVehicleTipo(row.tipo)) ov.tipo = row.tipo
+      if (typeof row.prefixo === 'string' && row.prefixo.trim()) ov.prefixo = normalizePrefixo(row.prefixo)
+      if (typeof row.responsavel === 'string' && row.responsavel.trim()) {
+        ov.responsavel = row.responsavel.trim().toUpperCase()
+      }
+      if (typeof row.supervisor === 'string' && row.supervisor.trim()) {
+        ov.supervisor = row.supervisor.trim().toUpperCase()
+      }
+      if (typeof row.coordenador === 'string' && row.coordenador.trim()) {
+        ov.coordenador = row.coordenador.trim().toUpperCase()
+      }
+      if (typeof row.base === 'string' && row.base.trim()) ov.base = row.base.trim().toUpperCase()
+      if (typeof row.ano === 'string' && row.ano.trim()) ov.ano = row.ano.trim()
+      if (Object.keys(ov).length > 0) out[p] = ov
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function writeOverrideByPlaca(map: Record<string, FleetCatalogFieldOverride>): void {
+  const keys = Object.keys(map)
+  if (keys.length === 0) {
+    localStorage.removeItem(FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY)
+    return
+  }
+  localStorage.setItem(FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY, JSON.stringify(map))
 }
 
 function writeManutencaoByPlaca(map: Record<string, boolean>): void {
@@ -200,6 +251,66 @@ export function formatPlaca(s: string): string {
   return p
 }
 
+/** ID usado em apontamentos / página Gerenciar (`placa-abc1234`). */
+export function apontamentoVeiculoIdFromPlaca(placa: string): string {
+  const p = normalizePlaca(placa).toLowerCase()
+  return `placa-${p || 'desconhecido'}`
+}
+
+/** Extrai a placa normalizada de um `veiculoId` de apontamento. */
+export function placaFromApontamentoVeiculoId(veiculoId: string): string {
+  if (!veiculoId.startsWith('placa-')) return ''
+  const raw = veiculoId.slice('placa-'.length)
+  if (!raw || raw === 'desconhecido') return ''
+  return normalizePlaca(raw)
+}
+
+/**
+ * Resolve placa a partir de `dados_veiculo` do checklist; se vazia, tenta casar prefixo na frota.
+ */
+export function resolveFleetPlacaFromDadosVeiculo(dv: Record<string, string>): string {
+  const fromField = normalizePlaca(dv.placa ?? '')
+  if (fromField) return fromField
+
+  const prefixo = (dv.prefixo ?? '').trim().toUpperCase()
+  if (!prefixo) return ''
+
+  const norm = (s: string) => s.trim().toUpperCase().replace(/\s+/g, '')
+  const target = norm(prefixo)
+  const match = getDisplayedFleetVehicles().find((v) => {
+    const vp = norm(v.prefixo ?? '')
+    return vp === target && vp !== 'N/A' && vp !== 'NA'
+  })
+  return match ? normalizePlaca(match.placa) : ''
+}
+
+export type ApontamentoVehicleFilter = {
+  vehicleId: string
+  placa?: string | null
+  prefixo?: string | null
+}
+
+/** Filtro de veículo na página Gerenciar (ID, placa ou prefixo). */
+export function apontamentoMatchesVehicleFilter(
+  row: { veiculoId: string; placa?: string; prefixo: string; veiculoLabel: string },
+  filter: ApontamentoVehicleFilter,
+): boolean {
+  if (filter.vehicleId === 'todos') return true
+
+  const targetPlaca = filter.placa ? normalizePlaca(filter.placa) : ''
+  const targetPrefixo = (filter.prefixo ?? '').trim().toUpperCase()
+  const rowPlaca = normalizePlaca(row.placa ?? placaFromApontamentoVeiculoId(row.veiculoId))
+  const rowPrefixo = (row.prefixo ?? '').trim().toUpperCase()
+
+  if (filter.vehicleId && row.veiculoId === filter.vehicleId) return true
+  if (targetPlaca && rowPlaca && rowPlaca === targetPlaca) return true
+  if (targetPlaca && apontamentoVeiculoIdFromPlaca(targetPlaca) === row.veiculoId) return true
+  if (targetPrefixo && rowPrefixo && rowPrefixo === targetPrefixo) return true
+  if (targetPrefixo && row.veiculoLabel.toUpperCase().includes(targetPrefixo)) return true
+
+  return false
+}
+
 function normalizePrefixo(s: string): string {
   const t = s.trim().toUpperCase()
   return t || 'N/A'
@@ -274,6 +385,15 @@ export function getDisplayedFleetVehicles(): FleetVehicle[] {
     const cur = map.get(p)
     if (!cur) continue
     map.set(p, { ...cur, emManutencao: val })
+  }
+
+  const overrideByPlaca = readOverrideByPlaca()
+  for (const [placaKey, ov] of Object.entries(overrideByPlaca)) {
+    const p = normalizePlaca(placaKey)
+    if (!p || localPlacas.has(p)) continue
+    const cur = map.get(p)
+    if (!cur) continue
+    map.set(p, { ...cur, ...ov })
   }
 
   return [...map.values()].sort((a, b) => a.placa.localeCompare(b.placa))
@@ -361,13 +481,60 @@ export function labelVeiculo(v: FleetVehicle): string {
   return `${formatPlaca(v.placa)} · ${v.modelo}`
 }
 
-export function addFleetVehicle(
+function normalizeFleetVehicleFields(
   input: AddFleetVehicleInput,
-): { ok: true } | { ok: false; message: string } {
+):
+  | {
+      ok: true
+      fields: {
+        placa: string
+        modelo: string
+        tipo: VehicleTipo
+        prefixo: string
+        responsavel: string
+        supervisor: string
+        coordenador: string
+        base: string
+        ano: string
+      }
+    }
+  | { ok: false; message: string } {
   const pl = normalizePlaca(input.placa)
   const modelo = input.modelo.trim()
   if (!pl) return { ok: false, message: 'Informe a placa.' }
   if (!modelo) return { ok: false, message: 'Informe o modelo / marca.' }
+
+  const tipo = isVehicleTipo(input.tipo) ? input.tipo : 'VEICULOS LEVES'
+  const prefixo = normalizePrefixo(input.prefixo)
+  const responsavel = input.responsavel.trim() ? input.responsavel.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
+  const supervisor = input.supervisor.trim() ? input.supervisor.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
+  const coordenador = input.coordenador.trim() ? input.coordenador.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
+  const base = input.base.trim() ? input.base.trim().toUpperCase() : 'N/A'
+  const ano = input.ano.trim() || new Date().getFullYear().toString()
+
+  return {
+    ok: true,
+    fields: {
+      placa: pl,
+      modelo: modelo.toUpperCase(),
+      tipo,
+      prefixo,
+      responsavel,
+      supervisor,
+      coordenador,
+      base,
+      ano,
+    },
+  }
+}
+
+export function addFleetVehicle(
+  input: AddFleetVehicleInput,
+): { ok: true } | { ok: false; message: string } {
+  const normalized = normalizeFleetVehicleFields(input)
+  if (!normalized.ok) return normalized
+
+  const { placa: pl, modelo, tipo, prefixo, responsavel, supervisor, coordenador, base, ano } = normalized.fields
 
   const list = readFleetVehicles()
   if (list.some((v) => v.placa === pl)) {
@@ -378,20 +545,13 @@ export function addFleetVehicle(
     return { ok: false, message: 'Esta placa já consta na base total de veículos.' }
   }
 
-  const prefixo = normalizePrefixo(input.prefixo)
-  const responsavel = input.responsavel.trim() ? input.responsavel.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
-  const supervisor = input.supervisor.trim() ? input.supervisor.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
-  const coordenador = input.coordenador.trim() ? input.coordenador.trim().toUpperCase() : 'NÃO ATRIBUÍDO'
-  const base = input.base.trim() ? input.base.trim().toUpperCase() : 'N/A'
-  const ano = input.ano.trim() || new Date().getFullYear().toString()
-
   writeFleetVehicles([
     ...list,
     {
       id: newVehicleId(),
       placa: pl,
-      modelo: modelo.toUpperCase(),
-      tipo: input.tipo,
+      modelo,
+      tipo,
       prefixo,
       responsavel,
       supervisor,
@@ -404,6 +564,62 @@ export function addFleetVehicle(
       source: 'local',
     },
   ])
+  return { ok: true }
+}
+
+/**
+ * Atualiza cadastro local ou aplica overlay editável em veículos do catálogo embebido.
+ */
+export function updateFleetVehicle(
+  id: string,
+  input: UpdateFleetVehicleInput,
+): { ok: true } | { ok: false; message: string } {
+  const normalized = normalizeFleetVehicleFields(input)
+  if (!normalized.ok) return normalized
+
+  const fields = normalized.fields
+
+  const list = readFleetVehicles()
+  const idx = list.findIndex((v) => v.id === id)
+  if (idx >= 0) {
+    const current = list[idx]
+    if (current.placa !== fields.placa && list.some((v) => v.placa === fields.placa && v.id !== id)) {
+      return { ok: false, message: 'Já existe um veículo com esta placa.' }
+    }
+    if (current.placa !== fields.placa && placaExistsInTotalCatalog(fields.placa)) {
+      return { ok: false, message: 'Esta placa já consta na base total de veículos.' }
+    }
+    const next = [...list]
+    next[idx] = {
+      ...current,
+      ...fields,
+      source: 'local',
+    }
+    writeFleetVehicles(next)
+    return { ok: true }
+  }
+
+  if (!isEmbeddedCatalogFleetVehicleId(id)) {
+    return { ok: false, message: 'Veículo não encontrado.' }
+  }
+
+  const catalogPlaca = normalizePlaca(id.slice('total-'.length))
+  if (!catalogPlaca || catalogPlaca !== fields.placa) {
+    return { ok: false, message: 'Não é possível alterar a placa de um veículo da base total.' }
+  }
+
+  const overrides = readOverrideByPlaca()
+  overrides[catalogPlaca] = {
+    modelo: fields.modelo,
+    tipo: fields.tipo,
+    prefixo: fields.prefixo,
+    responsavel: fields.responsavel,
+    supervisor: fields.supervisor,
+    coordenador: fields.coordenador,
+    base: fields.base,
+    ano: fields.ano,
+  }
+  writeOverrideByPlaca(overrides)
   return { ok: true }
 }
 

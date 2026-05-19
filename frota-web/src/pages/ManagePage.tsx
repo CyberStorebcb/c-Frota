@@ -147,6 +147,7 @@ export function ManagePage() {
   const [prefixo, setPrefixo] = useState('todos')
   const [data, setData] = useState('todos')
   const [pagina, setPagina] = useState(1)
+  const [dataOrdem, setDataOrdem] = useState<'asc' | 'desc'>('asc')
   const [pageSizeStr, setPageSizeStr] = useState('25')
   const pageSize = Number(pageSizeStr) || 25
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -282,10 +283,12 @@ export function ManagePage() {
         )
       })
     }
+    const dir = dataOrdem === 'asc' ? 1 : -1
     return [...list].sort(
-      (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),
+      (a, b) =>
+        dir * (new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime()),
     )
-  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, supervisor, prefixo, data, query])
+  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, supervisor, prefixo, data, query, dataOrdem])
 
   const sortedFiltered = useMemo(() => {
     let list = rowsMatchingFiltros
@@ -626,7 +629,25 @@ export function ManagePage() {
                 <th className="px-4 py-3 text-center">Base</th>
                 <th className="px-4 py-3 text-center">Gerência</th>
                 <th className="px-4 py-3 text-center">Defeito</th>
-                <th className="px-4 py-3 text-center">Data de apontamento</th>
+                <th className="px-4 py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDataOrdem((d) => (d === 'asc' ? 'desc' : 'asc'))
+                      setPagina(1)
+                    }}
+                    className="inline-flex items-center justify-center gap-1 hover:text-slate-800 dark:hover:text-slate-200"
+                    title={dataOrdem === 'asc' ? 'Mais antigos primeiro — clique para recentes' : 'Mais recentes primeiro — clique para antigos'}
+                    aria-label={`Ordenar por data de apontamento: ${dataOrdem === 'asc' ? 'mais antigos primeiro' : 'mais recentes primeiro'}`}
+                  >
+                    Data de apontamento
+                    {dataOrdem === 'desc' ? (
+                      <ChevronDown size={12} className="text-blue-500" aria-hidden />
+                    ) : (
+                      <ChevronUp size={12} className="text-blue-500" aria-hidden />
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-center">Prazo</th>
                 <th className="px-4 py-3 text-center">Resolvido ou não</th>
               </tr>
@@ -743,8 +764,13 @@ export function ManagePage() {
                 </span>
                 {' de '}
                 <span className="font-extrabold text-slate-700 dark:text-slate-300">{totalFiltrados}</span>
-                {' registro(s). Ordem: mais antigos primeiro na coluna '}
-                <span className="font-extrabold">&quot;Data de apontamento&quot;</span>.
+                {' registro(s). Ordem na coluna '}
+                <span className="font-extrabold">&quot;Data de apontamento&quot;</span>
+                {': '}
+                <span className="font-extrabold">
+                  {dataOrdem === 'asc' ? 'mais antigos primeiro' : 'mais recentes primeiro'}
+                </span>
+                .
               </>
             )}
           </div>

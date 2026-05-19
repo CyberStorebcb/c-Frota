@@ -10,7 +10,13 @@ import {
 } from 'react'
 import { supabase, type HistoricoRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
-import { apontamentoVeiculoIdFromPlaca, formatPlaca, normalizePlaca, getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
+import {
+  apontamentoVeiculoIdFromPlaca,
+  formatPlaca,
+  normalizePlaca,
+  resolveFleetPlacaFromDadosVeiculo,
+  getDisplayedFleetVehicles,
+} from '../frota/vehicleRegistry'
 
 // ---------------------------------------------------------------------------
 // Tipo público
@@ -20,6 +26,7 @@ export type Apontamento = {
   checklistId: string
   ncItemId: string
   veiculoId: string
+  placa: string
   veiculoLabel: string
   prefixo: string
   defeito: string
@@ -82,7 +89,9 @@ function rowToResolucao(r: any): Resolucao {
 function buildVehicleMap(): Map<string, { coordenador: string; responsavel: string; processo: string; base: string }> {
   const map = new Map<string, { coordenador: string; responsavel: string; processo: string; base: string }>()
   for (const v of getDisplayedFleetVehicles()) {
-    if (v.placa) map.set(v.placa, { coordenador: v.coordenador, responsavel: v.supervisor, processo: v.tipo, base: v.base })
+    const p = normalizePlaca(v.placa)
+    if (!p) continue
+    map.set(p, { coordenador: v.coordenador, responsavel: v.supervisor, processo: v.tipo, base: v.base })
   }
   return map
 }
@@ -94,8 +103,8 @@ function buildVehicleMap(): Map<string, { coordenador: string; responsavel: stri
 function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<string, Resolucao>, vehicleMap: Map<string, { coordenador: string; responsavel: string; processo: string; base: string }>): Apontamento {
   const id = `${cl.id}__${itemId}`
   const dv = cl.dados_veiculo ?? {}
-  const placa   = normalizePlaca(dv.placa ?? '')
-  const prefixo = dv.prefixo ?? ''
+  const placa   = resolveFleetPlacaFromDadosVeiculo(dv)
+  const prefixo = (dv.prefixo ?? '').trim()
   const schema  = SCHEMA_MAP[cl.tipo as string]
   const item    = schema?.grupos.flatMap((g) => g.itens).find((i) => i.id === itemId)
   const label   = item?.label ?? itemId
@@ -120,6 +129,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     checklistId:     cl.id,
     ncItemId:        itemId,
     veiculoId:       apontamentoVeiculoIdFromPlaca(placa),
+    placa,
     veiculoLabel:    prefixo && placa ? `${prefixo} · ${formatPlaca(placa)}` : formatPlaca(placa) || cl.nome_operador,
     prefixo,
     defeito:         label,

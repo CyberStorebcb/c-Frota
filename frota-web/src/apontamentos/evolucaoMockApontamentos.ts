@@ -38,11 +38,13 @@ function mk(
     base: id % 2 === 0 ? 'Base 01' : 'Base 02',
     coordenador: ['Jackson', 'Jamerson', 'JOÃO FELIPE', 'DESMOBILIZADO', 'FROTA', 'JÚLIO'][id % 6]!,
     responsavel: 'Resp. Mock',
+    placa:       '',
     checklistId: `mock-cl-${sid}`,
     ncItemId:    `mock-item-${sid}`,
     ncFotos:              [],
     problemasAdicionais:  '',
     descricaoProblema:    '',
+    imperativo:           false,
   }
 }
 

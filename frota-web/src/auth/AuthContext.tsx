@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 export type AuthUser = {
   id: string
   email: string
-  role: 'admin' | 'user'
+  role: 'super_admin' | 'admin' | 'user'
   mustChangePassword: boolean
 }
 
@@ -21,10 +21,10 @@ const AuthContext = createContext<Ctx | null>(null)
 
 type ProfileRow = { role: string; must_change_password: boolean }
 
-async function fetchProfile(userId: string, email: string): Promise<{ role: 'admin' | 'user'; mustChangePassword: boolean }> {
+async function fetchProfile(userId: string, email: string): Promise<{ role: 'super_admin' | 'admin' | 'user'; mustChangePassword: boolean }> {
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase()
   if (adminEmail && email.trim().toLowerCase() === adminEmail) {
-    return { role: 'admin', mustChangePassword: false }
+    return { role: 'super_admin', mustChangePassword: false }
   }
   try {
     const { data } = await Promise.race([
@@ -32,16 +32,18 @@ async function fetchProfile(userId: string, email: string): Promise<{ role: 'adm
       new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 4000)),
     ])
     const p = data as ProfileRow | null
-    return {
-      role: p?.role === 'admin' ? 'admin' : 'user',
-      mustChangePassword: p?.must_change_password ?? false,
-    }
+    const rawRole = p?.role ?? 'user'
+    const role: 'super_admin' | 'admin' | 'user' =
+      rawRole === 'super_admin' ? 'super_admin'
+      : rawRole === 'admin' ? 'admin'
+      : 'user'
+    return { role, mustChangePassword: p?.must_change_password ?? false }
   } catch {
     return { role: 'user', mustChangePassword: false }
   }
 }
 
-function toAuthUser(supabaseUser: User, role: 'admin' | 'user', mustChangePassword: boolean): AuthUser {
+function toAuthUser(supabaseUser: User, role: 'super_admin' | 'admin' | 'user', mustChangePassword: boolean): AuthUser {
   return {
     id: supabaseUser.id,
     email: supabaseUser.email ?? '',

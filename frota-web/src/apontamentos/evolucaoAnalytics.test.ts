@@ -21,6 +21,18 @@ function R(p: Partial<Apontamento> & Pick<Apontamento, 'id'>): Apontamento {
     base: 'Base 01',
     coordenador: 'Carlos',
     responsavel: 'João',
+    imperativo: false,
+    placa: '',
+    checklistId: 'cl-test',
+    ncItemId: 'item-test',
+    ncFotos: [],
+    problemasAdicionais: '',
+    descricaoProblema: '',
+    horaResolvido: null,
+    reparoValor: null,
+    reparoDescricao: null,
+    reparoImagens: [],
+    osArquivo: null,
     ...p,
   }
 }
