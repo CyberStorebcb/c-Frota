@@ -23,6 +23,7 @@ function R(p: Partial<Apontamento> & Pick<Apontamento, 'id'>): Apontamento {
     responsavel: 'João',
     imperativo: false,
     placa: '',
+    modelo: '',
     checklistId: 'cl-test',
     ncItemId: 'item-test',
     ncFotos: [],

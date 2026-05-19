@@ -27,6 +27,7 @@ export type Apontamento = {
   ncItemId: string
   veiculoId: string
   placa: string
+  modelo: string
   veiculoLabel: string
   prefixo: string
   defeito: string
@@ -131,6 +132,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     ncItemId:        itemId,
     veiculoId:       apontamentoVeiculoIdFromPlaca(placa),
     placa,
+    modelo:          (dv.marca_modelo ?? '').trim(),
     veiculoLabel:    prefixo && placa ? `${prefixo} · ${formatPlaca(placa)}` : formatPlaca(placa) || cl.nome_operador,
     prefixo,
     defeito:         label,

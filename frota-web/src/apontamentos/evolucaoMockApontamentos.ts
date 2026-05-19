@@ -39,6 +39,7 @@ function mk(
     coordenador: ['Jackson', 'Jamerson', 'JOÃO FELIPE', 'DESMOBILIZADO', 'FROTA', 'JÚLIO'][id % 6]!,
     responsavel: 'Resp. Mock',
     placa:       '',
+    modelo:      '',
     checklistId: `mock-cl-${sid}`,
     ncItemId:    `mock-item-${sid}`,
     ncFotos:              [],

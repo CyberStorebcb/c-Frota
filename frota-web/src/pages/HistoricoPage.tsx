@@ -483,10 +483,9 @@ export function HistoricoPage() {
     doc.setFont('helvetica', 'bold')
     doc.text(veiculoId, leftXBox + 34, line1)
     doc.text(placa, leftXBox + 46, line2)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(120)
-    doc.text('[Modelo do Veículo]', leftXBox + 58, line3)
+    doc.setFont('helvetica', 'bold')
     doc.setTextColor(0)
+    doc.text(r.modelo || '—', leftXBox + 58, line3)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
     const defectX = rightXBox + 54
