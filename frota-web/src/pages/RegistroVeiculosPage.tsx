@@ -237,7 +237,7 @@ function VehicleOverflowMenu({
   isAdmin = false,
   onEdit,
   supabaseVehicleIds,
-  deleteVehicle,
+  onDeleteRequest,
 }: {
   vehicle: FleetVehicle
   menuForId: string | null
@@ -248,7 +248,7 @@ function VehicleOverflowMenu({
   isAdmin?: boolean
   onEdit?: (vehicle: FleetVehicle) => void
   supabaseVehicleIds: Set<string>
-  deleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
+  onDeleteRequest: (id: string, placa: string, isSupabase: boolean) => void
 }) {
   const menuOpen = menuForId === vehicle.id
   const menuPosition =
@@ -352,16 +352,7 @@ function VehicleOverflowMenu({
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
               onClick={() => {
-                if (supabaseVehicleIds.has(vehicle.id)) {
-                  void deleteVehicle(vehicle.id).then((res) => {
-                    if (!res.ok) { showNotification(res.message, 'error'); return }
-                    showNotification('Veículo removido.', 'success')
-                  })
-                } else {
-                  removeFleetVehicle(vehicle.id)
-                  refresh()
-                  showNotification('Veículo removido.', 'success')
-                }
+                onDeleteRequest(vehicle.id, vehicle.placa, supabaseVehicleIds.has(vehicle.id))
                 setMenuForId(null)
               }}
             >
@@ -458,9 +449,11 @@ function defaultForm() {
  * Controlo da frota: cadastro e listagem de veículos (UI alinhada ao painel operacional).
  */
 export function RegistroVeiculosPage() {
-  const { vehicles: supabaseVehicles, saveVehicle, deleteVehicle, reload: reloadSupabase } = useSupabaseVehicles()
+  const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, reload: reloadSupabase } = useSupabaseVehicles()
   const supabaseVehicleIds = useMemo(() => new Set(supabaseVehicles.map((v) => v.id)), [supabaseVehicles])
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
+  const [activeTab, setActiveTab] = useState<'ativos' | 'removidos'>('ativos')
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; placa: string; isSupabase: boolean } | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -553,6 +546,21 @@ export function RegistroVeiculosPage() {
     setImportResult({ ok, skip: importRows.filter((r) => !!r._error).length, errors })
     setImportLoading(false)
     await reloadSupabase()
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return
+    const { id, isSupabase } = confirmDelete
+    if (isSupabase) {
+      const res = await softDeleteVehicle(id)
+      if (!res.ok) { showNotification(res.message, 'error') }
+      else showNotification('Veículo removido.', 'success')
+    } else {
+      removeFleetVehicle(id)
+      refresh()
+      showNotification('Veículo removido.', 'success')
+    }
+    setConfirmDelete(null)
   }
 
   const { rows: apontamentosRows, carregando: apontamentosCarregando } = useApontamentos()
@@ -1085,6 +1093,96 @@ export function RegistroVeiculosPage() {
           ))}
         </div>
 
+        {/* Abas Ativos / Removidos */}
+        {canRegisterVehicle && (
+          <div className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <button
+              type="button"
+              onClick={() => setActiveTab('ativos')}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-black transition-all ${
+                activeTab === 'ativos'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+            >
+              Frota ativa · {vehicles.length}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('removidos')}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-black transition-all ${
+                activeTab === 'removidos'
+                  ? 'bg-rose-600 text-white'
+                  : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+            >
+              Removidos{deletedVehicles.length > 0 && ` · ${deletedVehicles.length}`}
+            </button>
+          </div>
+        )}
+
+        {/* Aba Removidos */}
+        {activeTab === 'removidos' && canRegisterVehicle ? (
+          <div className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {deletedVehicles.length === 0 ? (
+              <div className="py-16 text-center text-sm font-semibold text-slate-400">Nenhum veículo removido.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/50">
+                    <tr className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      <th className="px-5 py-3">Placa</th>
+                      <th className="px-5 py-3">Tipo</th>
+                      <th className="px-5 py-3">Modelo</th>
+                      <th className="px-5 py-3">Base</th>
+                      <th className="px-5 py-3">Removido em</th>
+                      <th className="px-5 py-3 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {deletedVehicles.map((v) => (
+                      <tr key={v.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/40">
+                        <td className="px-5 py-3 font-extrabold text-slate-900 dark:text-slate-100">{v.placa}</td>
+                        <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{v.tipo}</td>
+                        <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{v.modelo}</td>
+                        <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{v.base}</td>
+                        <td className="px-5 py-3 text-xs text-slate-400">
+                          {new Date(v.deletedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void restoreVehicle(v.id).then((r) => {
+                                if (!r.ok) showNotification(r.message, 'error')
+                                else showNotification(`${v.placa} restaurado com sucesso.`, 'success')
+                              })}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-extrabold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            >
+                              <Check size={12} /> Restaurar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void hardDeleteVehicle(v.id).then((r) => {
+                                if (!r.ok) showNotification(r.message, 'error')
+                                else showNotification(`${v.placa} excluído permanentemente.`, 'success')
+                              })}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-extrabold text-rose-600 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-400"
+                            >
+                              <X size={12} /> Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {activeTab === 'ativos' ? (<>
         <div className="flex min-w-0 flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             {/*
@@ -1352,7 +1450,7 @@ export function RegistroVeiculosPage() {
                     isAdmin={canRegisterVehicle}
                     onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                     supabaseVehicleIds={supabaseVehicleIds}
-                    deleteVehicle={deleteVehicle}
+                    onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
                   />
                 </div>
               </div>
@@ -1614,7 +1712,7 @@ export function RegistroVeiculosPage() {
                           isAdmin={canRegisterVehicle}
                           onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                           supabaseVehicleIds={supabaseVehicleIds}
-                          deleteVehicle={deleteVehicle}
+                          onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
                         />
                       </td>
                     </tr>
@@ -1635,6 +1733,7 @@ export function RegistroVeiculosPage() {
           <p className="mt-1 text-slate-500 dark:text-slate-400">Tente ajustar os filtros ou o termo de pesquisa.</p>
         </div>
       ) : null}
+        </>) : null /* fim aba ativos */}
 
       {canRegisterVehicle && isModalOpen ? (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -1912,6 +2011,42 @@ export function RegistroVeiculosPage() {
         </div>
       </div>
       )}
+
+      {/* Modal confirmação de remoção */}
+      {confirmDelete ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-100 dark:bg-rose-950/50">
+                <AlertCircle size={20} className="text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Remover veículo</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Esta ação pode ser desfeita na aba Removidos.</p>
+              </div>
+            </div>
+            <p className="mb-5 rounded-xl bg-slate-50 px-4 py-3 text-sm font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              {confirmDelete.placa}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-extrabold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmDelete()}
+                className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-extrabold text-white hover:bg-rose-700"
+              >
+                Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Modal importar Excel */}
       {importModalOpen && canRegisterVehicle ? (

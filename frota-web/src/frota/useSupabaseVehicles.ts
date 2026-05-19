@@ -22,6 +22,7 @@ type SupabaseVehicleRow = {
   ano: string
   status: string
   created_at: string
+  deleted_at: string | null
 }
 
 function rowToFleetVehicle(r: SupabaseVehicleRow): FleetVehicle {
@@ -48,27 +49,41 @@ function rowToFleetVehicle(r: SupabaseVehicleRow): FleetVehicle {
 
 export type SaveVehicleInput = AddFleetVehicleInput & { status?: VehicleStatus }
 
+export type DeletedFleetVehicle = FleetVehicle & { deletedAt: string }
+
 export type UseSupabaseVehiclesResult = {
   vehicles: FleetVehicle[]
+  deletedVehicles: DeletedFleetVehicle[]
   loading: boolean
   reload: () => void
   saveVehicle: (input: SaveVehicleInput, editId?: string) => Promise<{ ok: true } | { ok: false; message: string }>
-  deleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
+  softDeleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
+  restoreVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
+  hardDeleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
 }
 
 export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([])
+  const [deletedVehicles, setDeletedVehicles] = useState<DeletedFleetVehicle[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('vehicles')
-      .select('*')
-      .order('placa', { ascending: true })
+    const [activeRes, deletedRes] = await Promise.all([
+      supabase.from('vehicles').select('*').is('deleted_at', null).order('placa', { ascending: true }),
+      supabase.from('vehicles').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
+    ])
 
-    if (!error && data) {
-      setVehicles((data as SupabaseVehicleRow[]).map(rowToFleetVehicle))
+    if (!activeRes.error && activeRes.data) {
+      setVehicles((activeRes.data as SupabaseVehicleRow[]).map(rowToFleetVehicle))
+    }
+    if (!deletedRes.error && deletedRes.data) {
+      setDeletedVehicles(
+        (deletedRes.data as SupabaseVehicleRow[]).map((r) => ({
+          ...rowToFleetVehicle(r),
+          deletedAt: r.deleted_at ?? '',
+        }))
+      )
     }
     setLoading(false)
   }, [])
@@ -114,12 +129,32 @@ export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
     return { ok: true }
   }, [load])
 
-  const deleteVehicle = useCallback(async (id: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+  const softDeleteVehicle = useCallback(async (id: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const { error } = await supabase
+      .from('vehicles')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) return { ok: false, message: error.message }
+    await load()
+    return { ok: true }
+  }, [load])
+
+  const restoreVehicle = useCallback(async (id: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const { error } = await supabase
+      .from('vehicles')
+      .update({ deleted_at: null })
+      .eq('id', id)
+    if (error) return { ok: false, message: error.message }
+    await load()
+    return { ok: true }
+  }, [load])
+
+  const hardDeleteVehicle = useCallback(async (id: string): Promise<{ ok: true } | { ok: false; message: string }> => {
     const { error } = await supabase.from('vehicles').delete().eq('id', id)
     if (error) return { ok: false, message: error.message }
     await load()
     return { ok: true }
   }, [load])
 
-  return { vehicles, loading, reload, saveVehicle, deleteVehicle }
+  return { vehicles, deletedVehicles, loading, reload, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle }
 }
