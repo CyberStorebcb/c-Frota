@@ -1,0 +1,125 @@
+import { useCallback, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import {
+  type FleetVehicle,
+  type AddFleetVehicleInput,
+  type VehicleStatus,
+  type VehicleTipo,
+  normalizePlaca,
+  VEHICLE_TYPE_IDS,
+} from './vehicleRegistry'
+
+type SupabaseVehicleRow = {
+  id: string
+  placa: string
+  modelo: string
+  tipo: string
+  prefixo: string
+  responsavel: string
+  supervisor: string
+  coordenador: string
+  base: string
+  ano: string
+  status: string
+  created_at: string
+}
+
+function rowToFleetVehicle(r: SupabaseVehicleRow): FleetVehicle {
+  const tipo = VEHICLE_TYPE_IDS.includes(r.tipo as VehicleTipo)
+    ? (r.tipo as VehicleTipo)
+    : 'VEICULOS LEVES'
+  return {
+    id: r.id,
+    placa: normalizePlaca(r.placa),
+    modelo: r.modelo || '—',
+    tipo,
+    prefixo: r.prefixo || 'N/A',
+    responsavel: r.responsavel || 'NÃO ATRIBUÍDO',
+    supervisor: r.supervisor || 'NÃO ATRIBUÍDO',
+    coordenador: r.coordenador || 'NÃO ATRIBUÍDO',
+    base: r.base || 'N/A',
+    status: r.status === 'INATIVO' ? 'INATIVO' : 'ATIVO',
+    emManutencao: false,
+    ano: r.ano || '',
+    createdAt: r.created_at,
+    source: 'local',
+  }
+}
+
+export type SaveVehicleInput = AddFleetVehicleInput & { status?: VehicleStatus }
+
+export type UseSupabaseVehiclesResult = {
+  vehicles: FleetVehicle[]
+  loading: boolean
+  reload: () => void
+  saveVehicle: (input: SaveVehicleInput, editId?: string) => Promise<{ ok: true } | { ok: false; message: string }>
+  deleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
+}
+
+export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
+  const [vehicles, setVehicles] = useState<FleetVehicle[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select('*')
+      .order('placa', { ascending: true })
+
+    if (!error && data) {
+      setVehicles((data as SupabaseVehicleRow[]).map(rowToFleetVehicle))
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const reload = useCallback(() => { void load() }, [load])
+
+  const saveVehicle = useCallback(async (
+    input: SaveVehicleInput,
+    editId?: string,
+  ): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const placa = normalizePlaca(input.placa)
+    if (!placa) return { ok: false, message: 'Informe a placa.' }
+    const modelo = input.modelo.trim()
+    if (!modelo) return { ok: false, message: 'Informe o modelo / marca.' }
+
+    const row = {
+      placa,
+      modelo: modelo.toUpperCase(),
+      tipo: input.tipo,
+      prefixo: input.prefixo.trim().toUpperCase() || 'N/A',
+      responsavel: input.responsavel.trim().toUpperCase() || 'NÃO ATRIBUÍDO',
+      supervisor: input.supervisor.trim().toUpperCase() || 'NÃO ATRIBUÍDO',
+      coordenador: input.coordenador.trim().toUpperCase() || 'NÃO ATRIBUÍDO',
+      base: input.base.trim().toUpperCase() || 'N/A',
+      ano: input.ano.trim() || new Date().getFullYear().toString(),
+      status: input.status ?? 'ATIVO',
+    }
+
+    if (editId) {
+      const { error } = await supabase.from('vehicles').update(row).eq('id', editId)
+      if (error) return { ok: false, message: error.message }
+    } else {
+      const { error } = await supabase.from('vehicles').insert(row)
+      if (error) {
+        if (error.code === '23505') return { ok: false, message: 'Já existe um veículo com esta placa.' }
+        return { ok: false, message: error.message }
+      }
+    }
+
+    await load()
+    return { ok: true }
+  }, [load])
+
+  const deleteVehicle = useCallback(async (id: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const { error } = await supabase.from('vehicles').delete().eq('id', id)
+    if (error) return { ok: false, message: error.message }
+    await load()
+    return { ok: true }
+  }, [load])
+
+  return { vehicles, loading, reload, saveVehicle, deleteVehicle }
+}

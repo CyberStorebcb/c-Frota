@@ -30,7 +30,6 @@ import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { useAuth } from '../auth/AuthContext'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import {
-  addFleetVehicle,
   apontamentoVeiculoIdFromPlaca,
   FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY,
   FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY,
@@ -42,12 +41,12 @@ import {
   removeFleetVehicle,
   setFleetVehicleManutencao,
   setFleetVehicleStatus,
-  updateFleetVehicle,
   VEHICLE_TYPE_IDS,
   type FleetVehicle,
   type VehicleStatus,
   type VehicleTipo,
 } from '../frota/vehicleRegistry'
+import { useSupabaseVehicles } from '../frota/useSupabaseVehicles'
 import { isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
 import { renderFormattedText } from '../utils/renderFormattedAiText'
 
@@ -233,6 +232,8 @@ function VehicleOverflowMenu({
   placement = 'up',
   isAdmin = false,
   onEdit,
+  supabaseVehicleIds,
+  deleteVehicle,
 }: {
   vehicle: FleetVehicle
   menuForId: string | null
@@ -242,6 +243,8 @@ function VehicleOverflowMenu({
   placement?: 'up' | 'down'
   isAdmin?: boolean
   onEdit?: (vehicle: FleetVehicle) => void
+  supabaseVehicleIds: Set<string>
+  deleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
 }) {
   const menuOpen = menuForId === vehicle.id
   const menuPosition =
@@ -345,9 +348,17 @@ function VehicleOverflowMenu({
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
               onClick={() => {
-                removeFleetVehicle(vehicle.id)
-                refresh(); setMenuForId(null)
-                showNotification('Veículo removido.', 'success')
+                if (supabaseVehicleIds.has(vehicle.id)) {
+                  void deleteVehicle(vehicle.id).then((res) => {
+                    if (!res.ok) { showNotification(res.message, 'error'); return }
+                    showNotification('Veículo removido.', 'success')
+                  })
+                } else {
+                  removeFleetVehicle(vehicle.id)
+                  refresh()
+                  showNotification('Veículo removido.', 'success')
+                }
+                setMenuForId(null)
               }}
             >
               Remover
@@ -378,6 +389,8 @@ function defaultForm() {
  * Controlo da frota: cadastro e listagem de veículos (UI alinhada ao painel operacional).
  */
 export function RegistroVeiculosPage() {
+  const { vehicles: supabaseVehicles, saveVehicle, deleteVehicle, reload: reloadSupabase } = useSupabaseVehicles()
+  const supabaseVehicleIds = useMemo(() => new Set(supabaseVehicles.map((v) => v.id)), [supabaseVehicles])
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
@@ -411,7 +424,20 @@ export function RegistroVeiculosPage() {
     },
   ])
 
-  const refresh = () => setVehicles(getDisplayedFleetVehicles())
+  const refresh = () => {
+    const embedded = getDisplayedFleetVehicles()
+    const supaPlacas = new Set(supabaseVehicles.map((v) => v.placa))
+    const merged = [
+      ...supabaseVehicles,
+      ...embedded.filter((v) => !supaPlacas.has(v.placa)),
+    ].sort((a, b) => a.placa.localeCompare(b.placa))
+    setVehicles(merged)
+  }
+
+  useEffect(() => {
+    refresh()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseVehicles])
 
   const { rows: apontamentosRows, carregando: apontamentosCarregando } = useApontamentos()
 
@@ -475,7 +501,7 @@ export function RegistroVeiculosPage() {
         e.key === FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY ||
         e.key === null
       ) {
-        setVehicles(getDisplayedFleetVehicles())
+        refresh()
       }
     }
     window.addEventListener('storage', onStorage)
@@ -736,7 +762,7 @@ export function RegistroVeiculosPage() {
     }
   }
 
-  const handleSave = (e: FormEvent) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault()
     if (!canRegisterVehicle) return
     if (!formData.placa.trim() || !formData.modelo.trim()) {
@@ -755,12 +781,19 @@ export function RegistroVeiculosPage() {
       base: formData.base,
       ano: formData.ano,
     }
-    const res = editingVehicleId ? updateFleetVehicle(editingVehicleId, payload) : addFleetVehicle(payload)
-    if (res.ok === false) {
+
+    // Se estiver editando veículo do Supabase, atualiza lá; senão tenta adicionar no Supabase
+    const editingSupabase = editingVehicleId
+      ? supabaseVehicles.find((v) => v.id === editingVehicleId)
+      : null
+
+    const res = await saveVehicle(payload, editingSupabase?.id)
+    if (!res.ok) {
       showNotification(res.message, 'error')
       return
     }
-    refresh()
+
+    await reloadSupabase()
     showNotification(editingVehicleId ? 'Veículo atualizado com sucesso!' : 'Veículo cadastrado com sucesso!', 'success')
     handleCloseModal()
   }
@@ -1192,6 +1225,8 @@ export function RegistroVeiculosPage() {
                     placement="up"
                     isAdmin={canRegisterVehicle}
                     onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
+                    supabaseVehicleIds={supabaseVehicleIds}
+                    deleteVehicle={deleteVehicle}
                   />
                 </div>
               </div>
@@ -1452,6 +1487,8 @@ export function RegistroVeiculosPage() {
                           placement="down"
                           isAdmin={canRegisterVehicle}
                           onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
+                          supabaseVehicleIds={supabaseVehicleIds}
+                          deleteVehicle={deleteVehicle}
                         />
                       </td>
                     </tr>
