@@ -64,14 +64,17 @@ export function getVehicleOperationalStatusRows() {
  * Usada pelo Dashboard e pelo Registro para manter o KPI sincronizado.
  */
 export function getVehicleOperationalStatusRowsWithLocals(
-  displayedVehicles: { placa: string; prefixo: string; base: string }[],
+  displayedVehicles: { placa: string; prefixo: string; base: string; status?: string }[],
 ) {
   return displayedVehicles.map((v) => ({
     placa: v.placa,
     prefixo: v.prefixo ?? '',
     base: v.base ?? '',
     processo: '',
-    statusOperacional: statusOperacionalCatalogo(v.placa, v.prefixo ?? ''),
+    statusOperacional:
+      v.status === 'INATIVO'
+        ? 'DESMOBILIZADO'
+        : statusOperacionalCatalogo(v.placa, v.prefixo ?? ''),
   }))
 }
 

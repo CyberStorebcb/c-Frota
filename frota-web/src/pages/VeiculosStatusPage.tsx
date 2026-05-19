@@ -1,12 +1,13 @@
 import { ArrowLeft, ClipboardList, Truck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
-  getVehicleOperationalStatusRows,
+  getVehicleOperationalStatusRowsWithLocals,
   getVehicleOperationalStatusSummary,
   VEHICLE_OPERATIONAL_STATUS_LABELS,
   type VehicleOperationalStatus,
 } from '../frota/vehicleOperationalStatus'
 import { formatPlaca } from '../frota/vehicleRegistry'
+import { useFleet } from '../frota/FleetContext'
 
 const STATUS_STYLE: Record<VehicleOperationalStatus, { card: string; badge: string }> = {
   ATIVOS: {
@@ -40,7 +41,8 @@ const STATUS_STYLE: Record<VehicleOperationalStatus, { card: string; badge: stri
 }
 
 export function VeiculosStatusPage() {
-  const statusRows = getVehicleOperationalStatusRows()
+  const { vehicles } = useFleet()
+  const statusRows = getVehicleOperationalStatusRowsWithLocals(vehicles)
   const summary = getVehicleOperationalStatusSummary(statusRows)
   /** Placas na base (ex.: 412); não é a soma dos números exibidos nos cartões (ex.: ATIVOS inclui Transporte na visualização). */
   const totalFrota = statusRows.length
