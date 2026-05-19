@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react'
+﻿import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   type LucideIcon,
@@ -9,18 +9,14 @@ import {
   ChevronUp,
   ClipboardCheck,
   ClipboardX,
-  Filter,
   Gauge,
   Truck,
 } from 'lucide-react'
 
-import {
-  BASE_DASHBOARD_QUICK_SELECT_OPTIONS,
-  BASE_FILTER_SELECT_OPTIONS,
-  matchesBaseFilter,
-} from '../data/baseFilterOptions'
+import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
+import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select } from '../components/ui/Select'
 import {
   getVehicleOperationalStatusSummary,
@@ -204,41 +200,6 @@ function GomanLogo({
   )
 }
 
-function QuickSelect({
-  icon: Icon,
-  value,
-  onChange,
-  options,
-}: {
-  icon: LucideIcon
-  value: string
-  onChange: (v: string) => void
-  options: readonly { label: string; value: string }[]
-}) {
-  return (
-    <div className="relative min-w-0">
-      <Icon
-        className="pointer-events-none absolute left-3 top-1/2 z-10 size-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500"
-        aria-hidden
-      />
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full min-w-[132px] appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-bold text-slate-900 shadow-sm outline-none transition-colors hover:bg-slate-50 focus:ring-2 focus:ring-blue-500/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900/60 sm:min-w-[158px]"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
-        aria-hidden
-      />
-    </div>
-  )
-}
 
 type Stat = {
   label: string
@@ -257,17 +218,14 @@ export function DashboardPage() {
   const [periodo, setPeriodo] = useState<string>('7d')
   const [customDesde, setCustomDesde] = useState<string>(defaultCustomDesdeIso)
   const [customAte, setCustomAte] = useState<string>(() => hojeLocalIso())
-  const [filtroBaseRapido, setFiltroBaseRapido] = useState<string>('todos')
   const [filtroProcesso, setFiltroProcesso] = useState<string>('todos')
   const [filtroBase, setFiltroBase] = useState<string>('todos')
   const [filtroCoordenador, setFiltroCoordenador] = useState<string>('todos')
+  const [filtroSupervisor, setFiltroSupervisor] = useState<string>('todos')
   const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(() => {
     try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
     catch { return false }
   })
-
-  const baseEfetiva =
-    filtroBaseRapido !== 'todos' ? filtroBaseRapido : filtroBase !== 'todos' ? filtroBase : 'todos'
 
   // Reage a veículos adicionados/removidos pelo admin no Registro
   const [fleetVehicles, setFleetVehicles] = useState(() => getDisplayedFleetVehicles())
@@ -318,7 +276,7 @@ export function DashboardPage() {
         }
         const map = new Map<string, { realizados: number; comNc: number }>()
         for (const row of data) {
-          if (!checklistMatchesDashboardBase(row.dados_veiculo, baseEfetiva, placaParaBaseOperacional)) {
+          if (!checklistMatchesDashboardBase(row.dados_veiculo, filtroBase, placaParaBaseOperacional)) {
             continue
           }
           const dia = (row.data_inspecao as string).slice(0, 10)
@@ -332,7 +290,7 @@ export function DashboardPage() {
           Array.from(map.entries()).map(([data, v]) => ({ data, ...v })),
         )
       })
-  }, [periodoInicioIso, periodoFimIso, baseEfetiva, placaParaBaseOperacional])
+  }, [periodoInicioIso, periodoFimIso, filtroBase, placaParaBaseOperacional])
 
   const { rows } = useApontamentos()
 
@@ -341,11 +299,12 @@ export function DashboardPage() {
     return rows.filter((r) => {
       if (r.resolvido) return false
       if (filtroProcesso !== 'todos' && !matchesProcessoFilter(r.processo, filtroProcesso)) return false
-      if (baseEfetiva !== 'todos' && !matchesBaseFilter(r.base, baseEfetiva)) return false
+      if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
+      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.responsavel, filtroSupervisor)) return false
       return true
     })
-  }, [rows, filtroProcesso, baseEfetiva, filtroCoordenador])
+  }, [rows, filtroProcesso, filtroBase, filtroCoordenador, filtroSupervisor])
 
   const checklistsPorDiaNoPeriodo = useMemo(() => {
     return checklistsPorDia
@@ -379,9 +338,9 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const todasLinhas = getVehicleOperationalStatusRowsWithLocals(fleetVehicles)
     const linhasOperacionais =
-      baseEfetiva === 'todos'
+      filtroBase === 'todos'
         ? todasLinhas
-        : todasLinhas.filter((r) => r.base.toLowerCase().includes(baseEfetiva))
+        : todasLinhas.filter((r) => r.base.toLowerCase().includes(filtroBase))
     const resumoBase = getVehicleOperationalStatusSummary(linhasOperacionais)
     const ativosOperacionais =
       (resumoBase.find((s) => s.label === 'ATIVOS')?.count ?? 0) +
@@ -438,7 +397,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDia, checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, baseEfetiva, fleetVehicles])
+  }, [checklistsPorDia, checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, filtroBase, fleetVehicles])
 
   const chartUi = useMemo(
     () => ({
@@ -512,15 +471,6 @@ export function DashboardPage() {
                   </label>
                 </div>
               ) : null}
-              <QuickSelect
-                icon={Filter}
-                value={filtroBaseRapido}
-                onChange={(v) => {
-                  setFiltroBaseRapido(v)
-                  setFiltroBase(v === 'todos' ? 'todos' : v)
-                }}
-                options={BASE_DASHBOARD_QUICK_SELECT_OPTIONS}
-              />
             </div>
           </div>
 
@@ -561,7 +511,7 @@ export function DashboardPage() {
         >
           <div className="overflow-hidden">
             <div className="border-t border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 lg:gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4 lg:gap-4">
                 <Select
                   label="Processo"
                   value={filtroProcesso}
@@ -571,11 +521,7 @@ export function DashboardPage() {
                 <Select
                   label="Base"
                   value={filtroBase}
-                  onChange={(v) => {
-                    setFiltroBase(v)
-                    if (v === 'todos') setFiltroBaseRapido('todos')
-                    else setFiltroBaseRapido(v)
-                  }}
+                  onChange={setFiltroBase}
                   options={BASE_FILTER_SELECT_OPTIONS}
                 />
                 <Select
@@ -583,6 +529,12 @@ export function DashboardPage() {
                   value={filtroCoordenador}
                   onChange={setFiltroCoordenador}
                   options={COORDENADOR_FILTER_SELECT_OPTIONS}
+                />
+                <Select
+                  label="Supervisor"
+                  value={filtroSupervisor}
+                  onChange={setFiltroSupervisor}
+                  options={SUPERVISOR_FILTER_SELECT_OPTIONS}
                 />
               </div>
             </div>
