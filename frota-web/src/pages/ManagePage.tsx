@@ -28,6 +28,7 @@ import { useAuth } from '../auth/AuthContext'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
+import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { Portal } from '../components/ui/Portal'
 import {
@@ -146,6 +147,7 @@ export function ManagePage() {
   const [base, setBase] = useState('todos')
   const [coordenador, setCoordenador] = useState('todos')
   const [responsavel, setResponsavel] = useState('todos')
+  const [supervisor, setSupervisor] = useState('todos')
   const [prefixo, setPrefixo] = useState('todos')
   const [data, setData] = useState('todos')
   const [pagina, setPagina] = useState(1)
@@ -253,6 +255,7 @@ export function ManagePage() {
     if (base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, base))
     if (coordenador !== 'todos') list = list.filter((r) => matchesCoordenadorFilter(r.coordenador, coordenador))
     if (responsavel !== 'todos') list = list.filter((r) => r.responsavel === responsavel)
+    if (supervisor !== 'todos') list = list.filter((r) => matchesSupervisorFilter(r.responsavel, supervisor))
     if (prefixo !== 'todos') list = list.filter((r) => r.prefixo === prefixo)
 
     if (data !== 'todos') {
@@ -293,7 +296,7 @@ export function ManagePage() {
     return [...list].sort(
       (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),
     )
-  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, prefixo, data, query])
+  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, supervisor, prefixo, data, query])
 
   const sortedFiltered = useMemo(() => {
     let list = rowsMatchingFiltros
@@ -330,6 +333,7 @@ export function ManagePage() {
     base !== 'todos' ||
     coordenador !== 'todos' ||
     responsavel !== 'todos' ||
+    supervisor !== 'todos' ||
     prefixo !== 'todos' ||
     data !== 'todos'
 
@@ -339,6 +343,7 @@ export function ManagePage() {
     setBase('todos')
     setCoordenador('todos')
     setResponsavel('todos')
+    setSupervisor('todos')
     setPrefixo('todos')
     setData('todos')
     setPagina(1)
@@ -575,6 +580,12 @@ export function ManagePage() {
                   value={coordenador}
                   options={COORDENADOR_FILTER_SELECT_OPTIONS}
                   onChange={(v) => { setCoordenador(v); setPagina(1) }}
+                />
+                <Select
+                  label="Supervisor"
+                  value={supervisor}
+                  options={SUPERVISOR_FILTER_SELECT_OPTIONS}
+                  onChange={(v) => { setSupervisor(v); setPagina(1) }}
                 />
                 <Select
                   label="Responsável"
