@@ -1,5 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Car, ClipboardList, LayoutDashboard, LogOut, Settings2, Shield, X } from 'lucide-react'
+import { InstagramIcon } from '../../branding/InstagramIcon'
+import { SOCIAL_LINKS } from '../../branding/socialLinks'
 import { useAuth } from '../../auth/AuthContext'
 import { useTheme } from '../../theme/ThemeProvider'
 import { BrandLogo } from '../../branding/BrandLogo'
@@ -28,6 +30,7 @@ export function Sidebar({
     <>
       {/* Desktop sidebar */}
       <aside
+        data-tour="sidebar"
         className={[
           'hidden h-full shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col dark:border-slate-800 dark:bg-slate-950',
           'transition-[width] duration-200 ease-out',
@@ -182,8 +185,34 @@ function Footer({ collapsed, onAfterLogout }: { collapsed: boolean; onAfterLogou
         </div>
       ) : null}
       {!collapsed ? (
-        <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold leading-relaxed text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
-          © {new Date().getFullYear()} Italo Bruno da Silva Fontes. Software proprietário.
+        <div className="mb-3 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+          <p className="text-[10px] font-semibold leading-relaxed text-slate-500 dark:text-slate-400">
+            Desenvolvido por Italo Bruno da Silva Fontes
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={SOCIAL_LINKS.cgb.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-extrabold text-[#9f1239] transition hover:bg-white/80 dark:text-rose-300 dark:hover:bg-slate-800/80"
+              title={`Instagram ${SOCIAL_LINKS.cgb.label}`}
+            >
+              <InstagramIcon size={12} />
+              @{SOCIAL_LINKS.cgb.handle}
+            </a>
+            {SOCIAL_LINKS.developer.href ? (
+              <a
+                href={SOCIAL_LINKS.developer.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-extrabold text-slate-600 transition hover:bg-white/80 dark:text-slate-300 dark:hover:bg-slate-800/80"
+                title={`Instagram ${SOCIAL_LINKS.developer.label}`}
+              >
+                <InstagramIcon size={12} />
+                @{SOCIAL_LINKS.developer.handle}
+              </a>
+            ) : null}
+          </div>
         </div>
       ) : null}
       <div className={['flex items-center gap-2', collapsed ? 'flex-col' : 'flex-row'].join(' ')}>

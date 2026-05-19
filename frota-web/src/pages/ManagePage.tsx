@@ -48,11 +48,16 @@ function formatDateBR(iso: string) {
   })
 }
 
+function isApontamentoHoje(dataApontamento: string, nowMs: number) {
+  const d = new Date(nowMs)
+  const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return dataApontamento.slice(0, 10) === hoje
+}
+
+/** Defeito novo do dia: apontado hoje e ainda não resolvido. */
 function isDefeitoEntrante(r: Apontamento, nowMs: number) {
   if (r.resolvido) return false
-  const ap = new Date(r.dataApontamento + 'T12:00:00').getTime()
-  const ageDays = (nowMs - ap) / 86_400_000
-  return ageDays >= 0 && ageDays <= 7
+  return isApontamentoHoje(r.dataApontamento, nowMs)
 }
 
 function formatCurrency(digits: string): string {
@@ -132,7 +137,7 @@ export function ManagePage() {
   const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')
+  const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes'>('apontamentos')
   const [vehicleId, setVehicleId] = useState(() => searchParams.get('veiculo') ?? 'todos')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
     if (searchParams.get('veiculo')) return true
@@ -297,6 +302,7 @@ export function ManagePage() {
     let list = rowsMatchingFiltros
     if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
     if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
+    if (visao === 'entrantes') list = list.filter((r) => isDefeitoEntrante(r, nowMs))
     return list
   }, [rowsMatchingFiltros, visao])
 
@@ -497,7 +503,7 @@ export function ManagePage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-tour="manage-stats" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatPill
           label="Checklists realizados"
           value={String(filtrosAtivos ? new Set(rowsMatchingFiltros.map((r) => r.checklistId)).size : checklistsRealizadosTotal)}
@@ -527,6 +533,13 @@ export function ManagePage() {
           value={String(stats.entrantes)}
           icon={<Inbox size={18} />}
           tone="sky"
+          selected={visao === 'entrantes'}
+          onClick={() => {
+            setVisao('entrantes')
+            setDataOrdem('desc')
+            setPagina(1)
+            tabelaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
         />
       </div>
 
@@ -548,7 +561,7 @@ export function ManagePage() {
             }
           </button>
         </div>
-        <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div data-tour="manage-filtros" className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
             <div className="flex flex-col gap-3 p-4">
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
@@ -620,6 +633,22 @@ export function ManagePage() {
             Carregando apontamentos...
           </div>
         )}
+        {visao === 'entrantes' && (
+          <div className="mt-4 flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-950/40">
+            <Inbox size={15} className="shrink-0 text-sky-600 dark:text-sky-400" />
+            <p className="flex-1 text-sm font-semibold text-sky-900 dark:text-sky-200">
+              Exibindo defeitos novos registrados hoje ({new Date(nowMs).toLocaleDateString('pt-BR')}).
+            </p>
+            <button
+              type="button"
+              onClick={() => { setVisao('apontamentos'); setPagina(1) }}
+              className="inline-flex items-center gap-1 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-extrabold text-sky-800 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800"
+            >
+              <X size={12} />
+              Ver todos
+            </button>
+          </div>
+        )}
         {urlChecklist && (
           <div className="mt-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-900/20">
             <ExternalLink size={15} className="shrink-0 text-amber-600 dark:text-amber-400" />
@@ -637,6 +666,7 @@ export function ManagePage() {
         )}
         <div
           ref={tabelaRef}
+          data-tour="manage-table"
           className={`mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}
         >
           <table className="min-w-[1040px] w-full border-collapse text-center text-sm">
@@ -674,7 +704,9 @@ export function ManagePage() {
               {sortedFiltered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-10 text-center text-slate-500 dark:text-slate-400">
-                    Nenhum registro para os filtros atuais.
+                    {visao === 'entrantes'
+                      ? 'Nenhum defeito novo registrado hoje.'
+                      : 'Nenhum registro para os filtros atuais.'}
                   </td>
                 </tr>
               ) : (

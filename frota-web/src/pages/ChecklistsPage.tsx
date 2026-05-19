@@ -395,7 +395,7 @@ export function ChecklistsPage() {
       </div>
 
       {/* Busca + Resultados */}
-      <div className="flex gap-2">
+      <div data-tour="checklists-actions" className="flex gap-2">
         <div className="flex h-12 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <Search size={18} className="shrink-0 text-slate-400 dark:text-slate-500" />
           <input

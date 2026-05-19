@@ -983,7 +983,7 @@ export function RegistroVeiculosPage() {
               Análise IA ✨
             </button>
             {canRegisterVehicle ? (
-              <>
+              <div data-tour="registro-actions" className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => { setImportRows([]); setImportResult(null); setImportModalOpen(true) }}
@@ -1000,7 +1000,7 @@ export function RegistroVeiculosPage() {
                   <Plus size={20} strokeWidth={3} />
                   Novo veículo
                 </button>
-              </>
+              </div>
             ) : null}
           </div>
         </header>

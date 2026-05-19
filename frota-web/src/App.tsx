@@ -5,6 +5,19 @@ import { RequireSuperAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
 import { RouteFallback } from './components/RouteFallback'
 import { ApontamentosLayout } from './layouts/ApontamentosLayout'
+import { TourProvider } from './tour/TourContext'
+import { TourOverlay } from './tour/TourOverlay'
+import { TourLauncher } from './tour/TourLauncher'
+
+function AuthedShellWithTour() {
+  return (
+    <TourProvider>
+      <AppShell />
+      <TourOverlay />
+      <TourLauncher />
+    </TourProvider>
+  )
+}
 
 const UsuariosPage = lazy(() =>
   import('./pages/AdministradorPage').then((m) => ({ default: m.UsuariosPage })),
@@ -73,7 +86,7 @@ export default function App() {
 
         {/* Rotas autenticadas */}
         <Route element={<RequireAuth />}>
-          <Route element={<AppShell />}>
+          <Route element={<AuthedShellWithTour />}>
             <Route index element={<DashboardPage />} />
             <Route path="/gerenciar" element={<ApontamentosLayout />}>
               <Route index element={<ManagePage />} />
