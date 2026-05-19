@@ -3,7 +3,6 @@ export type BaseFilterSelectOption = { value: string; label: string }
 
 export const BASE_FILTER_SELECT_OPTIONS: BaseFilterSelectOption[] = [
   { value: 'todos', label: 'Todos' },
-  { value: 'desmob', label: 'DESMOBIBILIZADA' },
   { value: 'bcb', label: 'BCB' },
   { value: 'bdc', label: 'BDC' },
   { value: 'itm', label: 'ITM' },
