@@ -1,5 +1,5 @@
 import type { AccessArea } from './accessAreas'
-import { readAllowlist, addToAllowlist, removeFromAllowlist } from './allowlist'
+import { readAllowlist, removeFromAllowlist } from './allowlist'
 import { registerSpecialUser } from './specialUsers'
 
 function normalizeEmail(email: string): string {

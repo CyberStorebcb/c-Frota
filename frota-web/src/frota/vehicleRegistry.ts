@@ -134,14 +134,6 @@ function readOverrideByPlaca(): Record<string, FleetCatalogFieldOverride> {
   }
 }
 
-function writeOverrideByPlaca(map: Record<string, FleetCatalogFieldOverride>): void {
-  const keys = Object.keys(map)
-  if (keys.length === 0) {
-    localStorage.removeItem(FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY)
-    return
-  }
-  localStorage.setItem(FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY, JSON.stringify(map))
-}
 
 function writeManutencaoByPlaca(map: Record<string, boolean>): void {
   const keys = Object.keys(map).filter((k) => map[k])
@@ -398,10 +390,6 @@ export function getDisplayedFleetVehicles(): FleetVehicle[] {
   return [...map.values()].sort((a, b) => a.placa.localeCompare(b.placa))
 }
 
-function placaExistsInTotalCatalog(placa: string): boolean {
-  const p = normalizePlaca(placa)
-  return TOTAL_VEHICLE_ROWS.some((r) => normalizePlaca(r.placa) === p)
-}
 
 /** Quantidade de placas distintas na base total embebida (TOTAL DE VEICULOS.xlsx deduplicado). */
 export const TOTAL_VEHICLE_CATALOG_UNIQUE_COUNT = TOTAL_VEHICLE_ROWS.length

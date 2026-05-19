@@ -45,6 +45,7 @@ function mk(
     problemasAdicionais:  '',
     descricaoProblema:    '',
     imperativo:           false,
+    horaApontamento:      '',
   }
 }
 
