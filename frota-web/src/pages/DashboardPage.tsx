@@ -10,7 +10,9 @@ import {
   ClipboardCheck,
   ClipboardX,
   Gauge,
+  Search,
   Truck,
+  X,
 } from 'lucide-react'
 
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
@@ -227,6 +229,45 @@ export function DashboardPage() {
     catch { return false }
   })
 
+  // Modal Detalhar
+  const [detalharOpen, setDetalharOpen] = useState(false)
+  const [detalharSearch, setDetalharSearch] = useState('')
+  const [detalharTab, setDetalharTab] = useState<'realizaram' | 'nao_realizaram'>('nao_realizaram')
+  const [placasRealizaram, setPlacasRealizaram] = useState<{ placa: string; modelo: string; hora: string }[]>([])
+  const [detalharLoading, setDetalharLoading] = useState(false)
+
+  const abrirDetalhar = async () => {
+    setDetalharOpen(true)
+    setDetalharSearch('')
+    setDetalharLoading(true)
+    const hojeIso = hojeLocalIso()
+    const { data } = await supabase
+      .from('checklists')
+      .select('dados_veiculo, created_at')
+      .eq('progresso', 100)
+      .eq('data_inspecao', hojeIso)
+    const realizaram = (data ?? []).map((row) => {
+      const dv = row.dados_veiculo && typeof row.dados_veiculo === 'object'
+        ? (row.dados_veiculo as Record<string, unknown>)
+        : {}
+      const placa = normalizePlacaDashboard(String(dv.placa ?? ''))
+      const modelo = String(dv.modelo ?? dv.veiculo ?? '—')
+      const hora = row.created_at
+        ? new Date(row.created_at as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        : '—'
+      return { placa, modelo, hora }
+    }).filter((r) => r.placa)
+    // deduplicar por placa (mantém o mais recente — array já vem ordenado por created_at desc se sorted)
+    const seen = new Set<string>()
+    const deduped = realizaram.filter((r) => {
+      if (seen.has(r.placa)) return false
+      seen.add(r.placa)
+      return true
+    })
+    setPlacasRealizaram(deduped)
+    setDetalharLoading(false)
+  }
+
   // Reage a veículos adicionados/removidos pelo admin no Registro
   const [fleetVehicles, setFleetVehicles] = useState(() => getDisplayedFleetVehicles())
   useEffect(() => {
@@ -246,6 +287,26 @@ export function DashboardPage() {
     }
     return m
   }, [])
+
+  // Veículos que NÃO realizaram checklist hoje (frota ativa - realizaram)
+  const placasNaoRealizaram = useMemo(() => {
+    const feitas = new Set(placasRealizaram.map((r) => r.placa))
+    return getVehicleOperationalStatusRowsWithLocals(fleetVehicles)
+      .filter((r) => !feitas.has(r.placa.trim().toUpperCase()))
+      .map((r) => ({ placa: r.placa.trim().toUpperCase(), modelo: r.modelo ?? '—', base: r.base ?? '' }))
+  }, [fleetVehicles, placasRealizaram])
+
+  const detalharRealizaramFiltrados = useMemo(() => {
+    const q = detalharSearch.trim().toUpperCase()
+    if (!q) return placasRealizaram
+    return placasRealizaram.filter((r) => r.placa.includes(q) || r.modelo.toUpperCase().includes(q))
+  }, [placasRealizaram, detalharSearch])
+
+  const detalharNaoRealizaramFiltrados = useMemo(() => {
+    const q = detalharSearch.trim().toUpperCase()
+    if (!q) return placasNaoRealizaram
+    return placasNaoRealizaram.filter((r) => r.placa.includes(q) || r.modelo.toUpperCase().includes(q) || r.base.toUpperCase().includes(q))
+  }, [placasNaoRealizaram, detalharSearch])
 
   const periodoLimites = useMemo(
     () => computePeriodoLimites(periodo, customDesde, customAte),
@@ -496,12 +557,13 @@ export function DashboardPage() {
                 {filtrosAvancadosVisiveis ? 'Ocultar filtros' : 'Mostrar filtros'}
               </span>
             </button>
-            <Link
-              to="/gerenciar"
+            <button
+              type="button"
+              onClick={() => void abrirDetalhar()}
               className="flex items-center justify-center rounded-xl bg-[#1E3A8A] px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-900/15 transition-all duration-300 ease-out will-change-transform hover:-translate-y-0.5 hover:scale-[1.03] hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-0 active:scale-[0.98] active:shadow-lg dark:shadow-blue-950/30 dark:focus-visible:ring-offset-slate-950 sm:rounded-2xl sm:px-5 sm:text-xs sm:py-3"
             >
               Detalhar
-            </Link>
+            </button>
           </div>
         </header>
 
@@ -635,6 +697,153 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Detalhar — checklists hoje */}
+      {detalharOpen && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          onClick={() => setDetalharOpen(false)}
+        >
+          <div
+            className="flex w-full max-w-xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            style={{ maxHeight: '85vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+              <div>
+                <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Checklists de hoje</p>
+                <p className="text-xs font-medium text-slate-400">
+                  {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetalharOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {detalharLoading ? (
+              <div className="flex flex-1 items-center justify-center py-16">
+                <span className="size-6 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400" />
+              </div>
+            ) : (
+              <>
+                {/* Tabs */}
+                <div className="flex border-b border-slate-100 px-5 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setDetalharTab('nao_realizaram')}
+                    className={`relative mr-5 py-3 text-xs font-extrabold transition-colors ${
+                      detalharTab === 'nao_realizaram'
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    Não realizaram
+                    <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                      detalharTab === 'nao_realizaram'
+                        ? 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}>
+                      {placasNaoRealizaram.length}
+                    </span>
+                    {detalharTab === 'nao_realizaram' && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-rose-500" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetalharTab('realizaram')}
+                    className={`relative py-3 text-xs font-extrabold transition-colors ${
+                      detalharTab === 'realizaram'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    Realizaram
+                    <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                      detalharTab === 'realizaram'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}>
+                      {placasRealizaram.length}
+                    </span>
+                    {detalharTab === 'realizaram' && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-emerald-500" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Busca */}
+                <div className="px-5 pt-3 pb-2">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+                    <Search size={13} className="shrink-0 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Buscar placa ou modelo…"
+                      value={detalharSearch}
+                      onChange={(e) => setDetalharSearch(e.target.value)}
+                      className="min-w-0 flex-1 bg-transparent text-xs font-medium text-slate-700 placeholder-slate-400 outline-none dark:text-slate-200"
+                    />
+                    {detalharSearch && (
+                      <button type="button" onClick={() => setDetalharSearch('')} className="text-slate-400 hover:text-slate-600">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista */}
+                <div className="custom-scrollbar flex-1 overflow-y-auto px-5 pb-5">
+                  {detalharTab === 'nao_realizaram' ? (
+                    detalharNaoRealizaramFiltrados.length === 0 ? (
+                      <p className="py-10 text-center text-xs font-semibold text-slate-400">
+                        {detalharSearch ? 'Nenhum resultado.' : 'Todos os veículos realizaram o checklist hoje!'}
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {detalharNaoRealizaramFiltrados.map((v) => (
+                          <div key={v.placa} className="flex items-center gap-3 py-2.5">
+                            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-950/40">
+                              <ClipboardX size={11} className="text-rose-500" />
+                            </span>
+                            <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
+                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
+                            {v.base && <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">{v.base}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    detalharRealizaramFiltrados.length === 0 ? (
+                      <p className="py-10 text-center text-xs font-semibold text-slate-400">
+                        {detalharSearch ? 'Nenhum resultado.' : 'Nenhum checklist realizado hoje ainda.'}
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {detalharRealizaramFiltrados.map((v) => (
+                          <div key={v.placa} className="flex items-center gap-3 py-2.5">
+                            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/40">
+                              <ClipboardCheck size={11} className="text-emerald-500" />
+                            </span>
+                            <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
+                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
+                            <span className="shrink-0 rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">{v.hora}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
