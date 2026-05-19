@@ -801,6 +801,29 @@ function FormularioChecklist({
   const todosItens = schema.grupos.flatMap((g) => g.itens)
   const totalItens = todosItens.length
 
+  // Mapeamento checklist → tipo de veículo no registro
+  const TIPO_MAP: Record<string, string[]> = {
+    'sky':          ['SKY'],
+    'munck':        ['MUNCK'],
+    'picape-leve':  ['PICAPE LEVE'],
+    'picape-4x4':   ['PICAPE 4X4'],
+    'motocicleta':  ['MOTO'],
+    'veiculo-leve': ['VEICULOS LEVES'],
+    'empilhadeira': [],
+  }
+
+  // Opções dinâmicas vindas do registro de veículos
+  const opcoesVeiculo = useMemo(() => {
+    const todos = getDisplayedFleetVehicles().filter((v) => v.status === 'ATIVO')
+    const tipos = TIPO_MAP[schema.id] ?? []
+    const filtrados = tipos.length > 0 ? todos.filter((v) => tipos.includes(v.tipo)) : todos
+    return {
+      placa:       [...new Set(filtrados.map((v) => formatPlaca(v.placa)).filter(Boolean))].sort(),
+      marca_modelo:[...new Set(filtrados.map((v) => v.modelo).filter(Boolean))].sort(),
+      prefixo:     [...new Set(filtrados.map((v) => v.prefixo).filter((p) => p && p !== 'N/A'))].sort(),
+    }
+  }, [schema.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const draft = readFormDraft(schema.id)
 
   const [respostas, setRespostas]         = useState<Record<string, Resposta>>(draft?.respostas ?? {})
@@ -1017,8 +1040,21 @@ function FormularioChecklist({
     scrollTimers.current.push(t1)
   }, [todosItens, setFotosItem, setItemDestacado, setRespostas])
 
-  const setDado = (id: string, valor: string) =>
-    setDadosVeiculo((prev) => ({ ...prev, [id]: valor }))
+  const setDado = (id: string, valor: string) => {
+    setDadosVeiculo((prev) => {
+      const next = { ...prev, [id]: valor }
+      // Ao escolher uma placa, preenche modelo e prefixo automaticamente
+      if (id === 'placa' && valor) {
+        const normalizada = normalizePlaca(valor)
+        const veiculo = getDisplayedFleetVehicles().find((v) => v.placa === normalizada)
+        if (veiculo) {
+          if (veiculo.modelo) next['marca_modelo'] = veiculo.modelo
+          if (veiculo.prefixo && veiculo.prefixo !== 'N/A') next['prefixo'] = veiculo.prefixo
+        }
+      }
+      return next
+    })
+  }
 
   const pedirLocalizacao = useCallback(() => {
     setLocalidadeGeoErro('')
@@ -1662,16 +1698,27 @@ function FormularioChecklist({
                       )
                     })() : null}
                   </div>
-                ) : campo.tipo === 'select' && campo.opcoes && campo.opcoes.length > 0 ? (
-                  <select
-                    value={dadosVeiculo[campo.id] ?? ''}
-                    onChange={(e) => setDado(campo.id, e.target.value)}
-                    className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:text-slate-100"
-                  >
-                    <option value="">Escolher...</option>
-                    {campo.opcoes.map((op) => <option key={op} value={op}>{op}</option>)}
-                  </select>
-                ) : (
+                ) : campo.tipo === 'select' ? (() => {
+                  // Opções: schema estático OU dinâmico do registro de veículos
+                  const opcoesDinamicas = (opcoesVeiculo as Record<string, string[]>)[campo.id] ?? []
+                  const opcoesEstaticas = campo.opcoes ?? []
+                  const opcoes = opcoesEstaticas.length > 0 ? opcoesEstaticas : opcoesDinamicas
+                  const listId = `datalist-${campo.id}`
+                  return (
+                    <>
+                      <input
+                        list={listId}
+                        value={dadosVeiculo[campo.id] ?? ''}
+                        onChange={(e) => setDado(campo.id, e.target.value)}
+                        placeholder={opcoes.length > 0 ? 'Escolher ou digitar...' : '—'}
+                        className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                      />
+                      <datalist id={listId}>
+                        {opcoes.map((op) => <option key={op} value={op} />)}
+                      </datalist>
+                    </>
+                  )
+                })() : (
                   <input
                     type={campo.tipo === 'number' ? 'number' : 'text'}
                     inputMode={campo.tipo === 'number' ? 'numeric' : 'text'}
