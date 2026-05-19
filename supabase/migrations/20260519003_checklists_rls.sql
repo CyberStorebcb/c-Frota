@@ -22,6 +22,17 @@ create policy "Autenticados podem ler checklists"
   on public.checklists for select
   to authenticated using (true);
 
+-- Admins podem atualizar checklists
+create policy "Admins podem atualizar checklists"
+  on public.checklists for update
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role in ('admin', 'super_admin')
+    )
+  );
+
 -- Admins podem deletar checklists
 create policy "Admins podem deletar checklists"
   on public.checklists for delete

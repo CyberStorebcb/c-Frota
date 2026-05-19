@@ -12,11 +12,14 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardList,
+  Clock,
   Download,
   ExternalLink,
   FileText,
   Image,
+  Pencil,
   RefreshCw,
+  Save,
   Search,
   Trash2,
   X,
@@ -579,6 +582,133 @@ function ModalDetalhe({ row, onClose }: { row: ChecklistRow; onClose: () => void
 }
 
 // ---------------------------------------------------------------------------
+// Modal de edição
+// ---------------------------------------------------------------------------
+
+function ModalEditar({ row, onClose, onSalvo }: { row: ChecklistRow; onClose: () => void; onSalvo: (updated: ChecklistRow) => void }) {
+  const [nomeOperador, setNomeOperador] = useState(row.nome_operador)
+  const [matricula, setMatricula]       = useState(row.matricula)
+  const [dataInspecao, setDataInspecao] = useState(row.data_inspecao)
+  const [nomeSupervisor, setNomeSupervisor] = useState(row.nome_supervisor ?? '')
+  const [problemas, setProblemas]       = useState(row.problemas ?? '')
+  const [dadosVeiculo, setDadosVeiculo] = useState<Record<string, string>>(
+    Object.fromEntries(Object.entries(row.dados_veiculo ?? {}).map(([k, v]) => [k, String(v ?? '')]))
+  )
+  const [salvando, setSalvando]         = useState(false)
+  const [erro, setErro]                 = useState('')
+
+  const handleSalvar = async () => {
+    setSalvando(true)
+    setErro('')
+    const { data, error } = await supabase
+      .from('checklists')
+      .update({
+        nome_operador: nomeOperador.trim(),
+        matricula: matricula.trim(),
+        data_inspecao: dataInspecao,
+        nome_supervisor: nomeSupervisor.trim(),
+        problemas: problemas.trim(),
+        dados_veiculo: dadosVeiculo,
+      })
+      .eq('id', row.id)
+      .select()
+      .single()
+    setSalvando(false)
+    if (error) { setErro('Erro ao salvar: ' + error.message); return }
+    onSalvo(data as ChecklistRow)
+    onClose()
+  }
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+  const labelCls = 'mb-1 block text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-8">
+      <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        {/* header */}
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Pencil size={16} className="text-blue-500" />
+            <div className="text-base font-black text-slate-900 dark:text-slate-100">Editar Checklist</div>
+          </div>
+          <button type="button" onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-400">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          {/* Operador */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Operador</label>
+              <input value={nomeOperador} onChange={(e) => setNomeOperador(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Matrícula</label>
+              <input value={matricula} onChange={(e) => setMatricula(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Data + Supervisor */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Data da Inspeção</label>
+              <input type="date" value={dataInspecao} onChange={(e) => setDataInspecao(e.target.value)} className={inputCls + ' dark:[color-scheme:dark]'} />
+            </div>
+            <div>
+              <label className={labelCls}>Supervisor</label>
+              <input value={nomeSupervisor} onChange={(e) => setNomeSupervisor(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Dados do veículo */}
+          {Object.keys(dadosVeiculo).length > 0 && (
+            <div>
+              <p className={labelCls}>Dados do Veículo</p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(dadosVeiculo).map(([k, v]) => (
+                  <div key={k}>
+                    <label className="mb-0.5 block text-[10px] font-bold uppercase text-slate-400">{k.replace(/_/g, ' ')}</label>
+                    <input
+                      value={v}
+                      onChange={(e) => setDadosVeiculo((prev) => ({ ...prev, [k]: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Problemas */}
+          <div>
+            <label className={labelCls}>Problemas</label>
+            <textarea
+              value={problemas}
+              onChange={(e) => setProblemas(e.target.value)}
+              rows={3}
+              className={inputCls + ' resize-none'}
+            />
+          </div>
+
+          {erro && <p className="text-sm font-extrabold text-rose-500">{erro}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} disabled={salvando} className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+              Cancelar
+            </button>
+            <button type="button" onClick={() => void handleSalvar()} disabled={salvando} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-50">
+              <Save size={14} />
+              {salvando ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Linha da tabela expansível (mobile)
 // ---------------------------------------------------------------------------
 
@@ -586,10 +716,12 @@ function LinhaChecklist({
   row,
   onVerDetalhe,
   onApagar,
+  onEditar,
 }: {
   row: ChecklistRow
   onVerDetalhe: () => void
   onApagar?: () => void
+  onEditar?: () => void
 }) {
   const [expandido, setExpandido] = useState(false)
   const schema = SCHEMA_MAP[row.tipo]
@@ -622,7 +754,11 @@ function LinhaChecklist({
           {placa || <span className="text-slate-400">—</span>}
         </td>
         <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          {formatDateBR(row.data_inspecao)}
+          <div>{formatDateBR(row.data_inspecao)}</div>
+          <div className="flex items-center gap-1 text-xs font-semibold text-slate-400 dark:text-slate-500">
+            <Clock size={11} />
+            {new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </div>
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
@@ -642,6 +778,17 @@ function LinhaChecklist({
         </td>
         <td className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-1">
+            {onEditar && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEditar() }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-500 hover:bg-blue-100 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                aria-label="Editar"
+                title="Editar checklist"
+              >
+                <Pencil size={13} />
+              </button>
+            )}
             {onApagar && (
               <button
                 type="button"
@@ -754,6 +901,7 @@ export function ChecklistResultadosPage() {
   const [ordemCol, setOrdemCol]       = useState<OrdemCol>('created_at')
   const [ordemDir, setOrdemDir]       = useState<OrdemDir>('desc')
   const [detalhe, setDetalhe]         = useState<ChecklistRow | null>(null)
+  const [editando, setEditando]       = useState<ChecklistRow | null>(null)
   const [sparkRows, setSparkRows]     = useState<ChecklistRow[]>([])
   const [reloadNonce, setReloadNonce] = useState(0)
 
@@ -1379,7 +1527,7 @@ export function ChecklistResultadosPage() {
                       { label: 'Operador', col: 'nome_operador' as OrdemCol },
                       { label: 'Tipo',     col: null },
                       { label: 'Placa',    col: null },
-                      { label: 'Data',     col: 'data_inspecao' as OrdemCol },
+                      { label: 'Data / Hora', col: 'data_inspecao' as OrdemCol },
                       { label: 'Resultado',col: 'nc_count' as OrdemCol },
                     ] as { label: string; col: OrdemCol | null }[]
                   ).map(({ label, col }) => (
@@ -1417,6 +1565,7 @@ export function ChecklistResultadosPage() {
                       row={row}
                       onVerDetalhe={() => setDetalhe(row)}
                       onApagar={podeGerenciar ? () => setConfirmDelete(row) : undefined}
+                      onEditar={podeGerenciar ? () => setEditando(row) : undefined}
                     />
                   ))
                 )}
@@ -1485,6 +1634,17 @@ export function ChecklistResultadosPage() {
       )}
 
       {detalhe && <ModalDetalhe row={detalhe} onClose={() => setDetalhe(null)} />}
+
+      {editando && (
+        <ModalEditar
+          row={editando}
+          onClose={() => setEditando(null)}
+          onSalvo={(updated) => {
+            setRows((prev) => prev.map((r) => r.id === updated.id ? updated : r))
+            setEditando(null)
+          }}
+        />
+      )}
 
       {/* Modal de confirmação de exclusão */}
       {confirmDelete && (
