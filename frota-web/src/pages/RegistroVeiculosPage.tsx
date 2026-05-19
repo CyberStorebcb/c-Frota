@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Download,
+  FileSpreadsheet,
   LayoutGrid,
   List,
   Loader2,
@@ -22,10 +24,12 @@ import {
   Sparkles,
   Tag,
   Truck,
+  Upload,
   User,
   Wrench,
   X,
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { useAuth } from '../auth/AuthContext'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
@@ -370,6 +374,71 @@ function VehicleOverflowMenu({
   )
 }
 
+// ── Import Excel ──────────────────────────────────────────────────────────────
+
+type ImportRow = {
+  placa: string
+  tipo: string
+  modelo: string
+  prefixo: string
+  ano: string
+  base: string
+  supervisor: string
+  coordenador: string
+  _error?: string
+}
+
+const IMPORT_COLUMN_MAP: Record<string, keyof ImportRow> = {
+  placa: 'placa',
+  'tipo de veículo': 'tipo', tipo: 'tipo',
+  'modelo/marca': 'modelo', modelo: 'modelo', marca: 'modelo',
+  prefixo: 'prefixo',
+  ano: 'ano',
+  base: 'base',
+  supervisor: 'supervisor',
+  gerência: 'coordenador', gerencia: 'coordenador', coordenador: 'coordenador',
+}
+
+function parseImportSheet(file: File): Promise<ImportRow[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target!.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const rows: ImportRow[] = raw.map((r) => {
+          const row: ImportRow = { placa: '', tipo: '', modelo: '', prefixo: '', ano: '', base: '', supervisor: '', coordenador: '' }
+          for (const [col, val] of Object.entries(r)) {
+            const key = IMPORT_COLUMN_MAP[col.trim().toLowerCase()]
+            if (key) row[key] = String(val ?? '').trim()
+          }
+          if (!row.placa) row._error = 'Placa ausente'
+          return row
+        }).filter((r) => r.placa || r._error)
+        resolve(rows)
+      } catch (err) {
+        reject(err)
+      }
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+function downloadImportTemplate() {
+  const headers = ['Placa', 'Tipo de Veículo', 'Modelo/Marca', 'Prefixo', 'Ano', 'Base', 'Supervisor', 'Gerência']
+  const example = ['ABC1D23', 'PICAPE 4X4', 'HILUX', 'STI301', '2024', 'BCB', 'NOME SUPERVISOR', 'NOME GERÊNCIA']
+  const ws = XLSX.utils.aoa_to_sheet([headers, example])
+  ws['!cols'] = headers.map(() => ({ wch: 20 }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Veículos')
+  XLSX.writeFile(wb, 'template-importacao-veiculos.xlsx')
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 function defaultForm() {
   const y = new Date().getFullYear().toString()
   return {
@@ -409,6 +478,13 @@ export function RegistroVeiculosPage() {
   const [colFilterLocalBase, setColFilterLocalBase] = useState('')
   const [colFilterCoordSup, setColFilterCoordSup] = useState('')
   const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus | 'MANUTENÇÃO'>('ALL')
+  // Import Excel modal
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [importRows, setImportRows] = useState<ImportRow[]>([])
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<{ ok: number; skip: number; errors: string[] } | null>(null)
+  const importFileRef = useRef<HTMLInputElement>(null)
+
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
@@ -438,6 +514,46 @@ export function RegistroVeiculosPage() {
     refresh()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseVehicles])
+
+  const handleImportFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const rows = await parseImportSheet(file)
+      setImportRows(rows)
+      setImportResult(null)
+    } catch {
+      showNotification('Erro ao ler o arquivo. Verifique o formato.', 'error')
+    }
+    e.target.value = ''
+  }
+
+  const handleImportConfirm = async () => {
+    const validRows = importRows.filter((r) => !r._error && r.placa)
+    if (!validRows.length) return
+    setImportLoading(true)
+    let ok = 0
+    const errors: string[] = []
+
+    for (const row of validRows) {
+      const res = await saveVehicle({
+        placa: row.placa,
+        modelo: row.modelo || '—',
+        tipo: (VEHICLE_TYPE_IDS.includes(row.tipo as VehicleTipo) ? row.tipo : 'VEICULOS LEVES') as VehicleTipo,
+        prefixo: row.prefixo || 'N/A',
+        responsavel: 'NÃO ATRIBUÍDO',
+        supervisor: row.supervisor || 'NÃO ATRIBUÍDO',
+        coordenador: row.coordenador || 'NÃO ATRIBUÍDO',
+        base: row.base || 'N/A',
+        ano: row.ano || new Date().getFullYear().toString(),
+      })
+      if (res.ok) { ok++ } else { errors.push(`${row.placa}: ${res.message}`) }
+    }
+
+    setImportResult({ ok, skip: importRows.filter((r) => !!r._error).length, errors })
+    setImportLoading(false)
+    await reloadSupabase()
+  }
 
   const { rows: apontamentosRows, carregando: apontamentosCarregando } = useApontamentos()
 
@@ -843,14 +959,24 @@ export function RegistroVeiculosPage() {
               Análise IA ✨
             </button>
             {canRegisterVehicle ? (
-              <button
-                type="button"
-                onClick={handleOpenModal}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95 dark:shadow-blue-900/30"
-              >
-                <Plus size={20} strokeWidth={3} />
-                Novo veículo
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => { setImportRows([]); setImportResult(null); setImportModalOpen(true) }}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-700 transition-all hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+                >
+                  <FileSpreadsheet size={18} />
+                  Importar Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenModal}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95 dark:shadow-blue-900/30"
+                >
+                  <Plus size={20} strokeWidth={3} />
+                  Novo veículo
+                </button>
+              </>
             ) : null}
           </div>
         </header>
@@ -1786,6 +1912,134 @@ export function RegistroVeiculosPage() {
         </div>
       </div>
       )}
+
+      {/* Modal importar Excel */}
+      {importModalOpen && canRegisterVehicle ? (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onClick={() => setImportModalOpen(false)}
+        >
+          <div
+            className="flex w-full max-w-2xl flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet size={18} className="text-emerald-500" />
+                <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Importar veículos via Excel</span>
+              </div>
+              <button type="button" onClick={() => setImportModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Download template */}
+            <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <div>
+                <p className="text-xs font-extrabold text-slate-700 dark:text-slate-200">Modelo de planilha</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Colunas: Placa, Tipo de Veículo, Modelo/Marca, Prefixo, Ano, Base, Supervisor, Gerência</p>
+              </div>
+              <button
+                type="button"
+                onClick={downloadImportTemplate}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-extrabold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-400"
+              >
+                <Download size={14} />
+                Baixar modelo
+              </button>
+            </div>
+
+            {/* Upload */}
+            <div>
+              <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportFile} />
+              <button
+                type="button"
+                onClick={() => importFileRef.current?.click()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-4 text-sm font-extrabold text-slate-500 transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400"
+              >
+                <Upload size={18} />
+                {importRows.length > 0 ? `${importRows.length} linha(s) carregada(s) — clique para trocar` : 'Selecionar arquivo .xlsx / .xls'}
+              </button>
+            </div>
+
+            {/* Preview */}
+            {importRows.length > 0 && !importResult && (
+              <div className="max-h-52 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800">
+                    <tr>
+                      {['Placa','Tipo','Modelo','Prefixo','Ano','Base','Supervisor','Gerência'].map((h) => (
+                        <th key={h} className="px-3 py-2 font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">{h}</th>
+                      ))}
+                      <th className="px-3 py-2 font-black uppercase tracking-wide text-slate-500">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {importRows.map((r, i) => (
+                      <tr key={i} className={r._error ? 'bg-rose-50 dark:bg-rose-950/20' : ''}>
+                        <td className="px-3 py-2 font-extrabold text-slate-900 dark:text-slate-100">{r.placa}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.tipo}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.modelo}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.prefixo}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.ano}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.base}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.supervisor}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.coordenador}</td>
+                        <td className="px-3 py-2">
+                          {r._error
+                            ? <span className="font-extrabold text-rose-500">{r._error}</span>
+                            : <span className="font-extrabold text-emerald-600">✓ OK</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Resultado */}
+            {importResult && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                <p className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300">
+                  ✓ {importResult.ok} veículo(s) importado(s) com sucesso
+                  {importResult.skip > 0 && ` · ${importResult.skip} linha(s) ignorada(s)`}
+                </p>
+                {importResult.errors.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {importResult.errors.map((e, i) => (
+                      <li key={i} className="text-xs font-semibold text-rose-600 dark:text-rose-400">{e}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setImportModalOpen(false)}
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-extrabold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              >
+                {importResult ? 'Fechar' : 'Cancelar'}
+              </button>
+              {!importResult && (
+                <button
+                  type="button"
+                  onClick={() => void handleImportConfirm()}
+                  disabled={importLoading || importRows.filter((r) => !r._error).length === 0}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {importLoading
+                    ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" />Importando...</span>
+                    : `Importar ${importRows.filter((r) => !r._error).length} veículo(s)`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
