@@ -837,7 +837,7 @@ function FormularioChecklist({
   const [gpsPermissao, setGpsPermissao] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking')
   const [gpsGuiaAberto, setGpsGuiaAberto] = useState(false)
   const [gpsErroCodigo, setGpsErroCodigo] = useState<1 | 2 | 3 | null>(null)
-  const [dataInspecao, setDataInspecao]   = useState(draft?.dataInspecao ?? new Date().toISOString().split('T')[0] ?? '')
+  const [dataInspecao] = useState(draft?.dataInspecao ?? new Date().toISOString().split('T')[0] ?? '')
   const [problemas, setProblemas]         = useState(draft?.problemas ?? '')
   const [descricaoProblema, setDescricaoProblema] = useState(draft?.descricaoProblema ?? '')
   const [supervisor, setSupervisor]       = useState(draft?.supervisor ?? '')
