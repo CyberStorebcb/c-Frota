@@ -41,6 +41,9 @@ const RegistroEspecialPage = lazy(() =>
 const VeiculosStatusPage = lazy(() =>
   import('./pages/VeiculosStatusPage').then((m) => ({ default: m.VeiculosStatusPage })),
 )
+const ChecklistDetalharPage = lazy(() =>
+  import('./pages/ChecklistDetalharPage').then((m) => ({ default: m.ChecklistDetalharPage })),
+)
 const LazyRegistroRoute = lazy(() =>
   import('./routes/RegistroRoute').then((m) => ({ default: m.RegistroRoute })),
 )
@@ -72,6 +75,7 @@ export default function App() {
               <Route path="checklists/resultados" element={<ChecklistResultadosPage />} />
             </Route>
             <Route path="/veiculos/status" element={<VeiculosStatusPage />} />
+            <Route path="/checklists/detalhar" element={<ChecklistDetalharPage />} />
             <Route path="/veiculos" element={<Navigate to="/gerenciar" replace />} />
             <Route
               path="/usuarios"
