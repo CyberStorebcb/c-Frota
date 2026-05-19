@@ -69,10 +69,6 @@ function parseCurrency(masked: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function uniqSorted(values: string[]): SelectOption[] {
-  const u = [...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  return u.map((v) => ({ value: v, label: v }))
-}
 
 
 const PAGE_SIZE_OPTIONS: SelectOption[] = [
@@ -225,13 +221,6 @@ export function ManagePage() {
     return [{ value: 'todos', label: 'Todos os veículos' }, ...opts]
   }, [rows, searchParams, urlPlaca])
 
-  const respOptions = useMemo<SelectOption[]>(() => {
-    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.responsavel))]
-  }, [rows])
-
-  const prefixoOptions = useMemo<SelectOption[]>(() => {
-    return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.prefixo))]
-  }, [rows])
 
   const dataOpts = useMemo<SelectOption[]>(() => {
     const anos = [...new Set(rows.map((r) => r.dataApontamento.slice(0, 4)).filter(Boolean))]
@@ -586,18 +575,6 @@ export function ManagePage() {
                   value={supervisor}
                   options={SUPERVISOR_FILTER_SELECT_OPTIONS}
                   onChange={(v) => { setSupervisor(v); setPagina(1) }}
-                />
-                <Select
-                  label="Responsável"
-                  value={responsavel}
-                  options={respOptions}
-                  onChange={(v) => { setResponsavel(v); setPagina(1) }}
-                />
-                <Select
-                  label="Prefixo"
-                  value={prefixo}
-                  options={prefixoOptions}
-                  onChange={(v) => { setPrefixo(v); setPagina(1) }}
                 />
                 <Select label="Data" value={data} options={dataOpts} onChange={(v) => { setData(v); setPagina(1) }} />
               </div>
