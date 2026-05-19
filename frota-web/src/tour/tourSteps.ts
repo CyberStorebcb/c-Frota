@@ -141,18 +141,8 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="checklists-actions"]',
     title: '🔗 Link Público do Checklist',
     content:
-      'Os operadores acessam um link único (/checklist) para preencher o checklist do veículo sem precisar de login. Esse link pode ser enviado por WhatsApp ou QR Code.',
+      'Os operadores acessam um link único (/checklist) para preencher o checklist do veículo sem precisar de login. O formulário pede a placa, as perguntas de inspeção e fotos dos defeitos encontrados. Pode ser enviado por WhatsApp ou QR Code.',
     placement: 'bottom',
-  },
-
-  // ─── Checklist público ───────────────────────────────────────────────────
-  {
-    path: '/checklist',
-    area: 'Checklists',
-    title: '📱 Formulário do Operador',
-    content:
-      'Esta é a tela que o operador usa no campo. Sem necessidade de login — basta acessar o link. O operador informa a placa, responde as perguntas e tira fotos dos defeitos encontrados.',
-    waitMs: 800,
   },
 
   // ─── Resultados ─────────────────────────────────────────────────────────
