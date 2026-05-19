@@ -48,7 +48,7 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
             collapsed={sidebarCollapsed}
             onClose={closeSidebar}
           />
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
             <Topbar
               sidebarCollapsed={sidebarCollapsed}
               onMenuClick={toggleSidebar}
@@ -56,7 +56,7 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
             />
             <PrimeiroAcessoBanner />
             <main
-              className="flex min-h-0 flex-1 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
+              className="flex-1 overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
               onClick={closeMenuWhenClickingContent}
             >
               {children}
