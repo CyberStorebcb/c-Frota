@@ -1,22 +1,9 @@
 import type { AccessArea } from './accessAreas'
 import { readAllowlist, addToAllowlist, removeFromAllowlist } from './allowlist'
-import { readSpecialUsers, registerSpecialUser, removeSpecialUser } from './specialUsers'
+import { registerSpecialUser } from './specialUsers'
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
-}
-
-/** Remove da lista de especiais e passa a utilizador padrão com a mesma senha. */
-export function convertSpecialUserToNormal(email: string): { ok: true } | { ok: false; message: string } {
-  const e = normalizeEmail(email)
-  const row = readSpecialUsers().find((u) => u.email === e)
-  if (!row) return { ok: false, message: 'Utilizador especial não encontrado.' }
-
-  const add = addToAllowlist(row.email, row.password)
-  if (!add.ok) return add
-
-  removeSpecialUser(row.email)
-  return { ok: true }
 }
 
 /** Remove da lista padrão e regista como especial (mantém senha e área por omissão). */
