@@ -360,6 +360,7 @@ export function RegistroVeiculosPage() {
   const [colFilterModeloPrefixo, setColFilterModeloPrefixo] = useState('')
   const [colFilterOrgResp, setColFilterOrgResp] = useState('')
   const [colFilterLocalBase, setColFilterLocalBase] = useState('')
+  const [colFilterCoordSup, setColFilterCoordSup] = useState('')
   const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus | 'MANUTENÇÃO'>('ALL')
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
@@ -470,6 +471,7 @@ export function RegistroVeiculosPage() {
     const fm = colFilterModeloPrefixo.trim().toLowerCase()
     const fo = colFilterOrgResp.trim().toLowerCase()
     const fl = colFilterLocalBase.trim().toLowerCase()
+    const fc = colFilterCoordSup.trim().toLowerCase()
 
     return globallyFilteredVehicles.filter((v) => {
       if (fp && !normalizePlaca(v.placa).includes(fp)) return false
@@ -479,6 +481,10 @@ export function RegistroVeiculosPage() {
       }
       if (fo && !String(v.responsavel || '').toLowerCase().includes(fo)) return false
       if (fl && !String(v.base || '').toLowerCase().includes(fl)) return false
+      if (fc) {
+        const blob = `${v.coordenador || ''} ${v.supervisor || ''}`.toLowerCase()
+        if (!blob.includes(fc)) return false
+      }
       if (colFilterStatus === 'MANUTENÇÃO') {
         if (!v.emManutencao) return false
       } else if (colFilterStatus !== 'ALL' && v.status !== colFilterStatus) {
@@ -493,6 +499,7 @@ export function RegistroVeiculosPage() {
     colFilterModeloPrefixo,
     colFilterOrgResp,
     colFilterLocalBase,
+    colFilterCoordSup,
     colFilterStatus,
   ])
 
@@ -501,6 +508,7 @@ export function RegistroVeiculosPage() {
     setColFilterModeloPrefixo('')
     setColFilterOrgResp('')
     setColFilterLocalBase('')
+    setColFilterCoordSup('')
     setColFilterStatus('ALL')
   }
 
@@ -509,6 +517,7 @@ export function RegistroVeiculosPage() {
       colFilterModeloPrefixo.trim() ||
       colFilterOrgResp.trim() ||
       colFilterLocalBase.trim() ||
+      colFilterCoordSup.trim() ||
       colFilterStatus !== 'ALL',
   )
 
@@ -1213,7 +1222,17 @@ export function RegistroVeiculosPage() {
                   />
                 </th>
                 <th className="hidden px-2 py-2 align-top xl:table-cell">
-                  <span className="sr-only">Filtrar coord./sup.</span>
+                  <label className="sr-only" htmlFor="flt-coord-col">
+                    Filtrar coordenador ou supervisor
+                  </label>
+                  <input
+                    id="flt-coord-col"
+                    type="text"
+                    value={colFilterCoordSup}
+                    onChange={(e) => setColFilterCoordSup(e.target.value)}
+                    placeholder="Coord. / sup.…"
+                    className={inputFilterClass}
+                  />
                 </th>
                 <th className="px-2 py-2 align-top">
                   <label className="sr-only" htmlFor="flt-status-col">
