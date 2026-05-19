@@ -1434,8 +1434,8 @@ function FormularioChecklist({
               <input
                 type="date"
                 value={dataInspecao}
-                onChange={(e) => setDataInspecao(e.target.value)}
-                className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none dark:[color-scheme:dark] dark:text-slate-100"
+                readOnly
+                className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none pointer-events-none select-none dark:[color-scheme:dark] dark:text-slate-100"
               />
             </div>
             {(schema.camposExtras ?? []).map((campo) => (
