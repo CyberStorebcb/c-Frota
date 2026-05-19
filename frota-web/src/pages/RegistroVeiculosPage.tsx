@@ -454,6 +454,7 @@ export function RegistroVeiculosPage() {
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
   const [activeTab, setActiveTab] = useState<'ativos' | 'removidos'>('ativos')
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; placa: string; isSupabase: boolean } | null>(null)
+  const [confirmHardDelete, setConfirmHardDelete] = useState<{ id: string; placa: string } | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -1163,10 +1164,7 @@ export function RegistroVeiculosPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => void hardDeleteVehicle(v.id).then((r) => {
-                                if (!r.ok) showNotification(r.message, 'error')
-                                else showNotification(`${v.placa} excluído permanentemente.`, 'success')
-                              })}
+                              onClick={() => setConfirmHardDelete({ id: v.id, placa: v.placa })}
                               className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-extrabold text-rose-600 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-400"
                             >
                               <X size={12} /> Excluir
@@ -2042,6 +2040,49 @@ export function RegistroVeiculosPage() {
                 className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-extrabold text-white hover:bg-rose-700"
               >
                 Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Modal confirmação de exclusão permanente */}
+      {confirmHardDelete ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-100 dark:bg-rose-950/50">
+                <AlertCircle size={20} className="text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Excluir permanentemente</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <p className="mb-5 rounded-xl bg-slate-50 px-4 py-3 text-sm font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              {confirmHardDelete.placa}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmHardDelete(null)}
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-extrabold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const { id, placa } = confirmHardDelete
+                  setConfirmHardDelete(null)
+                  void hardDeleteVehicle(id).then((r) => {
+                    if (!r.ok) showNotification(r.message, 'error')
+                    else showNotification(`${placa} excluído permanentemente.`, 'success')
+                  })
+                }}
+                className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-extrabold text-white hover:bg-rose-700"
+              >
+                Excluir
               </button>
             </div>
           </div>
