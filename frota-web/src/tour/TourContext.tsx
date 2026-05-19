@@ -8,7 +8,10 @@ type TourCtx = {
   stepIndex: number
   step: TourStep | null
   total: number
+  /** Inicia do passo salvo (retoma onde parou). */
   start: () => void
+  /** Inicia sempre do passo 0, ignorando progresso salvo. */
+  startFresh: () => void
   stop: () => void
   next: () => void
   prev: () => void
@@ -17,7 +20,26 @@ type TourCtx = {
 
 const Ctx = createContext<TourCtx | null>(null)
 
-const STORAGE_KEY = 'frota.tour.completed'
+const STORAGE_COMPLETED = 'frota.tour.completed'
+const STORAGE_PROGRESS  = 'frota.tour.progress'
+
+function loadProgress(): number {
+  try {
+    const v = localStorage.getItem(STORAGE_PROGRESS)
+    const n = v ? parseInt(v, 10) : 0
+    return Number.isFinite(n) && n >= 0 && n < TOUR_STEPS.length ? n : 0
+  } catch {
+    return 0
+  }
+}
+
+function saveProgress(index: number) {
+  try { localStorage.setItem(STORAGE_PROGRESS, String(index)) } catch { /* ignore */ }
+}
+
+function clearProgress() {
+  try { localStorage.removeItem(STORAGE_PROGRESS) } catch { /* ignore */ }
+}
 
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
@@ -33,9 +55,15 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     if (!shouldAutoStartTour(user.email)) return
     if (autoStartedFor.current === user.email) return
     autoStartedFor.current = user.email
-    setStepIndex(0)
+    const saved = loadProgress()
+    setStepIndex(saved)
     setActive(true)
   }, [user?.email])
+
+  // ── Persiste progresso sempre que o passo muda (enquanto ativo) ──────────
+  useEffect(() => {
+    if (active) saveProgress(stepIndex)
+  }, [active, stepIndex])
 
   // ── Navegação automática quando o passo muda de rota ────────────────────
   useEffect(() => {
@@ -47,14 +75,24 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
   }, [active, stepIndex, location.pathname, navigate])
 
+  // Inicia retomando progresso salvo
   const start = useCallback(() => {
+    const saved = loadProgress()
+    setStepIndex(saved)
+    setActive(true)
+  }, [])
+
+  // Inicia sempre do zero
+  const startFresh = useCallback(() => {
+    clearProgress()
     setStepIndex(0)
     setActive(true)
   }, [])
 
   const stop = useCallback(() => {
     setActive(false)
-    try { localStorage.setItem(STORAGE_KEY, 'true') } catch { /* ignore */ }
+    clearProgress()
+    try { localStorage.setItem(STORAGE_COMPLETED, 'true') } catch { /* ignore */ }
   }, [])
 
   const next = useCallback(() => {
@@ -62,7 +100,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       const n = i + 1
       if (n >= TOUR_STEPS.length) {
         setActive(false)
-        try { localStorage.setItem(STORAGE_KEY, 'true') } catch { /* ignore */ }
+        clearProgress()
+        try { localStorage.setItem(STORAGE_COMPLETED, 'true') } catch { /* ignore */ }
         return i
       }
       return n
@@ -85,12 +124,13 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       step: active ? TOUR_STEPS[stepIndex] ?? null : null,
       total: TOUR_STEPS.length,
       start,
+      startFresh,
       stop,
       next,
       prev,
       goTo,
     }),
-    [active, stepIndex, start, stop, next, prev, goTo],
+    [active, stepIndex, start, startFresh, stop, next, prev, goTo],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

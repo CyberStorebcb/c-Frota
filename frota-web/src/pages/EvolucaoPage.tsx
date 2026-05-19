@@ -752,7 +752,7 @@ export function EvolucaoPage() {
       </div>
 
       {/* ── KPIs principais ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div data-tour="evolucao-kpis" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 
         {/* Resolvidos */}
         <div className="flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-soft dark:border-emerald-900/40 dark:bg-emerald-950/20">
@@ -823,7 +823,7 @@ export function EvolucaoPage() {
       </div>
 
       {/* ── Painel principal com toggle de visão ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
+      <div data-tour="evolucao-chart" className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
 
         {/* Cabeçalho com toggles */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3 dark:border-slate-800">
