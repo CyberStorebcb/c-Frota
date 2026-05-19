@@ -365,13 +365,29 @@ export function ChecklistDetalharPage() {
             ) : (
               <div className="custom-scrollbar max-h-[60vh] divide-y divide-slate-50 overflow-y-auto dark:divide-slate-800/60">
                 {naoRealizaramFiltrados.map((v) => (
-                  <div key={v.placa} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
-                    {v.base && (
-                      <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                        {v.base}
-                      </span>
+                  <div key={v.placa} className="px-4 py-2.5 space-y-0.5">
+                    <div className="flex items-center gap-3">
+                      <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
+                      {v.base && (
+                        <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          {v.base}
+                        </span>
+                      )}
+                    </div>
+                    {(v.supervisor || v.coordenador) && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-0.5">
+                        {v.supervisor && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            <span className="font-bold">Sup:</span> {v.supervisor}
+                          </span>
+                        )}
+                        {v.coordenador && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            <span className="font-bold">Gerência:</span> {v.coordenador}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -396,24 +412,40 @@ export function ChecklistDetalharPage() {
             ) : (
               <div className="custom-scrollbar max-h-[60vh] divide-y divide-slate-50 overflow-y-auto dark:divide-slate-800/60">
                 {realizaramFiltrados.map((v) => (
-                  <div key={v.placa} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
-                    {v.base && (
-                      <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                        {v.base}
-                      </span>
-                    )}
-                    <div className="flex shrink-0 flex-col items-end gap-0.5">
-                      <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
-                        {v.hora}
-                      </span>
-                      {v.temNc && (
-                        <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
-                          NC
+                  <div key={v.placa} className="px-4 py-2.5 space-y-0.5">
+                    <div className="flex items-center gap-3">
+                      <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
+                      {v.base && (
+                        <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          {v.base}
                         </span>
                       )}
+                      <div className="flex shrink-0 flex-col items-end gap-0.5">
+                        <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                          {v.hora}
+                        </span>
+                        {v.temNc && (
+                          <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
+                            NC
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {(v.supervisor || v.coordenador) && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-0.5">
+                        {v.supervisor && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            <span className="font-bold">Sup:</span> {v.supervisor}
+                          </span>
+                        )}
+                        {v.coordenador && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            <span className="font-bold">Gerência:</span> {v.coordenador}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
