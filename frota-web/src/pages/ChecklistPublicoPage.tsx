@@ -6,6 +6,7 @@ import {
   Camera,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ClipboardList,
   ImagePlus,
@@ -124,9 +125,11 @@ function TelaEscolhaChecklist({
 function TelaIdentificacao({
   schema,
   onConfirmar,
+  onVoltar,
 }: {
   schema: ChecklistSchemaDef
   onConfirmar: (nome: string, matricula: string) => void
+  onVoltar: () => void
 }) {
   const [nome, setNome] = useState('')
   const [matricula, setMatricula] = useState('')
@@ -156,6 +159,13 @@ function TelaIdentificacao({
 
         {/* Cabeçalho */}
         <div className="mb-5">
+          <button
+            type="button"
+            onClick={onVoltar}
+            className="mb-3 inline-flex items-center gap-1.5 text-xs font-extrabold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          >
+            ← Trocar tipo de checklist
+          </button>
           <CgbHero
             eyebrow={schema.nome}
             title="Identificação"
@@ -780,11 +790,13 @@ function FormularioChecklist({
   operador,
   matricula,
   onConcluido,
+  onVoltar,
 }: {
   schema: ChecklistSchemaDef
   operador: string
   matricula: string
   onConcluido?: () => void
+  onVoltar?: () => void
 }) {
   const todosItens = schema.grupos.flatMap((g) => g.itens)
   const totalItens = todosItens.length
@@ -1300,7 +1312,18 @@ function FormularioChecklist({
       {/* ── Header fixo ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1020] px-4 py-3 text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] dark:bg-slate-950">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <CollapsedNavMark size="md" className="ring-1 ring-white/15" />
+          {onVoltar ? (
+            <button
+              type="button"
+              onClick={onVoltar}
+              title="Voltar para escolha do checklist"
+              className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          ) : (
+            <CollapsedNavMark size="md" className="ring-1 ring-white/15" />
+          )}
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-black text-white">{schema.nome}</div>
             <div className="mt-1 flex items-center gap-2">
@@ -1941,6 +1964,7 @@ export function ChecklistPublicoPage() {
       <TelaIdentificacao
         schema={schema}
         onConfirmar={handleOperador}
+        onVoltar={() => setTipoSelecionado(null)}
       />
     )
   }
@@ -1951,6 +1975,7 @@ export function ChecklistPublicoPage() {
       operador={operador}
       matricula={matricula}
       onConcluido={clearDraftSession}
+      onVoltar={() => { setOperador(''); setMatricula('') }}
     />
   )
 }
