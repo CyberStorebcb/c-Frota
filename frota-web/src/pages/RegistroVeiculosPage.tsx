@@ -1093,31 +1093,31 @@ export function RegistroVeiculosPage() {
           ))}
         </div>
 
-        {/* Abas Ativos / Removidos */}
+        {/* Link discreto para aba Removidos */}
         {canRegisterVehicle && (
-          <div className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <button
-              type="button"
-              onClick={() => setActiveTab('ativos')}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-black transition-all ${
-                activeTab === 'ativos'
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                  : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
-              }`}
-            >
-              Frota ativa · {vehicles.length}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('removidos')}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-black transition-all ${
-                activeTab === 'removidos'
-                  ? 'bg-rose-600 text-white'
-                  : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
-              }`}
-            >
-              Removidos{deletedVehicles.length > 0 && ` · ${deletedVehicles.length}`}
-            </button>
+          <div className="flex items-center justify-end">
+            {activeTab === 'removidos' ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab('ativos')}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              >
+                <span>← Voltar para frota ativa</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActiveTab('removidos')}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-rose-500 dark:text-slate-500 dark:hover:text-rose-400"
+              >
+                <span>Veículos removidos</span>
+                {deletedVehicles.length > 0 && (
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    {deletedVehicles.length}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         )}
 
