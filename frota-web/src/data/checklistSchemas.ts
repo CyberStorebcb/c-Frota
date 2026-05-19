@@ -391,7 +391,7 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
     id: 'empilhadeira',
     nome: 'Checklist Empilhadeira',
     descricao: 'Empilhadeira elétrica ou a combustão',
-    temEvidencia: true,
+    temEvidencia: false,
     temSupervisor: true,
     temProblemas: true,
     camposExtras: [
