@@ -385,7 +385,6 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
       },
     ],
   },
-]
 
   // ── EMPILHADEIRA ──────────────────────────────────────────────────────────
   {
@@ -471,3 +470,4 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
 ]
 
 export const SCHEMA_MAP = Object.fromEntries(CHECKLIST_SCHEMAS.map((s) => [s.id, s]))
+
