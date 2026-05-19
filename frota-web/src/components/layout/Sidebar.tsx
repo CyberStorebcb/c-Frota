@@ -94,7 +94,7 @@ function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => 
   const { user } = useAuth()
   const navItems = [
     ...baseNav,
-    ...(user?.role === 'admin' ? ([{ to: '/usuarios', label: 'Usuários', icon: Shield, end: false }] as const) : []),
+    ...(user?.role === 'super_admin' ? ([{ to: '/usuarios', label: 'Usuários', icon: Shield, end: false }] as const) : []),
   ]
 
   return (
@@ -170,7 +170,11 @@ function Footer({ collapsed, onAfterLogout }: { collapsed: boolean; onAfterLogou
           >
             {user.email}
           </div>
-          {user.role === 'admin' ? (
+          {user.role === 'super_admin' ? (
+            <div className="text-[11px] font-extrabold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+              Super Admin
+            </div>
+          ) : user.role === 'admin' ? (
             <div className="text-[11px] font-extrabold uppercase tracking-wide text-brand-600 dark:text-brand-400">
               Administrador
             </div>
