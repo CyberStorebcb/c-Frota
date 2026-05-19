@@ -387,4 +387,87 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
   },
 ]
 
+  // ── EMPILHADEIRA ──────────────────────────────────────────────────────────
+  {
+    id: 'empilhadeira',
+    nome: 'Checklist Empilhadeira',
+    descricao: 'Empilhadeira elétrica ou a combustão',
+    temEvidencia: true,
+    temSupervisor: true,
+    temProblemas: true,
+    camposExtras: [
+      {
+        id: 'placa',
+        label: 'PLACA / IDENTIFICAÇÃO',
+        tipo: 'text',
+        obrigatorio: true,
+      },
+      {
+        id: 'marca_modelo',
+        label: 'MARCA/MODELO',
+        tipo: 'text',
+        obrigatorio: true,
+      },
+      {
+        id: 'horimetro',
+        label: 'HORÍMETRO ATUAL',
+        tipo: 'number',
+        obrigatorio: true,
+      },
+      {
+        id: 'prefixo',
+        label: 'PREFIXO',
+        tipo: 'text',
+        obrigatorio: false,
+      },
+      {
+        id: 'localidade',
+        label: 'LOCALIDADE',
+        tipo: 'text',
+        obrigatorio: true,
+      },
+    ],
+    grupos: [
+      {
+        id: 'inspecao_parado',
+        titulo: 'Inspeção com Veículo/Equipamento Parado',
+        itens: [
+          { id: 'emp-01', label: 'Rodas e pneus traseiros e dianteiros (verificar estado de uso)', imperativo: true },
+          { id: 'emp-02', label: 'Armação superior (Santo Antônio) e Torre (verificar estrutura)', imperativo: true },
+          { id: 'emp-03', label: 'Correntes da torre (verificar folgas)', imperativo: true },
+          { id: 'emp-04', label: 'Nível do óleo hidráulico (verificar nível na marca superior)', imperativo: true },
+          { id: 'emp-05', label: 'Nível de combustível e água no reservatório — nunca retire o tampão (verificar vazamentos, nível na marca superior, manter)', imperativo: true },
+          { id: 'emp-06', label: 'Nível de óleo do motor (visual)', imperativo: true },
+          { id: 'emp-07', label: 'Danos ou vazamento de gás nas mangueiras ou conexões (verificar funcionamento perfeito)', imperativo: true },
+          { id: 'emp-08', label: 'Extintor de incêndios (fixação, validade, conservação)', imperativo: true },
+          { id: 'emp-09', label: 'Retrovisores (ajuste, fixação e trincas)', imperativo: true },
+          { id: 'emp-10', label: 'Lança e implementos com trinca (verificar visualmente)', imperativo: true },
+        ],
+      },
+      {
+        id: 'teste_operacao',
+        titulo: 'Teste de Operação — Ligado',
+        itens: [
+          { id: 'emp-11', label: 'Cilindros da torre (verificar inclinação, elevação e vazamento)' },
+          { id: 'emp-12', label: 'Freios de serviço e estacionário (testar parada do equipamento)', imperativo: true },
+          { id: 'emp-13', label: 'Faróis, lanternas e giroflex (funcionamento)', imperativo: true },
+          { id: 'emp-14', label: 'Alarme sonoro de marcha ré (funcionamento)', imperativo: true },
+          { id: 'emp-15', label: 'Buzina (funcionamento)', imperativo: true },
+          { id: 'emp-16', label: 'Volante de direção, alavancas e pedais (verificar folgas e ruídos ao girar)', imperativo: true },
+          { id: 'emp-17', label: 'Nível de óleo de transmissão (verificar manômetro de pressão)', imperativo: true },
+          { id: 'emp-18', label: 'Nível de vazamento de fluídos (verificar vazamentos)', imperativo: true },
+        ],
+      },
+      {
+        id: 'limpeza_manutencao',
+        titulo: 'Limpeza e Manutenção',
+        itens: [
+          { id: 'emp-19', label: 'Limpeza (verificar estado geral de limpeza do equipamento)' },
+          { id: 'emp-20', label: 'Manutenção periódica (verificar se está em dia)' },
+        ],
+      },
+    ],
+  },
+]
+
 export const SCHEMA_MAP = Object.fromEntries(CHECKLIST_SCHEMAS.map((s) => [s.id, s]))

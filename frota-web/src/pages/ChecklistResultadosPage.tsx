@@ -66,6 +66,7 @@ const TIPOS = [
   { id: 'picape-4x4', label: 'Picape 4x4' },
   { id: 'motocicleta', label: 'Motocicleta' },
   { id: 'veiculo-leve', label: 'Veículo Leve' },
+  { id: 'empilhadeira', label: 'Empilhadeira' },
 ]
 
 // Badge colorido por tipo
@@ -75,7 +76,8 @@ const TIPO_BADGE: Record<string, { label: string; cls: string }> = {
   'picape-leve': { label: 'Picape Leve',  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
   'picape-4x4':  { label: 'Picape 4x4',  cls: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' },
   motocicleta:   { label: 'Moto',         cls: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300' },
-  'veiculo-leve':{ label: 'Veíc. Leve',  cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  'veiculo-leve':  { label: 'Veíc. Leve',    cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  'empilhadeira':  { label: 'Empilhadeira',  cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
 }
 
 // Exportação CSV
