@@ -16,7 +16,7 @@ import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/p
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select } from '../components/ui/Select'
 import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
-import { getVehicleOperationalStatusRowsWithLocals } from '../frota/vehicleOperationalStatus'
+import { getVehicleOperationalStatusRowsWithLocals, isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
 import { supabase } from '../lib/supabase'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -115,12 +115,13 @@ export function ChecklistDetalharPage() {
     [periodo, customDesde, customAte],
   )
 
-  // ── frota ativa ──────────────────────────────────────────────────────────
+  // ── frota ATIVA (exclui desmobilizado, avariado, aguardando, reserva) ────
   const frotaMap = useMemo(() => {
     const m = new Map<string, VeiculoRow>()
     for (const v of getDisplayedFleetVehicles()) {
       const placa = normPlaca(v.placa)
       if (!placa) continue
+      if (!isOperacionalAtivosDashboardKpi(placa, v.prefixo ?? '')) continue
       m.set(placa, {
         placa,
         modelo: v.modelo ?? '—',
@@ -130,7 +131,7 @@ export function ChecklistDetalharPage() {
         processo: v.prefixo ?? '',
       })
     }
-    // merge com operational rows para pegar base/processo
+    // merge com operational rows para pegar base
     for (const r of getVehicleOperationalStatusRowsWithLocals(getDisplayedFleetVehicles())) {
       const placa = normPlaca(r.placa)
       const existing = m.get(placa)

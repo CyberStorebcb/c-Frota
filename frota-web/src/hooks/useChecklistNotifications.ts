@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
+import { isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
 
 export type ChecklistNotification = {
   id: string           // e.g. "2026-05-19-10"
@@ -54,7 +55,9 @@ async function fetchTodayStats(): Promise<{ realizaram: number; naoRealizaram: n
     if (placa) placasFeitas.add(placa)
   }
 
-  const total = getDisplayedFleetVehicles().length
+  const total = getDisplayedFleetVehicles().filter(
+    (v) => isOperacionalAtivosDashboardKpi(v.placa, v.prefixo ?? '')
+  ).length
   const realizaram = placasFeitas.size
   const naoRealizaram = Math.max(0, total - realizaram)
   return { realizaram, naoRealizaram, total }
