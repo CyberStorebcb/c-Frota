@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { supabase, type HistoricoRow } from '../lib/supabase'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
-import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
+import { apontamentoVeiculoIdFromPlaca, formatPlaca, normalizePlaca, getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
 
 // ---------------------------------------------------------------------------
 // Tipo público
@@ -39,6 +39,8 @@ export type Apontamento = {
   ncFotos: string[]
   problemasAdicionais: string
   descricaoProblema: string
+  /** Item 🚫 impeditivo no checklist — NC impede condução. */
+  imperativo: boolean
 }
 
 export type NovoApontamento = Omit<
@@ -75,10 +77,21 @@ function rowToResolucao(r: any): Resolucao {
 }
 
 // ---------------------------------------------------------------------------
+// Mapa placa → veículo (lazy, reconstruído quando necessário)
+// ---------------------------------------------------------------------------
+function buildVehicleMap(): Map<string, { coordenador: string; responsavel: string; processo: string; base: string }> {
+  const map = new Map<string, { coordenador: string; responsavel: string; processo: string; base: string }>()
+  for (const v of getDisplayedFleetVehicles()) {
+    if (v.placa) map.set(v.placa, { coordenador: v.coordenador, responsavel: v.supervisor, processo: v.tipo, base: v.base })
+  }
+  return map
+}
+
+// ---------------------------------------------------------------------------
 // Converte checklist + item NC → Apontamento
 // ---------------------------------------------------------------------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<string, Resolucao>): Apontamento {
+function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<string, Resolucao>, vehicleMap: Map<string, { coordenador: string; responsavel: string; processo: string; base: string }>): Apontamento {
   const id = `${cl.id}__${itemId}`
   const dv = cl.dados_veiculo ?? {}
   const placa   = normalizePlaca(dv.placa ?? '')
@@ -106,7 +119,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     id,
     checklistId:     cl.id,
     ncItemId:        itemId,
-    veiculoId:       `placa-${placa.toLowerCase() || 'desconhecido'}`,
+    veiculoId:       apontamentoVeiculoIdFromPlaca(placa),
     veiculoLabel:    prefixo && placa ? `${prefixo} · ${formatPlaca(placa)}` : formatPlaca(placa) || cl.nome_operador,
     prefixo,
     defeito:         label,
@@ -119,13 +132,14 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     reparoDescricao: res?.reparoDescricao ?? null,
     reparoImagens:   res?.reparoImagens   ?? [],
     osArquivo:       res?.osArquivo       ?? null,
-    processo:             'Checklist',
-    base:                 dv.localidade ?? '',
-    coordenador:          cl.nome_supervisor ?? '',
-    responsavel:          cl.nome_operador,
+    processo:             vehicleMap.get(placa)?.processo ?? 'Checklist',
+    base:                 vehicleMap.get(placa)?.base || (dv.localidade ?? ''),
+    coordenador:          vehicleMap.get(placa)?.coordenador ?? cl.nome_supervisor ?? '',
+    responsavel:          vehicleMap.get(placa)?.responsavel ?? cl.nome_operador,
     ncFotos,
     problemasAdicionais:  cl.problemas ?? '',
     descricaoProblema:    cl.descricao_problema ?? '',
+    imperativo:           item?.imperativo === true,
   }
 }
 
@@ -188,9 +202,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       .eq('progresso', 100)
     setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
 
-    // 2. Checklists com NC: busca nc_count > 0 OU nulo, mais os completos
-    //    recentes onde nc_count pode estar errado (0 mas com respostas 'nc').
-    // Busca todos os checklists com NC em páginas de 1000 (limite do Supabase)
+    // 2. Checklists concluídos — filtra itens NC nas respostas (nc_count pode estar desatualizado).
     const fetchAllNc = async () => {
       const all: unknown[] = []
       let from = 0
@@ -199,7 +211,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         const { data, error } = await supabase
           .from('checklists')
           .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, dados_veiculo, respostas, observacoes')
-          .gt('nc_count', 0)
+          .eq('progresso', 100)
           .order('data_inspecao', { ascending: true })
           .range(from, from + pageSize - 1)
         if (error) return { data: null, error }
@@ -232,6 +244,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
     // 4. Expande cada checklist em um apontamento por item NC
     //    Só gera apontamentos para checklists que realmente têm respostas 'nc'.
+    const vehicleMap = buildVehicleMap()
     const apontamentos: Apontamento[] = []
     for (const cl of (clData ?? []) as unknown[]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -240,7 +253,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       const ncItems = Object.entries(respostas).filter(([, v]) => v === 'nc')
       if (ncItems.length === 0) continue
       for (const [itemId] of ncItems) {
-        apontamentos.push(checklistItemToApontamento(checklist, itemId, resolucoes))
+        apontamentos.push(checklistItemToApontamento(checklist, itemId, resolucoes, vehicleMap))
       }
     }
 
