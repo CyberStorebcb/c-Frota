@@ -2,20 +2,15 @@
 export type ProcessoFilterSelectOption = { value: string; label: string }
 
 export const PROCESSO_FILTER_SELECT_OPTIONS: ProcessoFilterSelectOption[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'desmobilizado', label: 'DESMOBILIZADO' },
-  { value: 'adm', label: 'ADM' },
-  { value: 'frota', label: 'FROTA' },
-  { value: 'gere', label: 'GERE' },
-  { value: 'goman', label: 'GOMAN' },
-  { value: 'gstc', label: 'GSTC' },
-  { value: 'planejamento', label: 'PLANEJAMENTO' },
-  { value: 'reserva', label: 'RESERVA' },
-  { value: 'sesmt', label: 'SESMT' },
-  { value: 'spot', label: 'SPOT' },
-  { value: 'transporte', label: 'TRANSPORTE' },
-  /** Apontamentos gerados a partir de NC em checklist usam este rótulo. */
-  { value: 'checklist', label: 'Checklist' },
+  { value: 'todos',       label: 'Todos' },
+  { value: 'gstc',        label: 'GSTC' },
+  { value: 'gere',        label: 'GERE' },
+  { value: 'goman',       label: 'GOMAN' },
+  { value: 'sesmt',       label: 'SESMT' },
+  { value: 'transporte',  label: 'TRANSPORTE' },
+  { value: 'spot',        label: 'SPOT' },
+  { value: 'adm',         label: 'ADM' },
+  { value: 'frota',       label: 'FROTA' },
 ]
 
 export function matchesProcessoFilter(rowProcesso: string, filterValue: string): boolean {
