@@ -692,7 +692,10 @@ export function ManagePage() {
                         {formatDefeitoParaExibicao(r.defeito)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
-                        {formatDateBR(r.dataApontamento)}
+                        <div>{formatDateBR(r.dataApontamento)}</div>
+                        {r.horaApontamento && (
+                          <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">{r.horaApontamento}</div>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
                         <div className="flex flex-col items-center gap-0.5">

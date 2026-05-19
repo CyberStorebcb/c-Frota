@@ -31,6 +31,7 @@ export type Apontamento = {
   prefixo: string
   defeito: string
   dataApontamento: string
+  horaApontamento: string
   prazo: string | null
   resolvido: boolean
   dataResolvido: string | null
@@ -134,6 +135,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     prefixo,
     defeito:         label,
     dataApontamento: cl.data_inspecao,
+    horaApontamento: cl.created_at ? new Date(cl.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
     prazo,
     resolvido:       res?.resolvido       ?? false,
     dataResolvido:   res?.dataResolvido   ?? null,
