@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   Check,
@@ -30,6 +30,11 @@ import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../
 import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { Portal } from '../components/ui/Portal'
+import {
+  apontamentoMatchesVehicleFilter,
+  normalizePlaca,
+  placaFromApontamentoVeiculoId,
+} from '../frota/vehicleRegistry'
 
 function formatDateBR(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -127,10 +132,12 @@ export function ManagePage() {
   const { rows, carregando, marcarResolvido, checklistsRealizadosTotal } = useApontamentos()
   const { user } = useAuth()
   const canMarkResolved = user?.role === 'admin'
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos'>('apontamentos')
-  const [vehicleId, setVehicleId] = useState<string>('todos')
+  const [vehicleId, setVehicleId] = useState(() => searchParams.get('veiculo') ?? 'todos')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
+    if (searchParams.get('veiculo')) return true
     try { return localStorage.getItem('frota.filtros.manage') === 'true' }
     catch { return false }
   })
@@ -146,21 +153,75 @@ export function ManagePage() {
   const pageSize = Number(pageSizeStr) || 25
   const [nowMs, setNowMs] = useState(() => Date.now())
   const tabelaRef = useRef<HTMLDivElement | null>(null)
+  const syncedVehicleFromUrlRef = useRef<string | null>(null)
+  const urlPlaca = searchParams.get('placa')
+  const urlPrefixo = searchParams.get('prefixo')
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 60_000)
     return () => window.clearInterval(id)
   }, [])
 
+  useEffect(() => {
+    const veiculo = searchParams.get('veiculo')
+    const placa = searchParams.get('placa')
+    if (!veiculo && !placa) return
+    if (veiculo) setVehicleId(veiculo)
+    setFiltrosVisiveis(true)
+    setPagina(1)
+  }, [searchParams])
+
+  /** Alinha o select ao veiculoId real dos apontamentos quando a URL traz placa. */
+  useEffect(() => {
+    if (!urlPlaca || rows.length === 0) return
+    const placaNorm = normalizePlaca(urlPlaca)
+    if (syncedVehicleFromUrlRef.current === placaNorm) return
+    const match = rows.find(
+      (r) => normalizePlaca(r.placa ?? placaFromApontamentoVeiculoId(r.veiculoId)) === placaNorm,
+    )
+    if (match) {
+      setVehicleId(match.veiculoId)
+      syncedVehicleFromUrlRef.current = placaNorm
+    }
+  }, [rows, urlPlaca])
+
+  useEffect(() => {
+    if (!urlPlaca) syncedVehicleFromUrlRef.current = null
+  }, [urlPlaca])
+
+  const vehicleFilter = useMemo(
+    () => ({
+      vehicleId,
+      placa: urlPlaca,
+      prefixo: urlPrefixo,
+    }),
+    [vehicleId, urlPlaca, urlPrefixo],
+  )
+
   const vehicleOptions = useMemo<SelectOption[]>(() => {
     const map = new Map<string, string>()
     for (const r of rows) {
       if (!map.has(r.veiculoId)) map.set(r.veiculoId, r.veiculoLabel)
     }
+    const veiculoUrl = searchParams.get('veiculo')
+    const rotuloUrl = searchParams.get('rotulo')
+    if (urlPlaca) {
+      const placaNorm = normalizePlaca(urlPlaca)
+      const match = rows.find(
+        (r) => normalizePlaca(r.placa ?? placaFromApontamentoVeiculoId(r.veiculoId)) === placaNorm,
+      )
+      if (match) {
+        map.set(match.veiculoId, match.veiculoLabel)
+      } else if (veiculoUrl && veiculoUrl !== 'todos') {
+        map.set(veiculoUrl, rotuloUrl?.trim() || veiculoUrl)
+      }
+    } else if (veiculoUrl && veiculoUrl !== 'todos' && !map.has(veiculoUrl)) {
+      map.set(veiculoUrl, rotuloUrl?.trim() || veiculoUrl)
+    }
     const opts = Array.from(map.entries()).map(([value, label]) => ({ value, label }))
     opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
     return [{ value: 'todos', label: 'Todos os veículos' }, ...opts]
-  }, [rows])
+  }, [rows, searchParams, urlPlaca])
 
   const respOptions = useMemo<SelectOption[]>(() => {
     return [{ value: 'todos', label: 'Todos' }, ...uniqSorted(rows.map((r) => r.responsavel))]
@@ -187,7 +248,7 @@ export function ManagePage() {
   /** Filtros da página (veículo, data, busca, etc.) sem recorte por visão Pendentes/Resolvidos — usado nos KPIs e como base da tabela. */
   const rowsMatchingFiltros = useMemo(() => {
     let list = rows
-    if (vehicleId !== 'todos') list = list.filter((r) => r.veiculoId === vehicleId)
+    if (vehicleId !== 'todos') list = list.filter((r) => apontamentoMatchesVehicleFilter(r, vehicleFilter))
     if (processo !== 'todos') list = list.filter((r) => matchesProcessoFilter(r.processo, processo))
     if (base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, base))
     if (coordenador !== 'todos') list = list.filter((r) => matchesCoordenadorFilter(r.coordenador, coordenador))
@@ -232,7 +293,7 @@ export function ManagePage() {
     return [...list].sort(
       (a, b) => new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime(),
     )
-  }, [rows, vehicleId, processo, base, coordenador, responsavel, prefixo, data, query])
+  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, prefixo, data, query])
 
   const sortedFiltered = useMemo(() => {
     let list = rowsMatchingFiltros
@@ -281,6 +342,14 @@ export function ManagePage() {
     setPrefixo('todos')
     setData('todos')
     setPagina(1)
+    if (searchParams.get('veiculo') || searchParams.get('placa') || searchParams.get('prefixo')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('veiculo')
+      next.delete('rotulo')
+      next.delete('placa')
+      next.delete('prefixo')
+      setSearchParams(next, { replace: true })
+    }
   }
 
   const prazoPassou = (prazoIso: string | null, resolvido: boolean) => {
@@ -502,7 +571,7 @@ export function ManagePage() {
                   onChange={(v) => { setBase(v); setPagina(1) }}
                 />
                 <Select
-                  label="Coordenador"
+                  label="Gerência"
                   value={coordenador}
                   options={COORDENADOR_FILTER_SELECT_OPTIONS}
                   onChange={(v) => { setCoordenador(v); setPagina(1) }}
@@ -567,7 +636,7 @@ export function ManagePage() {
                 <th className="px-4 py-3 text-center">Veículo</th>
                 <th className="px-4 py-3 text-center">Processo</th>
                 <th className="px-4 py-3 text-center">Base</th>
-                <th className="px-4 py-3 text-center">Coordenador</th>
+                <th className="px-4 py-3 text-center">Gerência</th>
                 <th className="px-4 py-3 text-center">Defeito</th>
                 <th className="px-4 py-3 text-center">Data de apontamento</th>
                 <th className="px-4 py-3 text-center">Prazo</th>

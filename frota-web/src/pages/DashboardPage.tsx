@@ -579,7 +579,7 @@ export function DashboardPage() {
                   options={BASE_FILTER_SELECT_OPTIONS}
                 />
                 <Select
-                  label="Coordenador"
+                  label="Gerência"
                   value={filtroCoordenador}
                   onChange={setFiltroCoordenador}
                   options={COORDENADOR_FILTER_SELECT_OPTIONS}

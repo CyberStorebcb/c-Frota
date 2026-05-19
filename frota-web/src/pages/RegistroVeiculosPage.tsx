@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
   Ban,
@@ -25,12 +26,14 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
+import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { useAuth } from '../auth/AuthContext'
-import { supabase, supabaseConfigured } from '../lib/supabase'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import {
   addFleetVehicle,
+  apontamentoVeiculoIdFromPlaca,
   FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY,
+  FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY,
   FLEET_STATUS_BY_PLACA_STORAGE_KEY,
   formatPlaca,
   getDisplayedFleetVehicles,
@@ -39,6 +42,7 @@ import {
   removeFleetVehicle,
   setFleetVehicleManutencao,
   setFleetVehicleStatus,
+  updateFleetVehicle,
   VEHICLE_TYPE_IDS,
   type FleetVehicle,
   type VehicleStatus,
@@ -206,6 +210,20 @@ function readInitialLayout(): 'grid' | 'list' {
   }
 }
 
+function vehicleToFormData(vehicle: FleetVehicle) {
+  return {
+    placa: vehicle.placa,
+    modelo: vehicle.modelo === '—' ? '' : vehicle.modelo,
+    tipo: vehicle.tipo,
+    prefixo: vehicle.prefixo === 'N/A' ? '' : vehicle.prefixo,
+    responsavel: vehicle.responsavel === 'NÃO ATRIBUÍDO' || vehicle.responsavel === '—' ? '' : vehicle.responsavel,
+    supervisor: vehicle.supervisor === 'NÃO ATRIBUÍDO' ? '' : vehicle.supervisor,
+    coordenador: vehicle.coordenador === 'NÃO ATRIBUÍDO' ? '' : vehicle.coordenador,
+    base: vehicle.base === 'N/A' ? '' : vehicle.base,
+    ano: vehicle.ano || new Date().getFullYear().toString(),
+  }
+}
+
 function VehicleOverflowMenu({
   vehicle,
   menuForId,
@@ -214,6 +232,7 @@ function VehicleOverflowMenu({
   showNotification,
   placement = 'up',
   isAdmin = false,
+  onEdit,
 }: {
   vehicle: FleetVehicle
   menuForId: string | null
@@ -222,6 +241,7 @@ function VehicleOverflowMenu({
   showNotification: (message: string, type: 'success' | 'error') => void
   placement?: 'up' | 'down'
   isAdmin?: boolean
+  onEdit?: (vehicle: FleetVehicle) => void
 }) {
   const menuOpen = menuForId === vehicle.id
   const menuPosition =
@@ -250,6 +270,19 @@ function VehicleOverflowMenu({
           onClick={(e) => e.stopPropagation()}
           role="menu"
         >
+          {isAdmin && onEdit ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+              onClick={() => {
+                onEdit(vehicle)
+                setMenuForId(null)
+              }}
+            >
+              Editar
+            </button>
+          ) : null}
           {isAdmin && vehicle.status !== 'ATIVO' && (
             <button
               type="button"
@@ -347,6 +380,7 @@ function defaultForm() {
 export function RegistroVeiculosPage() {
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | VehicleTipo>('ALL')
   const [moreTypeMenuOpen, setMoreTypeMenuOpen] = useState(false)
@@ -379,25 +413,34 @@ export function RegistroVeiculosPage() {
 
   const refresh = () => setVehicles(getDisplayedFleetVehicles())
 
-  const [ncNaoImpeditivos, setNcNaoImpeditivos] = useState<number | null>(null)
+  const { rows: apontamentosRows, carregando: apontamentosCarregando } = useApontamentos()
 
-  useEffect(() => {
-    if (!supabaseConfigured) return
-    supabase
-      .from('checklists')
-      .select('nc_count, nc_imperativos')
-      .then(({ data: rows }) => {
-        if (!rows) return
-        const total = rows.reduce((acc, r) => {
-          const naoImp = Math.max(0, (r.nc_count ?? 0) - (r.nc_imperativos ?? 0))
-          return acc + naoImp
-        }, 0)
-        setNcNaoImpeditivos(total)
-      })
-  }, [])
+  /** NC pendentes em itens não impeditivos (sem 🚫 no checklist). */
+  const ncNaoImpeditivosPendentes = useMemo(
+    () => apontamentosRows.filter((r) => !r.resolvido && !r.imperativo).length,
+    [apontamentosRows],
+  )
 
+  const navigate = useNavigate()
   const { user } = useAuth()
   const canRegisterVehicle = user?.role === 'admin'
+
+  const goToGerenciarVeiculo = (vehicle: FleetVehicle) => {
+    const veiculoId = apontamentoVeiculoIdFromPlaca(vehicle.placa)
+    const rotulo =
+      vehicle.prefixo && vehicle.prefixo !== 'N/A'
+        ? `${vehicle.prefixo} · ${formatPlaca(vehicle.placa)}`
+        : formatPlaca(vehicle.placa)
+    const params = new URLSearchParams({
+      veiculo: veiculoId,
+      rotulo,
+      placa: normalizePlaca(vehicle.placa),
+    })
+    if (vehicle.prefixo && vehicle.prefixo !== 'N/A') {
+      params.set('prefixo', vehicle.prefixo.trim())
+    }
+    navigate(`/gerenciar?${params.toString()}`)
+  }
 
   useEffect(() => {
     if (!menuForId) return
@@ -425,7 +468,13 @@ export function RegistroVeiculosPage() {
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'frota.vehicles.registry' || e.key === FLEET_STATUS_BY_PLACA_STORAGE_KEY || e.key === FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY || e.key === null) {
+      if (
+        e.key === 'frota.vehicles.registry' ||
+        e.key === FLEET_STATUS_BY_PLACA_STORAGE_KEY ||
+        e.key === FLEET_MANUTENCAO_BY_PLACA_STORAGE_KEY ||
+        e.key === FLEET_OVERRIDE_BY_PLACA_STORAGE_KEY ||
+        e.key === null
+      ) {
         setVehicles(getDisplayedFleetVehicles())
       }
     }
@@ -435,7 +484,11 @@ export function RegistroVeiculosPage() {
 
   useEffect(() => {
     if (!canRegisterVehicle && isModalOpen) {
-      queueMicrotask(() => setIsModalOpen(false))
+      queueMicrotask(() => {
+        setIsModalOpen(false)
+        setEditingVehicleId(null)
+        setFormData(defaultForm())
+      })
     }
   }, [canRegisterVehicle, isModalOpen])
 
@@ -601,10 +654,19 @@ export function RegistroVeiculosPage() {
 
   const handleOpenModal = () => {
     if (!canRegisterVehicle) return
+    setEditingVehicleId(null)
+    setFormData(defaultForm())
+    setIsModalOpen(true)
+  }
+  const handleOpenEditModal = (vehicle: FleetVehicle) => {
+    if (!canRegisterVehicle) return
+    setEditingVehicleId(vehicle.id)
+    setFormData(vehicleToFormData(vehicle))
     setIsModalOpen(true)
   }
   const handleCloseModal = () => {
     setIsModalOpen(false)
+    setEditingVehicleId(null)
     setFormData(defaultForm())
   }
 
@@ -682,7 +744,7 @@ export function RegistroVeiculosPage() {
       return
     }
     const tipo = VEHICLE_TYPE_IDS.includes(formData.tipo as VehicleTipo) ? formData.tipo : 'VEICULOS LEVES'
-    const res = addFleetVehicle({
+    const payload = {
       placa: formData.placa,
       modelo: formData.modelo,
       tipo,
@@ -692,15 +754,18 @@ export function RegistroVeiculosPage() {
       coordenador: formData.coordenador,
       base: formData.base,
       ano: formData.ano,
-    })
+    }
+    const res = editingVehicleId ? updateFleetVehicle(editingVehicleId, payload) : addFleetVehicle(payload)
     if (res.ok === false) {
       showNotification(res.message, 'error')
       return
     }
     refresh()
-    showNotification('Veículo cadastrado com sucesso!', 'success')
+    showNotification(editingVehicleId ? 'Veículo atualizado com sucesso!' : 'Veículo cadastrado com sucesso!', 'success')
     handleCloseModal()
   }
+
+  const isEditingVehicle = editingVehicleId !== null
 
   return (
     <div className="min-h-screen w-full min-w-0 bg-slate-50 pb-32 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100 -mx-3 px-3 sm:-mx-4 sm:px-4 lg:-mx-8 lg:px-4 xl:px-6">
@@ -822,7 +887,7 @@ export function RegistroVeiculosPage() {
               },
               {
                 label: 'Precisam de atenção',
-                value: ncNaoImpeditivos ?? '—',
+                value: apontamentosCarregando ? '—' : ncNaoImpeditivosPendentes,
                 Icon: AlertCircle,
                 card:
                   'border-amber-200/90 bg-gradient-to-br from-white via-white to-amber-50/90 shadow-amber-500/[0.06] dark:border-amber-500/25 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/35 dark:shadow-amber-950/25',
@@ -1102,7 +1167,7 @@ export function RegistroVeiculosPage() {
                       <div className="flex gap-4">
                         {vehicle.coordenador && vehicle.coordenador !== 'NÃO ATRIBUÍDO' && (
                           <div className="space-y-0.5">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Coordenador</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Gerência</span>
                             <p className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.coordenador}</p>
                           </div>
                         )}
@@ -1126,6 +1191,7 @@ export function RegistroVeiculosPage() {
                     showNotification={showNotification}
                     placement="up"
                     isAdmin={canRegisterVehicle}
+                    onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                   />
                 </div>
               </div>
@@ -1305,9 +1371,15 @@ export function RegistroVeiculosPage() {
                     >
                       <td className="px-4 py-3 align-middle">
                         <div className="flex justify-center">
-                          <div className={`inline-flex rounded-xl bg-slate-100 p-2 dark:bg-slate-800 ${typeInfo.color}`}>
+                          <button
+                            type="button"
+                            onClick={() => goToGerenciarVeiculo(vehicle)}
+                            title={`Gerenciar apontamentos — ${formatPlaca(vehicle.placa)}`}
+                            aria-label={`Gerenciar apontamentos do veículo ${formatPlaca(vehicle.placa)}`}
+                            className={`inline-flex rounded-xl bg-slate-100 p-2 transition-colors hover:bg-blue-100 hover:ring-2 hover:ring-blue-500/30 dark:bg-slate-800 dark:hover:bg-blue-950/50 ${typeInfo.color}`}
+                          >
                             <Icon size={20} />
-                          </div>
+                          </button>
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
@@ -1379,6 +1451,7 @@ export function RegistroVeiculosPage() {
                           showNotification={showNotification}
                           placement="down"
                           isAdmin={canRegisterVehicle}
+                          onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                         />
                       </td>
                     </tr>
@@ -1411,8 +1484,14 @@ export function RegistroVeiculosPage() {
           <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl dark:bg-slate-900">
             <header className="flex items-center justify-between border-b border-slate-50 p-8 dark:border-slate-800">
               <div>
-                <h2 className="text-2xl font-black text-slate-800 dark:text-white">Novo registro</h2>
-                <p className="mt-0.5 text-sm font-medium text-slate-400">Adicione um novo ativo à frota GOMAN</p>
+                <h2 className="text-2xl font-black text-slate-800 dark:text-white">
+                  {isEditingVehicle ? 'Editar veículo' : 'Novo registro'}
+                </h2>
+                <p className="mt-0.5 text-sm font-medium text-slate-400">
+                  {isEditingVehicle
+                    ? 'Atualize os dados do ativo na frota GOMAN'
+                    : 'Adicione um novo ativo à frota GOMAN'}
+                </p>
               </div>
               <button
                 type="button"
@@ -1432,7 +1511,10 @@ export function RegistroVeiculosPage() {
                     <input
                       type="text"
                       required
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm font-bold uppercase text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      readOnly={isEditingVehicle}
+                      className={`w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm font-bold uppercase text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white ${
+                        isEditingVehicle ? 'cursor-not-allowed opacity-70' : ''
+                      }`}
                       placeholder="ABC-1234"
                       value={formatPlaca(formData.placa)}
                       onChange={(e) => setFormData({ ...formData, placa: normalizePlaca(e.target.value) })}
@@ -1541,7 +1623,7 @@ export function RegistroVeiculosPage() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Coordenador</label>
+                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Gerência</label>
                   <div className="relative">
                     <User className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                     <input
@@ -1567,7 +1649,7 @@ export function RegistroVeiculosPage() {
                   type="submit"
                   className="flex-[1.5] rounded-2xl bg-blue-600 py-4 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95"
                 >
-                  Salvar veículo
+                  {isEditingVehicle ? 'Guardar alterações' : 'Salvar veículo'}
                 </button>
               </div>
             </form>
