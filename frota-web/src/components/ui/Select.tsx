@@ -10,6 +10,8 @@ export function Select({
   options,
   onChange,
   tone = 'default',
+  centerLabel = false,
+  centerContent = false,
 }: {
   label: string
   value: string
@@ -17,6 +19,9 @@ export function Select({
   onChange: (v: string) => void
   /** `dark`: fundo escuro (ex.: faixa de filtros do dashboard). */
   tone?: 'default' | 'dark'
+  centerLabel?: boolean
+  /** Centraliza o texto do botão e dos itens da lista. */
+  centerContent?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -58,11 +63,12 @@ export function Select({
   return (
     <div className="min-w-0 flex-1 sm:min-w-[140px]">
       <div
-        className={
+        className={[
           isDark
             ? 'text-[10px] font-extrabold uppercase tracking-wider text-slate-500'
-            : 'text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400'
-        }
+            : 'text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400',
+          centerLabel || centerContent ? 'text-center' : '',
+        ].join(' ')}
       >
         {label}
       </div>
@@ -73,7 +79,7 @@ export function Select({
           type="button"
           onClick={() => setOpen((v) => !v)}
           className={[
-            'flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm font-bold',
+            `flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-sm font-bold ${centerContent ? 'justify-center text-center' : 'justify-between text-left'}`,
             'transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40',
             isDark
               ? [
@@ -164,7 +170,7 @@ export function Select({
                           setOpen(false)
                         }}
                         className={[
-                          'flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-extrabold',
+                          `flex w-full items-center rounded-xl px-3 py-2 text-sm font-extrabold ${centerContent ? 'justify-center text-center' : 'justify-between'}`,
                           isDark
                             ? isSel
                               ? 'bg-slate-800 text-white'

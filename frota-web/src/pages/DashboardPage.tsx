@@ -517,24 +517,28 @@ export function DashboardPage() {
                   value={filtroProcesso}
                   onChange={setFiltroProcesso}
                   options={PROCESSO_FILTER_SELECT_OPTIONS}
+                  centerContent
                 />
                 <Select
                   label="Base"
                   value={filtroBase}
                   onChange={setFiltroBase}
                   options={BASE_FILTER_SELECT_OPTIONS}
+                  centerContent
                 />
                 <Select
                   label="Gerência"
                   value={filtroCoordenador}
                   onChange={setFiltroCoordenador}
                   options={COORDENADOR_FILTER_SELECT_OPTIONS}
+                  centerContent
                 />
                 <Select
                   label="Supervisor"
                   value={filtroSupervisor}
                   onChange={setFiltroSupervisor}
                   options={SUPERVISOR_FILTER_SELECT_OPTIONS}
+                  centerContent
                 />
               </div>
             </div>
