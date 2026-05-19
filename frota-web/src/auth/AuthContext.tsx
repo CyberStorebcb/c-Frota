@@ -6,6 +6,7 @@ export type AuthUser = {
   id: string
   email: string
   role: 'admin' | 'user'
+  mustChangePassword: boolean
 }
 
 type Ctx = {
@@ -13,31 +14,39 @@ type Ctx = {
   loading: boolean
   login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; message: string }>
   logout: () => Promise<void>
+  changePassword: (newPassword: string) => Promise<{ ok: true } | { ok: false; message: string }>
 }
 
 const AuthContext = createContext<Ctx | null>(null)
 
-async function fetchRole(userId: string, email: string): Promise<'admin' | 'user'> {
+type ProfileRow = { role: string; must_change_password: boolean }
+
+async function fetchProfile(userId: string, email: string): Promise<{ role: 'admin' | 'user'; mustChangePassword: boolean }> {
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase()
   if (adminEmail && email.trim().toLowerCase() === adminEmail) {
-    return 'admin'
+    return { role: 'admin', mustChangePassword: false }
   }
   try {
     const { data } = await Promise.race([
-      supabase.from('profiles').select('role').eq('id', userId).single(),
+      supabase.from('profiles').select('role, must_change_password').eq('id', userId).single(),
       new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 4000)),
     ])
-    return (data?.role === 'admin') ? 'admin' : 'user'
+    const p = data as ProfileRow | null
+    return {
+      role: p?.role === 'admin' ? 'admin' : 'user',
+      mustChangePassword: p?.must_change_password ?? false,
+    }
   } catch {
-    return 'user'
+    return { role: 'user', mustChangePassword: false }
   }
 }
 
-function toAuthUser(supabaseUser: User, role: 'admin' | 'user'): AuthUser {
+function toAuthUser(supabaseUser: User, role: 'admin' | 'user', mustChangePassword: boolean): AuthUser {
   return {
     id: supabaseUser.id,
     email: supabaseUser.email ?? '',
     role,
+    mustChangePassword,
   }
 }
 
@@ -46,23 +55,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Carrega sessão existente (timeout de 8s para evitar loading infinito)
     const timeout = setTimeout(() => setLoading(false), 8000)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeout)
       if (session?.user) {
-        const role = await fetchRole(session.user.id, session.user.email ?? '')
-        setUser(toAuthUser(session.user, role))
+        const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
+        setUser(toAuthUser(session.user, role, mustChangePassword))
       }
       setLoading(false)
     }).catch(() => { clearTimeout(timeout); setLoading(false) })
 
-    // Escuta mudanças de auth (login, logout, refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event: string, session: Session | null) => {
         if (session?.user) {
-          const role = await fetchRole(session.user.id, session.user.email ?? '')
-          setUser(toAuthUser(session.user, role))
+          const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
+          setUser(toAuthUser(session.user, role, mustChangePassword))
         } else {
           setUser(null)
         }
@@ -77,9 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
   ): Promise<{ ok: true } | { ok: false; message: string }> => {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-    if (error) {
-      return { ok: false, message: 'E-mail ou senha incorretos.' }
-    }
+    if (error) return { ok: false, message: 'E-mail ou senha incorretos.' }
     return { ok: true }
   }, [])
 
@@ -88,7 +93,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }, [])
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout])
+  const changePassword = useCallback(async (
+    newPassword: string,
+  ): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) return { ok: false, message: error.message }
+
+    // Limpa o flag no perfil
+    if (user) {
+      await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id)
+      setUser((prev) => prev ? { ...prev, mustChangePassword: false } : prev)
+    }
+    return { ok: true }
+  }, [user])
+
+  const value = useMemo(
+    () => ({ user, loading, login, logout, changePassword }),
+    [user, loading, login, logout, changePassword],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -93,7 +93,7 @@ serve(async (req) => {
         return jsonResponse({ error: 'create_failed' }, 500)
       }
 
-      await adminClient.from('profiles').upsert({ id: userId, role })
+      await adminClient.from('profiles').upsert({ id: userId, role, must_change_password: true })
 
       return jsonResponse({ ok: true, mode: 'create', userId, email }, 200)
     }
