@@ -65,20 +65,43 @@ async function dataUrlToJpeg(dataUrl: string): Promise<{ data: string; w: number
 }
 
 async function urlToPngData(url: string): Promise<{ data: string; w: number; h: number }> {
+  // Fetch first so the canvas doesn't get tainted by cross-origin img elements
+  let dataUrl: string
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const blob = await resp.blob()
+    dataUrl = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result as string)
+      fr.onerror = reject
+      fr.readAsDataURL(blob)
+    })
+  } catch {
+    // Fallback: load as img without crossOrigin (works for display, may taint canvas)
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = url
+    await img.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return { data: url, w: img.width, h: img.height }
+    ctx.drawImage(img, 0, 0)
+    return { data: canvas.toDataURL('image/png'), w: img.width, h: img.height }
+  }
   const img = new Image()
   img.decoding = 'async'
-  img.crossOrigin = 'anonymous'
-  img.src = url
+  img.src = dataUrl
   await img.decode()
-
   const canvas = document.createElement('canvas')
   canvas.width = img.width
   canvas.height = img.height
   const ctx = canvas.getContext('2d')
-  if (!ctx) return { data: url, w: img.width, h: img.height }
+  if (!ctx) return { data: dataUrl, w: img.width, h: img.height }
   ctx.drawImage(img, 0, 0)
-  const png = canvas.toDataURL('image/png')
-  return { data: png, w: img.width, h: img.height }
+  return { data: canvas.toDataURL('image/png'), w: img.width, h: img.height }
 }
 
 /** Data URL (reparo) ou URL http(s) (fotos da NC no storage) → raster para jsPDF. */
