@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
+  ArrowLeft,
   Calendar,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   ClipboardCheck,
   ClipboardX,
   Search,
@@ -28,6 +30,15 @@ function hojeLocalIso(): string {
 
 function dateToLocalIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function formatIsoDateBR(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return iso
+  return new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+  })
 }
 
 function defaultDesde(): string {
@@ -71,6 +82,52 @@ function computeLimites(periodo: string, desde: string, ate: string): { ini: str
   return { ini: a, fim: b }
 }
 
+const FILTROS_STORAGE_KEY = 'frota.filtros.checklist-detalhar.v1'
+const FILTROS_VISIBLE_LEGACY_KEY = 'frota.filtros.checklist-detalhar'
+
+type ChecklistDetalharFiltersState = {
+  periodo: string
+  customDesde: string
+  customAte: string
+  processo: string
+  base: string
+  gerencia: string
+  supervisor: string
+  busca: string
+  filtrosVisiveis: boolean
+}
+
+function loadChecklistDetalharFilters(): Partial<ChecklistDetalharFiltersState> | null {
+  try {
+    const raw = localStorage.getItem(FILTROS_STORAGE_KEY)
+    if (raw) return JSON.parse(raw) as Partial<ChecklistDetalharFiltersState>
+    const legacyVisible = localStorage.getItem(FILTROS_VISIBLE_LEGACY_KEY)
+    if (legacyVisible != null) return { filtrosVisiveis: legacyVisible === 'true' }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function saveChecklistDetalharFilters(state: ChecklistDetalharFiltersState) {
+  try {
+    localStorage.setItem(FILTROS_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    /* ignore */
+  }
+}
+
+function pickFilter(
+  urlValue: string | null,
+  saved: Partial<ChecklistDetalharFiltersState> | null | undefined,
+  savedKey: keyof Omit<ChecklistDetalharFiltersState, 'filtrosVisiveis' | 'busca'>,
+  fallback: string,
+) {
+  if (urlValue != null && urlValue !== '') return urlValue
+  const savedValue = saved?.[savedKey]
+  return typeof savedValue === 'string' ? savedValue : fallback
+}
+
 // ─── tipos ─────────────────────────────────────────────────────────────────
 
 type VeiculoRow = {
@@ -98,18 +155,54 @@ type ChecklistRow = {
 
 export function ChecklistDetalharPage() {
   const [searchParams] = useSearchParams()
+  const savedFilters = useMemo(() => loadChecklistDetalharFilters(), [])
 
-  // herda filtros do dashboard via query string
-  const [periodo, setPeriodo] = useState(searchParams.get('periodo') ?? 'hoje')
-  const [customDesde, setCustomDesde] = useState(searchParams.get('desde') ?? defaultDesde())
-  const [customAte, setCustomAte] = useState(searchParams.get('ate') ?? hojeLocalIso())
-  const [filtroProcesso, setFiltroProcesso] = useState(searchParams.get('processo') ?? 'todos')
-  const [filtroBase, setFiltroBase] = useState(searchParams.get('base') ?? 'todos')
-  const [filtroCoordenador, setFiltroCoordenador] = useState(searchParams.get('gerencia') ?? 'todos')
-  const [filtroSupervisor, setFiltroSupervisor] = useState(searchParams.get('supervisor') ?? 'todos')
-  const [busca, setBusca] = useState('')
+  // URL do dashboard tem prioridade; senão restaura o último estado salvo pelo usuário
+  const [periodo, setPeriodo] = useState(() => pickFilter(searchParams.get('periodo'), savedFilters, 'periodo', 'hoje'))
+  const [customDesde, setCustomDesde] = useState(() =>
+    pickFilter(searchParams.get('desde'), savedFilters, 'customDesde', defaultDesde()),
+  )
+  const [customAte, setCustomAte] = useState(() =>
+    pickFilter(searchParams.get('ate'), savedFilters, 'customAte', hojeLocalIso()),
+  )
+  const [filtroProcesso, setFiltroProcesso] = useState(() =>
+    pickFilter(searchParams.get('processo'), savedFilters, 'processo', 'todos'),
+  )
+  const [filtroBase, setFiltroBase] = useState(() => pickFilter(searchParams.get('base'), savedFilters, 'base', 'todos'))
+  const [filtroCoordenador, setFiltroCoordenador] = useState(() =>
+    pickFilter(searchParams.get('gerencia'), savedFilters, 'gerencia', 'todos'),
+  )
+  const [filtroSupervisor, setFiltroSupervisor] = useState(() =>
+    pickFilter(searchParams.get('supervisor'), savedFilters, 'supervisor', 'todos'),
+  )
+  const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
 
   const { vehicles: allVehicles } = useFleet()
+
+  useEffect(() => {
+    saveChecklistDetalharFilters({
+      periodo,
+      customDesde,
+      customAte,
+      processo: filtroProcesso,
+      base: filtroBase,
+      gerencia: filtroCoordenador,
+      supervisor: filtroSupervisor,
+      busca,
+      filtrosVisiveis,
+    })
+  }, [
+    periodo,
+    customDesde,
+    customAte,
+    filtroProcesso,
+    filtroBase,
+    filtroCoordenador,
+    filtroSupervisor,
+    busca,
+    filtrosVisiveis,
+  ])
 
   const limites = useMemo(
     () => computeLimites(periodo, customDesde, customAte),
@@ -231,111 +324,218 @@ export function ChecklistDetalharPage() {
 
   const total = placasRealizaram.length + placasNaoRealizaram.length
   const pct = total > 0 ? Math.round((placasRealizaram.length / total) * 100) : 0
+  const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
+  const periodoResumo = limites.ini === limites.fim
+    ? formatIsoDateBR(limites.ini)
+    : `${formatIsoDateBR(limites.ini)} a ${formatIsoDateBR(limites.fim)}`
+  const filtrosAtivos =
+    filtroProcesso !== 'todos' ||
+    filtroBase !== 'todos' ||
+    filtroCoordenador !== 'todos' ||
+    filtroSupervisor !== 'todos' ||
+    busca.trim().length > 0
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto bg-slate-50/70 px-4 py-5 dark:bg-slate-950 sm:px-6 lg:px-8">
 
       {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">Detalhar checklists</h1>
-          <p className="text-xs font-medium text-slate-400">
-            Veículos que realizaram e não realizaram o checklist no período selecionado
-          </p>
-        </div>
+      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.18),transparent_32%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_34%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.32),transparent_32%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.20),transparent_34%)]" />
+          <div className="relative grid gap-5 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] xl:items-stretch">
+            <div className="flex flex-col justify-between gap-5">
+              <div>
+                <div className="mb-5 flex flex-wrap items-center gap-2">
+                  <Link
+                    to="/"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-extrabold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:text-slate-950 dark:border-slate-700 dark:bg-slate-950/75 dark:text-slate-200 dark:hover:bg-slate-950 dark:hover:text-white"
+                  >
+                    <ArrowLeft size={14} />
+                    Voltar ao dashboard
+                  </Link>
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-sm dark:border-slate-700 dark:bg-slate-950/80">
+                    <Calendar size={12} />
+                    {periodoLabel} · {periodoResumo}
+                  </div>
+                </div>
 
-        {/* Resumo aderência */}
-        {!loading && total > 0 && (
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Aderência</p>
-              <p className={`text-xl font-black ${pct >= 80 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-500' : 'text-rose-500'}`}>
-                {pct}%
-              </p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
+                  Checklist operacional
+                </p>
+                <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                  Detalhar checklists
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  Acompanhe a aderência da frota e identifique rapidamente quem ainda precisa realizar o checklist.
+                </p>
+              </div>
+
+              {!loading && total > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/45">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aderência no período</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                        {placasRealizaram.length} de {total} veículos realizaram checklist.
+                      </p>
+                    </div>
+                    <span className={`rounded-2xl px-3 py-1.5 text-xl font-black ${pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}`}>
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/70 dark:bg-slate-800 dark:ring-slate-700/70">
+                    <div
+                      className={`h-full rounded-full shadow-[0_0_22px_currentColor] ${pct >= 80 ? 'bg-emerald-500 text-emerald-500' : pct >= 50 ? 'bg-amber-500 text-amber-500' : 'bg-rose-500 text-rose-500'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="h-10 w-10 shrink-0">
-              <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
-                <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-100 dark:text-slate-800" />
-                <circle
-                  cx="18" cy="18" r="15" fill="none" strokeWidth="3" strokeLinecap="round"
-                  strokeDasharray={`${pct * 0.942} 94.2`}
-                  className={pct >= 80 ? 'text-emerald-500' : pct >= 50 ? 'text-amber-500' : 'text-rose-500'}
-                  stroke="currentColor"
-                />
-              </svg>
-            </div>
-            <div className="text-xs font-semibold text-slate-500">
-              <p>{placasRealizaram.length} realizaram</p>
-              <p>{placasNaoRealizaram.length} não realizaram</p>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/55">
+                <div className="absolute inset-y-0 left-0 w-1 bg-slate-400/70" />
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Frota filtrada</p>
+                <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{total}</p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">veículos no recorte atual</p>
+              </div>
+              <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm backdrop-blur dark:border-emerald-900/60 dark:bg-emerald-950/25">
+                <div className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
+                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700/70 dark:text-emerald-300/80">Realizaram</p>
+                <p className="mt-2 text-3xl font-black text-emerald-700 dark:text-emerald-300">{placasRealizaram.length}</p>
+                <p className="mt-1 text-[11px] font-semibold text-emerald-700/60 dark:text-emerald-300/60">checklists concluídos</p>
+              </div>
+              <div className="group relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/80 p-4 shadow-sm backdrop-blur dark:border-rose-900/60 dark:bg-rose-950/25">
+                <div className="absolute inset-y-0 left-0 w-1 bg-rose-500" />
+                <p className="text-[10px] font-black uppercase tracking-wider text-rose-700/70 dark:text-rose-300/80">Não realizaram</p>
+                <p className="mt-2 text-3xl font-black text-rose-700 dark:text-rose-300">{placasNaoRealizaram.length}</p>
+                <p className="mt-1 text-[11px] font-semibold text-rose-700/60 dark:text-rose-300/60">pendentes no período</p>
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      </section>
 
-      {/* Filtros */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          {/* Período */}
-          <div className="relative">
-            <Calendar size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value)}
-              className="h-9 appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-8 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      {/* Filtros e busca */}
+      <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</p>
+            {filtrosAtivos && !filtrosVisiveis ? (
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                Ativos
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+
+            {filtrosAtivos && filtrosVisiveis ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroProcesso('todos')
+                  setFiltroBase('todos')
+                  setFiltroCoordenador('todos')
+                  setFiltroSupervisor('todos')
+                  setBusca('')
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                <X size={13} className="text-slate-400" />
+                Limpar
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setFiltrosVisiveis((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
             >
-              {PERIODO_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            <ChevronDown size={12} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              {filtrosVisiveis ? (
+                <>
+                  <ChevronUp size={13} className="text-slate-400" />
+                  Ocultar filtros
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={13} className="text-slate-400" />
+                  Mostrar filtros
+                </>
+              )}
+            </button>
           </div>
+        </div>
 
-          {/* Datas personalizadas */}
-          {periodo === 'custom' && (
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={customDesde}
-                onChange={(e) => setCustomDesde(e.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              />
-              <span className="text-xs text-slate-400">até</span>
-              <input
-                type="date"
-                value={customAte}
-                onChange={(e) => setCustomAte(e.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              />
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+        >
+          <div className="overflow-hidden">
+            <div className="flex flex-col gap-3 p-4">
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                Refine por período, localidade, gestão e supervisor.
+              </p>
+
+              <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.35fr)]">
+                <div className="relative">
+                  <Calendar size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <select
+                    value={periodo}
+                    onChange={(e) => setPeriodo(e.target.value)}
+                    className="h-11 w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm font-extrabold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                  >
+                    {PERIODO_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-950">
+                  <Search size={15} className="shrink-0 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por placa, modelo ou base..."
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 outline-none dark:text-slate-200"
+                  />
+                  {busca && (
+                    <button type="button" onClick={() => setBusca('')} className="text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200">
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {periodo === 'custom' && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    type="date"
+                    value={customDesde}
+                    onChange={(e) => setCustomDesde(e.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                  />
+                  <span className="hidden text-xs font-bold text-slate-400 sm:inline">até</span>
+                  <input
+                    type="date"
+                    value={customAte}
+                    onChange={(e) => setCustomAte(e.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                  />
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Select label="Processo" value={filtroProcesso} onChange={setFiltroProcesso} options={PROCESSO_FILTER_SELECT_OPTIONS} />
+                <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={BASE_FILTER_SELECT_OPTIONS} />
+                <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
+                <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
+              </div>
             </div>
-          )}
+          </div>
         </div>
-
-        {/* Filtros em grade */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Select label="Processo" value={filtroProcesso} onChange={setFiltroProcesso} options={PROCESSO_FILTER_SELECT_OPTIONS} />
-          <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={BASE_FILTER_SELECT_OPTIONS} />
-          <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
-          <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
-        </div>
-      </div>
-
-      {/* Busca */}
-      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <Search size={14} className="shrink-0 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Buscar por placa, modelo ou base…"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-700 placeholder-slate-400 outline-none dark:text-slate-200"
-        />
-        {busca && (
-          <button type="button" onClick={() => setBusca('')} className="text-slate-400 hover:text-slate-600">
-            <X size={14} />
-          </button>
-        )}
-      </div>
+      </section>
 
       {/* Abas + listas */}
       {loading ? (
@@ -343,13 +543,18 @@ export function ChecklistDetalharPage() {
           <span className="size-7 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400" />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row lg:items-start">
+        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-2 xl:items-start">
 
           {/* Coluna: Não realizaram */}
-          <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-              <ClipboardX size={15} className="text-rose-500" />
-              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100">Não realizaram</span>
+          <div className="flex min-h-[420px] flex-col overflow-hidden rounded-[1.5rem] border border-rose-200/80 bg-white shadow-soft dark:border-rose-950/60 dark:bg-slate-900">
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-rose-100 bg-rose-50/85 px-4 py-3 backdrop-blur dark:border-rose-950/50 dark:bg-rose-950/25">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-rose-500 shadow-sm dark:bg-slate-950">
+                <ClipboardX size={15} />
+              </span>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300">Não realizaram</span>
+                <p className="text-[10px] font-semibold text-rose-500/70 dark:text-rose-300/60">Veículos sem checklist no período</p>
+              </div>
               <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
                 {naoRealizaramFiltrados.length}
               </span>
@@ -363,29 +568,42 @@ export function ChecklistDetalharPage() {
                 </p>
               </div>
             ) : (
-              <div className="custom-scrollbar max-h-[60vh] divide-y divide-slate-50 overflow-y-auto dark:divide-slate-800/60">
+              <div className="custom-scrollbar max-h-[62vh] space-y-3 overflow-y-auto p-3">
                 {naoRealizaramFiltrados.map((v) => (
-                  <div key={v.placa} className="px-4 py-2.5 space-y-0.5">
-                    <div className="flex items-center gap-3">
-                      <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
-                      {v.base && (
-                        <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                          {v.base}
-                        </span>
-                      )}
+                  <div
+                    key={v.placa}
+                    className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-rose-50/35 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-rose-950/10 dark:hover:border-rose-900/70"
+                  >
+                    <div className="absolute inset-y-0 left-0 w-1 bg-rose-400/70 dark:bg-rose-500/70" />
+                    <div className="flex items-start gap-3 pl-1">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-rose-100 text-xs font-black text-rose-700 shadow-sm ring-1 ring-rose-200/80 dark:bg-rose-950/45 dark:text-rose-300 dark:ring-rose-900/60">
+                        {v.placa.slice(0, 2)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-sm font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</span>
+                          {v.base && (
+                            <span className="shrink-0 rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-black text-slate-600 ring-1 ring-slate-300/50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                              {v.base}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{v.modelo}</p>
+                      </div>
                     </div>
                     {(v.supervisor || v.coordenador) && (
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-0.5">
+                      <div className="mt-3 grid gap-2 pl-1 sm:grid-cols-2">
                         {v.supervisor && (
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            <span className="font-bold">Sup:</span> {v.supervisor}
-                          </span>
+                          <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-slate-100 dark:bg-slate-900/60 dark:ring-slate-800">
+                            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Supervisor</p>
+                            <p className="mt-0.5 truncate text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor}</p>
+                          </div>
                         )}
                         {v.coordenador && (
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            <span className="font-bold">Gerência:</span> {v.coordenador}
-                          </span>
+                          <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-slate-100 dark:bg-slate-900/60 dark:ring-slate-800">
+                            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Gerência</p>
+                            <p className="mt-0.5 truncate text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador}</p>
+                          </div>
                         )}
                       </div>
                     )}
@@ -396,10 +614,15 @@ export function ChecklistDetalharPage() {
           </div>
 
           {/* Coluna: Realizaram */}
-          <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-              <ClipboardCheck size={15} className="text-emerald-500" />
-              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100">Realizaram</span>
+          <div className="flex min-h-[420px] flex-col overflow-hidden rounded-[1.5rem] border border-emerald-200/80 bg-white shadow-soft dark:border-emerald-950/60 dark:bg-slate-900">
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-emerald-100 bg-emerald-50/85 px-4 py-3 backdrop-blur dark:border-emerald-950/50 dark:bg-emerald-950/25">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-emerald-500 shadow-sm dark:bg-slate-950">
+                <ClipboardCheck size={15} />
+              </span>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Realizaram</span>
+                <p className="text-[10px] font-semibold text-emerald-500/70 dark:text-emerald-300/60">Último envio encontrado por veículo</p>
+              </div>
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
                 {realizaramFiltrados.length}
               </span>
@@ -410,39 +633,52 @@ export function ChecklistDetalharPage() {
                 {q ? 'Sem resultados.' : 'Nenhum checklist realizado no período.'}
               </div>
             ) : (
-              <div className="custom-scrollbar max-h-[60vh] divide-y divide-slate-50 overflow-y-auto dark:divide-slate-800/60">
+              <div className="custom-scrollbar max-h-[62vh] space-y-3 overflow-y-auto p-3">
                 {realizaramFiltrados.map((v) => (
-                  <div key={v.placa} className="px-4 py-2.5 space-y-0.5">
-                    <div className="flex items-center gap-3">
-                      <span className="w-20 shrink-0 text-xs font-extrabold tracking-wide text-slate-800 dark:text-slate-100">{v.placa}</span>
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">{v.modelo}</span>
-                      {v.base && (
-                        <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                          {v.base}
-                        </span>
-                      )}
-                      <div className="flex shrink-0 flex-col items-end gap-0.5">
-                        <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                  <div
+                    key={v.placa}
+                    className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-emerald-50/35 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-emerald-950/10 dark:hover:border-emerald-900/70"
+                  >
+                    <div className="absolute inset-y-0 left-0 w-1 bg-emerald-400/70 dark:bg-emerald-500/70" />
+                    <div className="flex items-start gap-3 pl-1">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-xs font-black text-emerald-700 shadow-sm ring-1 ring-emerald-200/80 dark:bg-emerald-950/45 dark:text-emerald-300 dark:ring-emerald-900/60">
+                        {v.placa.slice(0, 2)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</span>
+                          {v.base && (
+                            <span className="shrink-0 rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-black text-slate-600 ring-1 ring-slate-300/50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                              {v.base}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{v.modelo}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/60">
                           {v.hora}
                         </span>
                         {v.temNc && (
-                          <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
+                          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/60">
                             NC
                           </span>
                         )}
                       </div>
                     </div>
                     {(v.supervisor || v.coordenador) && (
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-0.5">
+                      <div className="mt-3 grid gap-2 pl-1 sm:grid-cols-2">
                         {v.supervisor && (
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            <span className="font-bold">Sup:</span> {v.supervisor}
-                          </span>
+                          <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-slate-100 dark:bg-slate-900/60 dark:ring-slate-800">
+                            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Supervisor</p>
+                            <p className="mt-0.5 truncate text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor}</p>
+                          </div>
                         )}
                         {v.coordenador && (
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            <span className="font-bold">Gerência:</span> {v.coordenador}
-                          </span>
+                          <div className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-slate-100 dark:bg-slate-900/60 dark:ring-slate-800">
+                            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Gerência</p>
+                            <p className="mt-0.5 truncate text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador}</p>
+                          </div>
                         )}
                       </div>
                     )}

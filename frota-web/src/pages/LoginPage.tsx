@@ -4,6 +4,8 @@ import { Eye, EyeOff, Loader2, Lock, LogIn, Mail, Moon, Sun } from 'lucide-react
 import { useAuth } from '../auth/AuthContext'
 import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
+import { InstagramIcon } from '../branding/InstagramIcon'
+import { SOCIAL_LINKS } from '../branding/socialLinks'
 import { useTheme } from '../theme/ThemeProvider'
 
 const FLUX_VB_H = 800
@@ -342,14 +344,45 @@ export function LoginPage() {
       </div>
 
       <footer
-        className="fixed bottom-0 left-0 right-0 z-[30] px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2 text-center text-[10px] font-semibold leading-snug text-slate-500/95 dark:text-slate-500"
+        className="fixed bottom-0 left-0 right-0 z-[30] flex flex-col items-center gap-2 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2 text-center text-[10px] font-semibold leading-snug text-slate-500/95 dark:text-slate-500"
         role="contentinfo"
       >
-        <span>© {new Date().getFullYear()} Italo Bruno da Silva Fontes · Todos os direitos reservados.</span>
-        <span className="mx-2 text-slate-400">·</span>
-        <Link to="/termos" className="pointer-events-auto text-[#9f1239] hover:underline dark:text-rose-300">Termos</Link>
-        <span className="mx-1 text-slate-400">/</span>
-        <Link to="/privacidade" className="pointer-events-auto text-[#9f1239] hover:underline dark:text-rose-300">Privacidade</Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={SOCIAL_LINKS.cgb.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pointer-events-auto inline-flex items-center gap-1.5 text-[#9f1239] transition hover:underline dark:text-rose-300"
+            title={`Instagram ${SOCIAL_LINKS.cgb.label}`}
+          >
+            <InstagramIcon size={12} />
+            @{SOCIAL_LINKS.cgb.handle}
+          </a>
+          <span className="text-slate-400" aria-hidden>
+            ·
+          </span>
+          <a
+            href={SOCIAL_LINKS.developer.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pointer-events-auto inline-flex items-center gap-1.5 text-slate-600 transition hover:text-[#9f1239] hover:underline dark:text-slate-400 dark:hover:text-rose-300"
+            title={`Instagram ${SOCIAL_LINKS.developer.label}`}
+          >
+            <InstagramIcon size={12} />
+            @{SOCIAL_LINKS.developer.handle}
+          </a>
+        </div>
+        <div>
+          <span>© {new Date().getFullYear()} Italo Bruno da Silva Fontes · Todos os direitos reservados.</span>
+          <span className="mx-2 text-slate-400">·</span>
+          <Link to="/termos" className="pointer-events-auto text-[#9f1239] hover:underline dark:text-rose-300">
+            Termos
+          </Link>
+          <span className="mx-1 text-slate-400">/</span>
+          <Link to="/privacidade" className="pointer-events-auto text-[#9f1239] hover:underline dark:text-rose-300">
+            Privacidade
+          </Link>
+        </div>
       </footer>
     </div>
   )
