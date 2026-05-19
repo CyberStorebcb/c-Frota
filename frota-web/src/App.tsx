@@ -47,6 +47,9 @@ const ChecklistDetalharPage = lazy(() =>
 const LazyRegistroRoute = lazy(() =>
   import('./routes/RegistroRoute').then((m) => ({ default: m.RegistroRoute })),
 )
+const TrocarSenhaPage = lazy(() =>
+  import('./pages/TrocarSenhaPage').then((m) => ({ default: m.TrocarSenhaPage })),
+)
 
 export default function App() {
   return (
@@ -62,6 +65,11 @@ export default function App() {
         <Route path="/checklist" element={<ChecklistPublicoPage />} />
         {/* Links antigos por tipo agora voltam para o fluxo único */}
         <Route path="/checklist/:tipo" element={<Navigate to="/checklist" replace />} />
+
+        {/* Troca de senha obrigatória (autenticado mas bloqueado) */}
+        <Route element={<RequireAuth />}>
+          <Route path="/trocar-senha" element={<TrocarSenhaPage />} />
+        </Route>
 
         {/* Rotas autenticadas */}
         <Route element={<RequireAuth />}>
