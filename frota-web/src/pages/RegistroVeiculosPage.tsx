@@ -577,7 +577,18 @@ export function RegistroVeiculosPage() {
 
   const navigate = useNavigate()
   const { user } = useAuth()
-  const canRegisterVehicle = user?.role === 'admin' || user?.role === 'super_admin'
+
+  const VEHICLE_REGISTER_ALLOWED_EMAILS = [
+    'italo.fontes@cgbengenharia.com.br',
+    'igor.dionisio@cgbengenharia.com.br',
+    'ruan.valmir@cgbengenharia.com.br',
+    'lucas.moreira@cgbengenharia.com.br',
+    'valvick.sales@cgbengenharia.com.br',
+  ]
+
+  const canRegisterVehicle =
+    (user?.role === 'admin' || user?.role === 'super_admin') &&
+    VEHICLE_REGISTER_ALLOWED_EMAILS.includes((user?.email ?? '').trim().toLowerCase())
 
   const goToGerenciarVeiculo = (vehicle: FleetVehicle) => {
     const veiculoId = apontamentoVeiculoIdFromPlaca(vehicle.placa)
