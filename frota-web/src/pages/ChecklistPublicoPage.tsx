@@ -1245,13 +1245,10 @@ function FormularioChecklist({
       const { error } = await supabase.from('checklists').insert(payload)
 
       if (error) {
-        try {
-          await enqueueChecklist(buildChecklistPayload(observacoesFinais, evidenciaUrls), buildOfflineFiles())
-        } catch {
-          setErroEnvio('Erro ao enviar e salvar offline. Verifique o armazenamento do dispositivo.')
-          setEnviando(false)
-          return
-        }
+        console.error('[checklist] Erro ao inserir no Supabase:', error.code, error.message, error.details)
+        setErroEnvio(`Erro ao enviar checklist: ${error.message || error.code || 'erro desconhecido'}. Verifique a conexão e tente novamente.`)
+        setEnviando(false)
+        return
       }
 
       const itensNc = todosItens
@@ -1259,7 +1256,7 @@ function FormularioChecklist({
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
       const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: Boolean(error), nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema })
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: false, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema })
       clearFormDraft()
       onConcluido?.()
       setConcluido(true)
