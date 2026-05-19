@@ -15,8 +15,8 @@ import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../
 import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select } from '../components/ui/Select'
-import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
 import { getVehicleOperationalStatusRowsWithLocals, isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
+import { useFleet } from '../frota/FleetContext'
 import { supabase } from '../lib/supabase'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -110,15 +110,17 @@ export function ChecklistDetalharPage() {
   const [busca, setBusca] = useState('')
   const [aba, setAba] = useState<'nao_realizaram' | 'realizaram'>('nao_realizaram')
 
+  const { vehicles: allVehicles } = useFleet()
+
   const limites = useMemo(
     () => computeLimites(periodo, customDesde, customAte),
     [periodo, customDesde, customAte],
   )
 
-  // ── frota ATIVA (exclui desmobilizado, avariado, aguardando, reserva) ────
+  // ── frota ATIVA via contexto (Supabase + catálogo, sem desmobilizado/inativo) ──
   const frotaMap = useMemo(() => {
     const m = new Map<string, VeiculoRow>()
-    for (const v of getDisplayedFleetVehicles()) {
+    for (const v of allVehicles) {
       const placa = normPlaca(v.placa)
       if (!placa) continue
       if (!isOperacionalAtivosDashboardKpi(placa, v.prefixo ?? '')) continue
@@ -131,14 +133,14 @@ export function ChecklistDetalharPage() {
         processo: v.prefixo ?? '',
       })
     }
-    // merge com operational rows para pegar base
-    for (const r of getVehicleOperationalStatusRowsWithLocals(getDisplayedFleetVehicles())) {
+    // merge com operational rows para pegar base do catálogo
+    for (const r of getVehicleOperationalStatusRowsWithLocals(allVehicles)) {
       const placa = normPlaca(r.placa)
       const existing = m.get(placa)
-      if (existing && r.base) existing.base = r.base
+      if (existing && r.base && existing.base === 'N/A') existing.base = r.base
     }
     return m
-  }, [])
+  }, [allVehicles])
 
   // ── checklists do período ─────────────────────────────────────────────────
   const [rawChecklists, setRawChecklists] = useState<ChecklistRow[]>([])

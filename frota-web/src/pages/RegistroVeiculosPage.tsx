@@ -52,6 +52,7 @@ import {
 } from '../frota/vehicleRegistry'
 import { useSupabaseVehicles } from '../frota/useSupabaseVehicles'
 import { isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
+import { useFleet } from '../frota/FleetContext'
 import { renderFormattedText } from '../utils/renderFormattedAiText'
 
 const TYPE_FILTER_IDLE =
@@ -450,6 +451,7 @@ function defaultForm() {
  */
 export function RegistroVeiculosPage() {
   const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, reload: reloadSupabase } = useSupabaseVehicles()
+  const { reload: reloadFleet } = useFleet()
   const supabaseVehicleIds = useMemo(() => new Set(supabaseVehicles.map((v) => v.id)), [supabaseVehicles])
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
   const [activeTab, setActiveTab] = useState<'ativos' | 'removidos'>('ativos')
@@ -547,6 +549,7 @@ export function RegistroVeiculosPage() {
     setImportResult({ ok, skip: importRows.filter((r) => !!r._error).length, errors })
     setImportLoading(false)
     await reloadSupabase()
+    reloadFleet()
   }
 
   const handleConfirmDelete = async () => {
@@ -555,7 +558,7 @@ export function RegistroVeiculosPage() {
     if (isSupabase) {
       const res = await softDeleteVehicle(id)
       if (!res.ok) { showNotification(res.message, 'error') }
-      else showNotification('Veículo removido.', 'success')
+      else { showNotification('Veículo removido.', 'success'); reloadFleet() }
     } else {
       removeFleetVehicle(id)
       refresh()
@@ -919,6 +922,7 @@ export function RegistroVeiculosPage() {
     }
 
     await reloadSupabase()
+    reloadFleet()
     showNotification(editingVehicleId ? 'Veículo atualizado com sucesso!' : 'Veículo cadastrado com sucesso!', 'success')
     handleCloseModal()
   }
@@ -1156,7 +1160,7 @@ export function RegistroVeiculosPage() {
                               type="button"
                               onClick={() => void restoreVehicle(v.id).then((r) => {
                                 if (!r.ok) showNotification(r.message, 'error')
-                                else showNotification(`${v.placa} restaurado com sucesso.`, 'success')
+                                else { showNotification(`${v.placa} restaurado com sucesso.`, 'success'); reloadFleet() }
                               })}
                               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-extrabold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400"
                             >
@@ -2077,7 +2081,7 @@ export function RegistroVeiculosPage() {
                   setConfirmHardDelete(null)
                   void hardDeleteVehicle(id).then((r) => {
                     if (!r.ok) showNotification(r.message, 'error')
-                    else showNotification(`${placa} excluído permanentemente.`, 'success')
+                    else { showNotification(`${placa} excluído permanentemente.`, 'success'); reloadFleet() }
                   })
                 }}
                 className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-extrabold text-white hover:bg-rose-700"

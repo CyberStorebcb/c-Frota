@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { FleetProvider } from '../../frota/FleetContext'
 
 const SIDEBAR_COLLAPSED_KEY = 'frota.sidebar.collapsed'
 
@@ -38,28 +39,30 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
   }, [closeSidebar, collapseSidebar, sidebarCollapsed, sidebarOpen])
 
   return (
-    <div className="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="flex h-full w-full">
-        <Sidebar
-          open={sidebarOpen}
-          collapsed={sidebarCollapsed}
-          onClose={closeSidebar}
-        />
-        <div className="min-w-0 flex-1">
-          <Topbar
-            sidebarCollapsed={sidebarCollapsed}
-            onMenuClick={toggleSidebar}
-            onToggleSidebar={toggleCollapsed}
+    <FleetProvider>
+      <div className="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <div className="flex h-full w-full">
+          <Sidebar
+            open={sidebarOpen}
+            collapsed={sidebarCollapsed}
+            onClose={closeSidebar}
           />
-          <main
-            className="flex h-[calc(100%-56px)] min-h-0 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
-            onClick={closeMenuWhenClickingContent}
-          >
-            {children}
-          </main>
+          <div className="min-w-0 flex-1">
+            <Topbar
+              sidebarCollapsed={sidebarCollapsed}
+              onMenuClick={toggleSidebar}
+              onToggleSidebar={toggleCollapsed}
+            />
+            <main
+              className="flex h-[calc(100%-56px)] min-h-0 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
+              onClick={closeMenuWhenClickingContent}
+            >
+              {children}
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </FleetProvider>
   )
 }
 

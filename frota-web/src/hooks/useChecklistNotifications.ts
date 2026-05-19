@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
 import { isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
+import type { FleetVehicle } from '../frota/vehicleRegistry'
 
 export type ChecklistNotification = {
   id: string           // e.g. "2026-05-19-10"
@@ -38,7 +38,7 @@ function saveStored(notifs: ChecklistNotification[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed)) } catch { /* ignore */ }
 }
 
-async function fetchTodayStats(): Promise<{ realizaram: number; naoRealizaram: number; total: number }> {
+async function fetchTodayStats(activeVehicles: FleetVehicle[]): Promise<{ realizaram: number; naoRealizaram: number; total: number }> {
   const hojeIso = hojeLocalIso()
   const { data } = await supabase
     .from('checklists')
@@ -55,7 +55,7 @@ async function fetchTodayStats(): Promise<{ realizaram: number; naoRealizaram: n
     if (placa) placasFeitas.add(placa)
   }
 
-  const total = getDisplayedFleetVehicles().filter(
+  const total = activeVehicles.filter(
     (v) => isOperacionalAtivosDashboardKpi(v.placa, v.prefixo ?? '')
   ).length
   const realizaram = placasFeitas.size
@@ -63,7 +63,7 @@ async function fetchTodayStats(): Promise<{ realizaram: number; naoRealizaram: n
   return { realizaram, naoRealizaram, total }
 }
 
-export function useChecklistNotifications() {
+export function useChecklistNotifications(allVehicles: FleetVehicle[]) {
   const [notifications, setNotifications] = useState<ChecklistNotification[]>(loadStored)
 
   const unreadCount = notifications.filter((n) => !n.lida).length
@@ -109,7 +109,7 @@ export function useChecklistNotifications() {
       }
 
       try {
-        const stats = await fetchTodayStats()
+        const stats = await fetchTodayStats(allVehicles)
         const notif: ChecklistNotification = {
           id,
           timestamp: Date.now(),

@@ -22,7 +22,7 @@ import {
   getVehicleOperationalStatusSummary,
   getVehicleOperationalStatusRowsWithLocals,
 } from '../frota/vehicleOperationalStatus'
-import { getDisplayedFleetVehicles } from '../frota/vehicleRegistry'
+import { useFleet } from '../frota/FleetContext'
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { supabase } from '../lib/supabase'
@@ -243,17 +243,7 @@ export function DashboardPage() {
     navigate(`/checklists/detalhar?${params.toString()}`)
   }
 
-  // Reage a veículos adicionados/removidos pelo admin no Registro
-  const [fleetVehicles, setFleetVehicles] = useState(() => getDisplayedFleetVehicles())
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'frota.vehicles.registry' || e.key === null) {
-        setFleetVehicles(getDisplayedFleetVehicles())
-      }
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  const { vehicles: fleetVehicles } = useFleet()
 
   const placaParaBaseOperacional = useMemo(() => {
     const m = new Map<string, string>()

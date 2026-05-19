@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, CheckCircle2, ClipboardCheck, ClipboardX, X } from 'lucide-react'
 import { useChecklistNotifications } from '../../hooks/useChecklistNotifications'
+import { useFleet } from '../../frota/FleetContext'
 
 const HOUR_LABELS: Record<number, string> = { 10: '10h', 16: '16h', 18: '18h' }
 
@@ -16,7 +17,8 @@ function hourFromId(id: string): string {
 }
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markAllRead, markRead } = useChecklistNotifications()
+  const { vehicles } = useFleet()
+  const { notifications, unreadCount, markAllRead, markRead } = useChecklistNotifications(vehicles)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
