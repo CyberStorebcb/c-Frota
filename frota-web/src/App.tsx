@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './components/auth/RequireAuth'
-import { RequireAdmin } from './components/auth/RequireAdmin'
+import { RequireSuperAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
 import { RouteFallback } from './components/RouteFallback'
 import { ApontamentosLayout } from './layouts/ApontamentosLayout'
@@ -80,9 +80,9 @@ export default function App() {
             <Route
               path="/usuarios"
               element={
-                <RequireAdmin>
+                <RequireSuperAdmin>
                   <UsuariosPage />
-                </RequireAdmin>
+                </RequireSuperAdmin>
               }
             />
           </Route>

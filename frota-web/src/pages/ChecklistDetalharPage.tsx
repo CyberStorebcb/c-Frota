@@ -108,7 +108,6 @@ export function ChecklistDetalharPage() {
   const [filtroCoordenador, setFiltroCoordenador] = useState(searchParams.get('gerencia') ?? 'todos')
   const [filtroSupervisor, setFiltroSupervisor] = useState(searchParams.get('supervisor') ?? 'todos')
   const [busca, setBusca] = useState('')
-  const [aba, setAba] = useState<'nao_realizaram' | 'realizaram'>('nao_realizaram')
 
   const { vehicles: allVehicles } = useFleet()
 
