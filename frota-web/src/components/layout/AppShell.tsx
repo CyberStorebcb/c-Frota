@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { FleetProvider } from '../../frota/FleetContext'
+import { PrimeiroAcessoBanner } from '../../pages/PrimeiroAcessoPage'
 
 const SIDEBAR_COLLAPSED_KEY = 'frota.sidebar.collapsed'
 
@@ -53,8 +54,9 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
               onMenuClick={toggleSidebar}
               onToggleSidebar={toggleCollapsed}
             />
+            <PrimeiroAcessoBanner />
             <main
-              className="flex h-[calc(100%-56px)] min-h-0 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
+              className="flex min-h-0 flex-1 flex-col overflow-auto bg-transparent px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6"
               onClick={closeMenuWhenClickingContent}
             >
               {children}

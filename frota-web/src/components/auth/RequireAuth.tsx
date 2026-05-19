@@ -1,6 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
-import { PrimeiroAcessoPage } from '../../pages/PrimeiroAcessoPage'
 
 export function RequireAuth() {
   const { user, loading } = useAuth()
@@ -16,10 +15,6 @@ export function RequireAuth() {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
-  }
-
-  if (user.mustChangePassword) {
-    return <PrimeiroAcessoPage />
   }
 
   return <Outlet />
