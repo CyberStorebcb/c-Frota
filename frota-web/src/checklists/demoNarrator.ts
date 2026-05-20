@@ -2,7 +2,7 @@ import { DEMO_NARRATION_STEPS, type DemoNarrationStepId } from './demoNarration'
 
 /** Loop ambiente — mixado via Web Audio junto com a narração */
 export const DEMO_AMBIENT_SRC = '/demo-narration/ambient-bg.wav'
-const AMBIENT_VOLUME = 0.85
+const AMBIENT_VOLUME = 0.32
 const VOICE_VOLUME = 1
 const AMBIENT_FADE_IN_SEC = 0.5
 const AMBIENT_FADE_OUT_SEC = 0.8
@@ -62,7 +62,8 @@ async function ensureAudioGraph(): Promise<AudioContext | null> {
   const ctx = await ensureAudioContext()
   if (!ctx) return null
 
-  if (!masterGain) {
+  // Reconstrói o grafo se o contexto mudou (ex: contexto fechado e recriado)
+  if (!masterGain || masterGain.context !== ctx) {
     masterGain = ctx.createGain()
     masterGain.gain.value = 1
     masterGain.connect(ctx.destination)
@@ -74,6 +75,11 @@ async function ensureAudioGraph(): Promise<AudioContext | null> {
     ambientGain = ctx.createGain()
     ambientGain.gain.value = 0
     ambientGain.connect(masterGain)
+
+    // Reseta estado derivado do grafo antigo
+    ambientSource = null
+    ambientActive = false
+    voiceSource = null
   }
 
   return ctx
@@ -400,9 +406,42 @@ export async function runDemoAudioDiagnostics(): Promise<DemoAudioDiagnostic> {
 declare global {
   interface Window {
     testarAudioDemo?: () => Promise<DemoAudioDiagnostic>
+    inspecionarAudio?: () => void
   }
 }
 
 if (typeof window !== 'undefined') {
   window.testarAudioDemo = runDemoAudioDiagnostics
+  window.inspecionarAudio = () => {
+    console.log('=== ESTADO INTERNO DO NARRATOR ===')
+    console.log('config:', config)
+    console.log('unlocked:', unlocked)
+    console.log('ambientActive:', ambientActive)
+    console.log('stopGeneration:', stopGeneration)
+    console.log('audioCtx state:', audioCtx?.state ?? 'null')
+    console.log('audioCtx sampleRate:', audioCtx?.sampleRate ?? 'null')
+    console.log('masterGain.gain:', masterGain?.gain.value ?? 'null')
+    console.log('masterGain.context === audioCtx:', masterGain?.context === audioCtx)
+    console.log('ambientGain.gain:', ambientGain?.gain.value ?? 'null')
+    console.log('ambientGain.context === audioCtx:', ambientGain?.context === audioCtx)
+    console.log('voiceGain.gain:', voiceGain?.gain.value ?? 'null')
+    console.log('ambientSource:', ambientSource ? 'existe' : 'null')
+    console.log('ambientBuffer:', ambientBuffer ? `${ambientBuffer.duration.toFixed(1)}s` : 'null')
+
+    if (audioCtx && ambientGain && ambientBuffer) {
+      console.log('\n→ Forçando playback direto (bypassa todo o código)...')
+      const src = audioCtx.createBufferSource()
+      src.buffer = ambientBuffer
+      src.loop = true
+      const g = audioCtx.createGain()
+      g.gain.value = 1.0
+      src.connect(g)
+      g.connect(audioCtx.destination)
+      src.start(0)
+      console.log('→ Tocando direto no destination com gain=1. Você deve ouvir agora.')
+      setTimeout(() => { try { src.stop() } catch {} console.log('→ Parado.') }, 4000)
+    } else {
+      console.log('→ Não tem buffer ou contexto para testar')
+    }
+  }
 }

@@ -130,6 +130,15 @@ export function useChecklistDemoPlayer({
       }
       await wait(DEMO_TIMING.identifyPause)
       if (cancelled) return
+      // Rola a tela para revelar o botão antes de clicar
+      const submitEl = document.querySelector('[data-demo-field="submit"]') as HTMLElement | null
+      if (submitEl) {
+        const scroller = document.querySelector('.checklist-phone-scroll') as HTMLElement | null
+        if (scroller) scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' })
+        else submitEl.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      }
+      await wait(600)
+      if (cancelled) return
       // Cursor vai para botão confirmar
       setCursorTarget({ selector: '[data-demo-field="submit"]', tap: true, key: 'id-submit' })
       setPulseSubmit(true)

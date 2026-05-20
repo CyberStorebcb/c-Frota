@@ -188,19 +188,8 @@ function TelaIdentificacao({
 
   return (
     <div
-      className={`flex flex-col items-center px-4 pb-8 ${CHECKLIST_PAGE_BG} ${
-        embeddedInFrame
-          ? 'min-h-full justify-start pt-10'
-          : 'min-h-dvh justify-start pt-6'
-      }`}
-      style={
-        embeddedInFrame
-          ? {
-              paddingTop: 'max(2.5rem, env(safe-area-inset-top, 0px))',
-              paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
-            }
-          : undefined
-      }
+      className={`flex flex-col items-center px-4 pb-8 ${CHECKLIST_PAGE_BG} ${embeddedInFrame ? 'min-h-full justify-start pt-10' : 'min-h-dvh justify-start pt-6'}`}
+      style={embeddedInFrame ? { paddingTop: 'max(2.5rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 0px))' } : undefined}
     >
       <div className="w-full max-w-sm">
 
@@ -871,8 +860,8 @@ const ItemChecklist = memo(function ItemChecklist({
       ref={itemRef}
       className={`px-3 py-2.5 transition-colors duration-300 sm:px-4 sm:py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800/80' : ''} ${bgClass}`}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-2 pt-0.5">
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
           <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-extrabold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
             {numero}
           </span>
@@ -884,7 +873,7 @@ const ItemChecklist = memo(function ItemChecklist({
           </span>
         </div>
 
-        <div className="flex shrink-0 gap-1 self-end sm:gap-1.5">
+        <div className="flex shrink-0 gap-1">
           {([
             { valor: 'c'  as const, label: 'C',  activeClass: 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-200 shadow-sm' },
             { valor: 'nc' as const, label: 'NC', activeClass: 'bg-rose-500 border-rose-500 text-white shadow-rose-200 shadow-sm' },
@@ -896,7 +885,7 @@ const ItemChecklist = memo(function ItemChecklist({
               data-demo-item={valor === 'c' ? item.id : undefined}
               data-demo-item-nc={valor === 'nc' ? item.id : undefined}
               onClick={() => onResposta(item.id, valor)}
-              className={`flex h-9 w-10 items-center justify-center rounded-xl border-2 text-[11px] font-extrabold transition-all active:scale-95 sm:h-11 sm:w-14 md:w-16 ${
+              className={`flex h-9 w-11 items-center justify-center rounded-xl border-2 text-[11px] font-extrabold transition-all active:scale-95 ${
                 resp === valor
                   ? activeClass
                   : 'border-slate-200 bg-white/70 text-slate-400 hover:border-[#b51649]/40 hover:text-[#7f1022] dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-500 dark:hover:border-rose-400/40 dark:hover:text-rose-200'
@@ -1929,8 +1918,8 @@ function FormularioChecklist({
 
   return (
     <div
-      className={`${embeddedInFrame ? 'min-h-full overflow-x-hidden' : 'min-h-dvh overflow-x-hidden'} ${CHECKLIST_PAGE_BG}`}
-      style={mostrarBarraEnvio ? { paddingBottom: embeddedInFrame ? 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' : 'calc(5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+      className={`${embeddedInFrame ? 'flex min-h-full flex-col overflow-x-hidden' : 'min-h-dvh overflow-x-hidden'} ${CHECKLIST_PAGE_BG}`}
+      style={!embeddedInFrame && mostrarBarraEnvio ? { paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
     >
 
       {/* ── Header fixo ─────────────────────────────────────────────── */}
@@ -1976,7 +1965,7 @@ function FormularioChecklist({
         </div>
       </header>
 
-      <div className={`mx-auto space-y-4 px-3 pt-4 sm:px-4 ${embeddedInFrame ? 'max-w-full' : 'max-w-2xl'}`}>
+      <div className={`mx-auto space-y-4 px-3 pt-4 pb-4 sm:px-4 ${embeddedInFrame ? 'max-w-full flex-1' : 'max-w-2xl'}`}>
         {!hideSync && <SyncStatus />}
 
         {/* ── Legenda C / NC / NA ──────────────────────────────────── */}
@@ -2511,7 +2500,7 @@ function FormularioChecklist({
       {/* ── Barra de envio fixa (só após todos os itens respondidos) ─── */}
       {mostrarBarraEnvio && (
       <div
-        className={`${embeddedInFrame ? 'sticky' : 'fixed'} bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-[#0b1020] px-3 pt-3 text-white shadow-[0_-18px_45px_rgba(15,23,42,0.18)] dark:bg-slate-950 sm:px-4`}
+        className={`${embeddedInFrame ? 'shrink-0' : 'fixed bottom-0 left-0 right-0'} z-20 border-t border-white/10 bg-[#0b1020] px-3 pt-3 text-white shadow-[0_-18px_45px_rgba(15,23,42,0.18)] dark:bg-slate-950 sm:px-4`}
         style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <div className={`mx-auto flex items-center justify-between gap-3 ${embeddedInFrame ? 'max-w-full' : 'max-w-2xl'}`}>
