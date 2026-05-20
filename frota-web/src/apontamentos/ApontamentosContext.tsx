@@ -54,6 +54,7 @@ export type Apontamento = {
   justificativa: string | null
   justificativaData: string | null
   justificativaImagem: string | null
+  agendamentoData: string | null
 }
 
 export type NovoApontamento = Omit<
@@ -77,6 +78,7 @@ type Resolucao = {
   justificativa: string | null
   justificativaData: string | null
   justificativaImagem: string | null
+  agendamentoData: string | null
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,9 +93,10 @@ function rowToResolucao(r: any): Resolucao {
     reparoImagens:       Array.isArray(r.reparo_imagens) ? r.reparo_imagens : [],
     osArquivo:           r.os_arquivo          ?? null,
     justificado:         Boolean(r.justificado),
-    justificativa:       r.justificativa       ?? null,
-    justificativaData:   r.justificativa_data  ?? null,
+    justificativa:       r.justificativa        ?? null,
+    justificativaData:   r.justificativa_data   ?? null,
     justificativaImagem: r.justificativa_imagem ?? null,
+    agendamentoData:     r.agendamento_data     ?? null,
   }
 }
 
@@ -162,6 +165,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     justificativa:       res?.justificativa       ?? null,
     justificativaData:   res?.justificativaData   ?? null,
     justificativaImagem: res?.justificativaImagem ?? null,
+    agendamentoData:     res?.agendamentoData     ?? null,
     processo:             vehicleMap.get(placa)?.processo ?? 'Checklist',
     base:                 vehicleMap.get(placa)?.base || (dv.localidade ?? ''),
     coordenador:          vehicleMap.get(placa)?.coordenador ?? cl.nome_supervisor ?? '',
@@ -268,7 +272,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     // 3. Busca resoluções da tabela apontamentos
     const { data: resData } = await supabase
       .from('apontamentos')
-      .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem')
+      .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
 
     const resolucoes = new Map<string, Resolucao>(
       ((resData ?? []) as unknown[]).map((r) => {
@@ -424,7 +428,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
   const marcarJustificado = useCallback(async (
     id: string,
-    payload: { justificativa: string; data: string; imagem: string | null },
+    payload: { justificativa: string; data: string; imagem: string | null; agendamentoData: string | null },
     usuarioEmail = 'desconhecido',
   ) => {
     const now = new Date()
@@ -439,6 +443,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
               justificativa:       payload.justificativa,
               justificativaData:   payload.data,
               justificativaImagem: payload.imagem,
+              agendamentoData:     payload.agendamentoData,
             }
           : r,
       ),
@@ -460,6 +465,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         justificativa:        payload.justificativa,
         justificativa_data:   payload.data,
         justificativa_imagem: payload.imagem,
+        agendamento_data:     payload.agendamentoData,
         processo:             row?.processo ?? 'Checklist',
         base:                 row?.base ?? '',
         coordenador:          row?.coordenador ?? '',
@@ -475,13 +481,17 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       return
     }
 
+    const descHistorico = payload.agendamentoData
+      ? `Justificativa: ${payload.justificativa} | Agendado para: ${payload.agendamentoData}`
+      : `Justificativa: ${payload.justificativa}`
+
     await supabase.from('apontamento_historico').insert({
-      apontamento_id: id,
-      acao:           'editado',
-      usuario_email:  usuarioEmail,
-      data_hora:      `${payload.data}T${hora}:00`,
-      descricao:      `Justificativa: ${payload.justificativa}`,
-      reparo_valor:   null,
+      apontamento_id:   id,
+      acao:             'editado',
+      usuario_email:    usuarioEmail,
+      data_hora:        `${payload.data}T${hora}:00`,
+      descricao:        descHistorico,
+      reparo_valor:     null,
       reparo_descricao: null,
     })
   }, [rows, recarregar])

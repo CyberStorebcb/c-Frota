@@ -383,6 +383,7 @@ export function ManagePage() {
   const [justData, setJustData] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [justTexto, setJustTexto] = useState<string>('')
   const [justImagem, setJustImagem] = useState<string | null>(null)
+  const [justAgendamento, setJustAgendamento] = useState<string>('')
   const [salvandoJust, setSalvandoJust] = useState(false)
   const justImgRef = useRef<HTMLInputElement | null>(null)
 
@@ -392,6 +393,7 @@ export function ManagePage() {
     setJustData(r.justificativaData ?? new Date().toISOString().slice(0, 10))
     setJustTexto(r.justificativa ?? '')
     setJustImagem(r.justificativaImagem ?? null)
+    setJustAgendamento(r.agendamentoData ?? '')
     setJustOpen(true)
   }
 
@@ -401,6 +403,7 @@ export function ManagePage() {
     setJustData(new Date().toISOString().slice(0, 10))
     setJustTexto('')
     setJustImagem(null)
+    setJustAgendamento('')
     if (justImgRef.current) justImgRef.current.value = ''
   }
 
@@ -416,7 +419,11 @@ export function ManagePage() {
   const confirmJust = async () => {
     if (!canMarkResolved || !justId || !justTexto.trim()) return
     setSalvandoJust(true)
-    await marcarJustificado(justId, { justificativa: justTexto.trim(), data: justData, imagem: justImagem }, user?.email ?? 'desconhecido')
+    await marcarJustificado(
+      justId,
+      { justificativa: justTexto.trim(), data: justData, imagem: justImagem, agendamentoData: justAgendamento || null },
+      user?.email ?? 'desconhecido',
+    )
     setSalvandoJust(false)
     closeJustModal()
   }
@@ -817,13 +824,20 @@ export function ManagePage() {
                             </span>
                           ) : r.justificado ? (
                             <>
-                              <span
-                                className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1.5 text-xs font-extrabold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                                title={r.justificativa ?? 'Justificado'}
-                              >
-                                <MessageSquareWarning size={13} className="text-amber-600" aria-hidden />
-                                Justificado
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1.5 text-xs font-extrabold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                                  title={r.justificativa ?? 'Justificado'}
+                                >
+                                  <MessageSquareWarning size={13} className="text-amber-600" aria-hidden />
+                                  Justificado
+                                </span>
+                                {r.agendamentoData && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                    📅 {new Date(r.agendamentoData + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
                               {canMarkResolved ? (
                                 <>
                                   <button
@@ -1250,6 +1264,26 @@ export function ManagePage() {
                     placeholder="Descreva o motivo pelo qual o serviço não foi realizado..."
                     className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm outline-none placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-amber-400/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600"
                   />
+                </div>
+
+                {/* Agendamento */}
+                <div>
+                  <label className="mb-1 block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Agendar correção <span className="text-slate-400 font-normal normal-case">(opcional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={justAgendamento}
+                    onChange={(e) => setJustAgendamento(e.target.value)}
+                    min={new Date().toISOString().slice(0, 10)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  {justAgendamento && (
+                    <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      <AlertTriangle size={11} />
+                      Correção agendada para {new Date(justAgendamento + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
                 </div>
 
                 {/* Imagem opcional */}
