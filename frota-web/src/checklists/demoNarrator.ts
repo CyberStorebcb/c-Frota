@@ -2,7 +2,7 @@ import { DEMO_NARRATION_STEPS, type DemoNarrationStepId } from './demoNarration'
 
 /** Loop ambiente — mixado via Web Audio junto com a narração */
 export const DEMO_AMBIENT_SRC = '/demo-narration/ambient-bg.wav'
-const AMBIENT_VOLUME = 0.42
+const AMBIENT_VOLUME = 0.85
 const VOICE_VOLUME = 1
 const AMBIENT_FADE_IN_SEC = 0.5
 const AMBIENT_FADE_OUT_SEC = 0.8
@@ -138,11 +138,11 @@ async function startAmbientBed() {
 
   const ctx = await ensureAudioGraph()
   if (!ctx || !ambientGain) return
-  if (stopGeneration !== genAtStart) return  // stop foi chamado durante o await
+  if (stopGeneration !== genAtStart) return
 
   const buffer = await fetchAmbientBuffer(ctx)
   if (!buffer) return
-  if (stopGeneration !== genAtStart) return  // stop foi chamado durante o fetch/decode
+  if (stopGeneration !== genAtStart) return
 
   teardownAmbientSource()
 

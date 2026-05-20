@@ -20,7 +20,8 @@ function synthSample(t) {
   const e3 = Math.sin(2 * Math.PI * 164.81 * t) * 0.55
   const a3 = Math.sin(2 * Math.PI * 220 * t) * 0.35
   const breath = Math.sin(2 * Math.PI * 0.7 * t) * 0.08
-  return ((a2 + e3 + a3) / 3 + breath) * swell * 0.48
+  // Amplitude aumentada para ~80% do máximo (era 0.48, resultava em -10 dBFS)
+  return ((a2 + e3 + a3) / 3 + breath) * swell * 0.82
 }
 
 function encodeWav(samples, sampleRate) {
