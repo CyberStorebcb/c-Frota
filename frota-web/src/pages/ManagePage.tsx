@@ -813,7 +813,7 @@ export function ManagePage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <div data-tour="manage-severidade" className="flex flex-wrap items-center gap-2 lg:justify-end">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Severidade
             </span>

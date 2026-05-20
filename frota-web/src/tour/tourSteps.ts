@@ -1,4 +1,15 @@
-export type TourArea = 'Início' | 'Dashboard' | 'Gerenciar' | 'Evolução' | 'Histórico' | 'Checklists' | 'Resultados' | 'Registro' | 'Usuários' | 'Encerramento'
+export type TourArea =
+  | 'Início'
+  | 'Dashboard'
+  | 'Checklist Demo'
+  | 'Gerenciar'
+  | 'Evolução'
+  | 'Histórico'
+  | 'Checklists'
+  | 'Resultados'
+  | 'Registro'
+  | 'Usuários'
+  | 'Encerramento'
 
 export type TourStep = {
   path: string
@@ -38,8 +49,28 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Dashboard',
     title: '📊 Dashboard — Visão Geral',
     content:
-      'Observe a tela acima: aqui ficam os KPIs principais da frota — total de veículos, checklists do dia, pendências e evolução mensal. É a primeira tela ao entrar no sistema.',
+      'Aqui ficam os KPIs principais da frota — total de veículos ativos, checklists do dia, conformidade e evolução. É a primeira tela ao entrar no sistema.',
     waitMs: 400,
+  },
+  {
+    path: '/',
+    area: 'Dashboard',
+    selector: '[data-tour="dashboard-recorrentes"]',
+    title: '🔁 Alerta de Defeitos Recorrentes',
+    content:
+      'Quando um defeito aparece no checklist 3 ou mais dias seguidos no mesmo veículo, este painel de alerta é exibido automaticamente. Clique em "Ver no Gerenciar" para agir direto no defeito.',
+    placement: 'top',
+    waitMs: 400,
+  },
+
+  // ─── Checklist Demo ─────────────────────────────────────────────────────
+  {
+    path: '/checklist/demo',
+    area: 'Checklist Demo',
+    title: '📱 Checklist — Visão do Operador',
+    content:
+      'Esta é a tela que o operador vê no celular. O link é enviado por WhatsApp ou QR Code — não exige login. Observe a simulação automática: seleção do tipo de veículo, identificação, preenchimento e envio.',
+    waitMs: 1200,
   },
 
   // ─── Gerenciar ──────────────────────────────────────────────────────────
@@ -48,7 +79,7 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Gerenciar',
     title: '🛠️ Gerenciar — Apontamentos de Defeitos',
     content:
-      'Veja a tela acima: cada NC (Não Conformidade) encontrada nos checklists vira um apontamento aqui. Admins acompanham, documentam a resolução e encerram cada ocorrência.',
+      'Cada NC (Não Conformidade) encontrada nos checklists vira um apontamento aqui. Admins acompanham, documentam a resolução e encerram cada ocorrência.',
     waitMs: 900,
   },
   {
@@ -57,8 +88,17 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="manage-stats"]',
     title: '📈 KPIs do Período',
     content:
-      'Os cartões mostram totais de Apontamentos, Pendentes, Resolvidos e Defeitos Entrantes (de hoje). Clique em qualquer cartão para filtrar automaticamente a tabela abaixo.',
+      'Os cartões mostram totais de Apontamentos, Pendentes, Resolvidos e Defeitos Entrantes (de hoje). Clique em qualquer cartão para filtrar a tabela automaticamente.',
     placement: 'bottom',
+  },
+  {
+    path: '/gerenciar',
+    area: 'Gerenciar',
+    selector: '[data-tour="manage-severidade"]',
+    title: '🚫 Filtro de Severidade',
+    content:
+      'Filtre rapidamente por 🚫 Impeditivos (veículo não pode rodar) ou ⚠ Precisa de Atenção (não bloqueia, mas exige acompanhamento). O contador em cada pill mostra o total atual.',
+    placement: 'top',
   },
   {
     path: '/gerenciar',
@@ -66,16 +106,16 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="manage-filtros"]',
     title: '🔍 Filtros Avançados',
     content:
-      'Filtre por veículo, base, supervisor, gerência e intervalo de datas. Os filtros ativos são destacados e podem ser limpos individualmente.',
+      'Filtre por veículo, base, supervisor, gerência e intervalo de datas. Os filtros ativos são destacados e podem ser limpos de uma só vez.',
     placement: 'bottom',
   },
   {
     path: '/gerenciar',
     area: 'Gerenciar',
     selector: '[data-tour="manage-table"]',
-    title: '📋 Tabela de Apontamentos',
+    title: '📋 Tabela — Recorrentes e Ações',
     content:
-      'Cada linha é um defeito: veículo, processo, descrição, data e status. Admins podem marcar como resolvido, adicionar evidências de resolução e acompanhar prazos.',
+      'Defeitos repetidos no mesmo veículo e item ficam agrupados em linha azul "Recorrente · Nx". Clique no badge azul "Ver histórico" para ver todas as ocorrências, ou use os botões de resolução e justificativa à direita.',
     placement: 'top',
   },
 
@@ -85,7 +125,7 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Evolução',
     title: '📉 Evolução — Análise Temporal',
     content:
-      'Veja o painel acima: mostra aberturas vs. resoluções ao longo do tempo, tempo médio de resolução e tendências mensais. Ferramenta essencial para análise estratégica da frota.',
+      'Mostra aberturas vs. resoluções ao longo do tempo, tempo médio de resolução e tendências mensais. Ferramenta essencial para análise estratégica da frota.',
     waitMs: 900,
   },
   {
@@ -94,7 +134,7 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="evolucao-kpis"]',
     title: '📊 KPIs de Velocidade',
     content:
-      'Estes cartões mostram: total resolvidos, pendentes, dias médios de resolução e tendência vs. período anterior. Verde = meta atingida, vermelho = atenção necessária.',
+      'Total resolvidos, pendentes, dias médios de resolução e tendência vs. período anterior. Verde = meta atingida, vermelho = atenção necessária.',
     placement: 'bottom',
   },
   {
@@ -113,16 +153,25 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Histórico',
     title: '📜 Histórico — Manutenções Concluídas',
     content:
-      'Todas as manutenções corretivas já encerradas ficam aqui, com fotos do antes/depois e descrição da resolução. É possível gerar relatórios em PDF de qualquer registro.',
+      'Todas as manutenções corretivas já encerradas ficam aqui, com fotos e descrição da resolução. Gere relatórios em PDF de qualquer registro com um clique.',
     waitMs: 800,
   },
   {
     path: '/gerenciar/historico',
     area: 'Histórico',
-    selector: '[data-tour="historico-lista"]',
-    title: '🗂️ Lista de Registros',
+    selector: '[data-tour="historico-filtros"]',
+    title: '🔍 Filtros + Paginação',
     content:
-      'Cada card mostra: veículo, defeito corrigido, data de resolução e custo do reparo. Clique em "PDF" para gerar o relatório completo com fotos e dados da manutenção.',
+      'Filtre por Base e Gerência para focar nos dados relevantes. A lista é paginada em 25 registros por vez — ideal para frotas com grande volume de manutenções.',
+    placement: 'bottom',
+  },
+  {
+    path: '/gerenciar/historico',
+    area: 'Histórico',
+    selector: '[data-tour="historico-lista"]',
+    title: '🗂️ Registros com Severidade',
+    content:
+      'A coluna "Sev." exibe 🚫 para impeditivos e ⚠ para atenção, igual ao Gerenciar. Cada linha tem botão PDF para gerar o relatório completo com fotos e dados da manutenção.',
     placement: 'top',
   },
 
@@ -132,7 +181,7 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Checklists',
     title: '✅ Checklists — Controle Diário',
     content:
-      'Veja na tela acima quais veículos realizaram (ou não) o checklist do dia. É a ponte entre o operador no campo e a gestão central da frota.',
+      'Veja quais veículos realizaram (ou não) o checklist do dia. É a ponte entre o operador no campo e a gestão central da frota.',
     waitMs: 800,
   },
   {
@@ -141,7 +190,7 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="checklists-actions"]',
     title: '🔗 Link Público do Checklist',
     content:
-      'Os operadores acessam um link único (/checklist) para preencher o checklist do veículo sem precisar de login. O formulário pede a placa, as perguntas de inspeção e fotos dos defeitos encontrados. Pode ser enviado por WhatsApp ou QR Code.',
+      'Os operadores acessam um link único (/checklist) sem precisar de login. O formulário pede placa, perguntas de inspeção e fotos dos defeitos. Pode ser enviado por WhatsApp ou QR Code.',
     placement: 'bottom',
   },
 
@@ -151,7 +200,7 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Resultados',
     title: '📊 Resultados dos Checklists',
     content:
-      'Todos os checklists enviados pelos operadores aparecem aqui. Filtre por tipo de veículo, veja os detalhes completos com fotos, edite (admin) ou exporte em CSV.',
+      'Todos os checklists enviados pelos operadores aparecem aqui. Filtre por tipo de veículo, veja detalhes completos com fotos, edite (admin) ou exporte em CSV.',
     waitMs: 800,
   },
 
@@ -161,7 +210,7 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Registro',
     title: '🚗 Registro — Cadastro da Frota',
     content:
-      'Veja a lista de veículos acima: este é o cadastro mestre da frota. Usuários autorizados adicionam veículos manualmente ou importam planilhas Excel de uma só vez.',
+      'O cadastro mestre da frota. Usuários autorizados adicionam veículos manualmente ou importam planilhas Excel. A lista é paginada (24 por página em grid, 50 na tabela) para não pesar com frotas grandes.',
     waitMs: 800,
   },
   {
@@ -170,7 +219,7 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="registro-actions"]',
     title: '➕ Importação e Cadastro',
     content:
-      'Os botões "Importar Excel" e "Novo veículo" aparecem apenas para os usuários com permissão de modificar a base. Para os demais, a página é somente leitura.',
+      'Os botões "Importar Excel" e "Novo veículo" aparecem apenas para usuários com permissão de modificar a base. Para os demais, a página é somente leitura.',
     placement: 'bottom',
   },
 
@@ -190,7 +239,7 @@ export const TOUR_STEPS: TourStep[] = [
     area: 'Encerramento',
     title: '🎉 Tour Concluído!',
     content:
-      'Você conheceu todas as áreas do sistema. Boa gestão da frota! Para rever o tour a qualquer momento, clique no botão "?" no canto inferior direito da tela.',
+      'Você conheceu todas as áreas do CGB Frota. Boa gestão! Para rever o tour a qualquer momento, clique no botão "?" no canto inferior direito da tela.',
     waitMs: 400,
   },
 ]

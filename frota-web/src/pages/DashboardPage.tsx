@@ -579,7 +579,7 @@ export function DashboardPage() {
           </div>
 
           {gruposRecorrentes.length > 0 && (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
+            <div data-tour="dashboard-recorrentes" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
               <div className="mb-3 flex items-center gap-2">
                 <AlertTriangle size={16} className="shrink-0 text-rose-600 dark:text-rose-400" />
                 <span className="text-sm font-extrabold text-rose-800 dark:text-rose-200">

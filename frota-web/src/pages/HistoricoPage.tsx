@@ -785,7 +785,7 @@ export function HistoricoPage() {
       </div>
 
       <div data-tour="historico-lista" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
-        <div className="mb-3 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+        <div data-tour="historico-filtros" className="mb-3 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
           <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={(v) => { setBase(v); setPagina(1) }} />
           <Select label="Gerência" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setCoordenador(v); setPagina(1) }} />
         </div>
