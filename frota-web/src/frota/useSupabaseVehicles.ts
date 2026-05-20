@@ -21,6 +21,7 @@ type SupabaseVehicleRow = {
   base: string
   ano: string
   status: string
+  em_manutencao: boolean
   created_at: string
   deleted_at: string | null
 }
@@ -40,7 +41,7 @@ function rowToFleetVehicle(r: SupabaseVehicleRow): FleetVehicle {
     coordenador: r.coordenador || 'NÃO ATRIBUÍDO',
     base: r.base || 'N/A',
     status: r.status === 'INATIVO' ? 'INATIVO' : 'ATIVO',
-    emManutencao: false,
+    emManutencao: r.em_manutencao ?? false,
     ano: r.ano || '',
     createdAt: r.created_at,
     source: 'local',
@@ -60,6 +61,7 @@ export type UseSupabaseVehiclesResult = {
   softDeleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
   restoreVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
   hardDeleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
+  setManutencao: (id: string, emManutencao: boolean) => Promise<{ ok: true } | { ok: false; message: string }>
 }
 
 export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
@@ -156,5 +158,13 @@ export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
     return { ok: true }
   }, [load])
 
-  return { vehicles, deletedVehicles, loading, reload, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle }
+  const setManutencao = useCallback(async (id: string, emManutencao: boolean): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const { error } = await supabase.from('vehicles').update({ em_manutencao: emManutencao }).eq('id', id)
+    if (error) return { ok: false, message: error.message }
+    // Atualiza estado local imediatamente sem recarregar tudo
+    setVehicles((prev) => prev.map((v) => v.id === id ? { ...v, emManutencao } : v))
+    return { ok: true }
+  }, [])
+
+  return { vehicles, deletedVehicles, loading, reload, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setManutencao }
 }

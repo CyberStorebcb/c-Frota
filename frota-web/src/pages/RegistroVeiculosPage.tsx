@@ -43,7 +43,6 @@ import {
   isEmbeddedCatalogFleetVehicleId,
   normalizePlaca,
   removeFleetVehicle,
-  setFleetVehicleManutencao,
   setFleetVehicleStatus,
   VEHICLE_TYPE_IDS,
   type FleetVehicle,
@@ -319,29 +318,31 @@ function VehicleOverflowMenu({
               Marcar inativo
             </button>
           )}
-          {isAdmin && !vehicle.emManutencao && (
+          {isAdmin && supabaseVehicleIds.has(vehicle.id) && !vehicle.emManutencao && (
             <button
               type="button"
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
               onClick={() => {
-                setFleetVehicleManutencao(vehicle.placa, true)
-                refresh(); setMenuForId(null)
-                showNotification('Veículo marcado como em manutenção.', 'success')
+                void setManutencao(vehicle.id, true).then(() => {
+                  refresh(); setMenuForId(null)
+                  showNotification('Veículo marcado como em manutenção.', 'success')
+                })
               }}
             >
               Marcar em manutenção
             </button>
           )}
-          {isAdmin && vehicle.emManutencao && (
+          {isAdmin && supabaseVehicleIds.has(vehicle.id) && vehicle.emManutencao && (
             <button
               type="button"
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
               onClick={() => {
-                setFleetVehicleManutencao(vehicle.placa, false)
-                refresh(); setMenuForId(null)
-                showNotification('Manutenção removida.', 'success')
+                void setManutencao(vehicle.id, false).then(() => {
+                  refresh(); setMenuForId(null)
+                  showNotification('Manutenção removida.', 'success')
+                })
               }}
             >
               Remover da manutenção
@@ -450,7 +451,7 @@ function defaultForm() {
  * Controlo da frota: cadastro e listagem de veículos (UI alinhada ao painel operacional).
  */
 export function RegistroVeiculosPage() {
-  const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, reload: reloadSupabase } = useSupabaseVehicles()
+  const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setManutencao, reload: reloadSupabase } = useSupabaseVehicles()
   const { reload: reloadFleet } = useFleet()
   const supabaseVehicleIds = useMemo(() => new Set(supabaseVehicles.map((v) => v.id)), [supabaseVehicles])
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
