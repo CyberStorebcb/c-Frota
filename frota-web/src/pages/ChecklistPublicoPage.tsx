@@ -899,6 +899,16 @@ function FormularioChecklist({
   const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
   const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
 
+  // Mapa de placa → veículo (precisa estar antes do efeito demo)
+  const fleetByPlaca = useMemo(() => {
+    void fleetTick
+    const map = new Map<string, ReturnType<typeof getDisplayedFleetVehicles>[number]>()
+    for (const v of getDisplayedFleetVehicles()) {
+      map.set(normalizePlaca(v.placa), v)
+    }
+    return map
+  }, [fleetTick])
+
   // Auto-save com debounce de 600ms para não salvar a cada keystroke
   useEffect(() => {
     if (concluido) return
@@ -1069,15 +1079,6 @@ function FormularioChecklist({
       scrollTimers.current = []
     }
   }, [])
-
-  const fleetByPlaca = useMemo(() => {
-    void fleetTick
-    const map = new Map<string, ReturnType<typeof getDisplayedFleetVehicles>[number]>()
-    for (const v of getDisplayedFleetVehicles()) {
-      map.set(normalizePlaca(v.placa), v)
-    }
-    return map
-  }, [fleetTick])
 
   const placasOrdenadas = useMemo(
     () => [...fleetByPlaca.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR')),
