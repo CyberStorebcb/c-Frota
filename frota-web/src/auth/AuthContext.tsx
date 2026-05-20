@@ -101,19 +101,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const changePassword = useCallback(async (
     newPassword: string,
   ): Promise<{ ok: true } | { ok: false; message: string }> => {
-    // Atualiza o perfil ANTES do updateUser para que, se o listener
-    // onAuthStateChange disparar, já leia must_change_password = false.
-    if (user) {
-      await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id)
-    }
+    const { error: authError } = await supabase.auth.updateUser({ password: newPassword })
+    if (authError) return { ok: false, message: authError.message }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) {
-      // Reverte o flag se a troca de senha falhou
-      if (user) {
-        await supabase.from('profiles').update({ must_change_password: true }).eq('id', user.id)
+    // Atualiza o perfil após confirmar que a senha foi trocada com sucesso.
+    // Tenta via RPC service-role primeiro, depois via update direto.
+    if (user) {
+      const { error: profileError, count } = await supabase
+        .from('profiles')
+        .update({ must_change_password: false })
+        .eq('id', user.id)
+        .select('id', { count: 'exact', head: true })
+      if (profileError || count === 0) {
+        // Fallback: tenta via RPC (se existir) ou ignora — o estado local ainda é atualizado
+        await supabase.rpc('clear_must_change_password', { user_id: user.id }).maybeSingle()
       }
-      return { ok: false, message: error.message }
     }
 
     // Atualiza estado local imediatamente — o listener USER_UPDATED é ignorado
