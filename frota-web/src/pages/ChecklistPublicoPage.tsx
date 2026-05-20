@@ -2147,14 +2147,17 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
 
   const handleTipo = useCallback((tipo: string) => {
     setTipoSelecionado(tipo)
-    if (!isDemo && operador && matricula) writeDraftSession(tipo, operador, matricula)
-  }, [isDemo, operador, matricula])
+    if (!isDemo) writeDraftSession(tipo, '', '')
+  }, [isDemo])
+
+  const tipoSelecionadoRef = useRef(tipoSelecionado)
+  useEffect(() => { tipoSelecionadoRef.current = tipoSelecionado }, [tipoSelecionado])
 
   const handleOperador = useCallback((nome: string, mat: string) => {
     setOperador(nome)
     setMatricula(mat)
-    if (!isDemo && tipoSelecionado) writeDraftSession(tipoSelecionado, nome, mat)
-  }, [isDemo, tipoSelecionado])
+    if (!isDemo && tipoSelecionadoRef.current) writeDraftSession(tipoSelecionadoRef.current, nome, mat)
+  }, [isDemo])
 
   const demo = useChecklistDemoPlayer({
     enabled: isDemo,
