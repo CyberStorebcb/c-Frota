@@ -1,7 +1,6 @@
 export type TourArea =
   | 'Início'
   | 'Dashboard'
-  | 'Checklist Demo'
   | 'Gerenciar'
   | 'Evolução'
   | 'Histórico'
@@ -61,16 +60,6 @@ export const TOUR_STEPS: TourStep[] = [
       'Quando um defeito aparece no checklist 3 ou mais dias seguidos no mesmo veículo, este painel de alerta é exibido automaticamente. Clique em "Ver no Gerenciar" para agir direto no defeito.',
     placement: 'top',
     waitMs: 400,
-  },
-
-  // ─── Checklist Demo ─────────────────────────────────────────────────────
-  {
-    path: '/checklist/demo',
-    area: 'Checklist Demo',
-    title: '📱 Checklist — Visão do Operador',
-    content:
-      'Esta é a tela que o operador vê no celular. O link é enviado por WhatsApp ou QR Code — não exige login. Observe a simulação automática: seleção do tipo de veículo, identificação, preenchimento e envio.',
-    waitMs: 1200,
   },
 
   // ─── Gerenciar ──────────────────────────────────────────────────────────
