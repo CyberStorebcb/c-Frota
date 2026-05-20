@@ -50,6 +50,10 @@ export type Apontamento = {
   descricaoProblema: string
   /** Item 🚫 impeditivo no checklist — NC impede condução. */
   imperativo: boolean
+  justificado: boolean
+  justificativa: string | null
+  justificativaData: string | null
+  justificativaImagem: string | null
 }
 
 export type NovoApontamento = Omit<
@@ -69,19 +73,27 @@ type Resolucao = {
   reparoDescricao: string | null
   reparoImagens: string[]
   osArquivo: string | null
+  justificado: boolean
+  justificativa: string | null
+  justificativaData: string | null
+  justificativaImagem: string | null
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToResolucao(r: any): Resolucao {
   return {
-    id:              r.id,
-    resolvido:       Boolean(r.resolvido),
-    dataResolvido:   r.data_resolvido   ?? null,
-    horaResolvido:   r.hora_resolvido   ?? null,
-    reparoValor:     r.reparo_valor     != null ? Number(r.reparo_valor) : null,
-    reparoDescricao: r.reparo_descricao ?? null,
-    reparoImagens:   Array.isArray(r.reparo_imagens) ? r.reparo_imagens : [],
-    osArquivo:       r.os_arquivo       ?? null,
+    id:                  r.id,
+    resolvido:           Boolean(r.resolvido),
+    dataResolvido:       r.data_resolvido      ?? null,
+    horaResolvido:       r.hora_resolvido      ?? null,
+    reparoValor:         r.reparo_valor        != null ? Number(r.reparo_valor) : null,
+    reparoDescricao:     r.reparo_descricao    ?? null,
+    reparoImagens:       Array.isArray(r.reparo_imagens) ? r.reparo_imagens : [],
+    osArquivo:           r.os_arquivo          ?? null,
+    justificado:         Boolean(r.justificado),
+    justificativa:       r.justificativa       ?? null,
+    justificativaData:   r.justificativa_data  ?? null,
+    justificativaImagem: r.justificativa_imagem ?? null,
   }
 }
 
@@ -145,7 +157,11 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     reparoValor:     res?.reparoValor     ?? null,
     reparoDescricao: res?.reparoDescricao ?? null,
     reparoImagens:   res?.reparoImagens   ?? [],
-    osArquivo:       res?.osArquivo       ?? null,
+    osArquivo:           res?.osArquivo           ?? null,
+    justificado:         res?.justificado         ?? false,
+    justificativa:       res?.justificativa       ?? null,
+    justificativaData:   res?.justificativaData   ?? null,
+    justificativaImagem: res?.justificativaImagem ?? null,
     processo:             vehicleMap.get(placa)?.processo ?? 'Checklist',
     base:                 vehicleMap.get(placa)?.base || (dv.localidade ?? ''),
     coordenador:          vehicleMap.get(placa)?.coordenador ?? cl.nome_supervisor ?? '',
@@ -184,6 +200,11 @@ type Ctx = {
   marcarResolvido: (
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null; dataResolvido?: string | null },
+    usuarioEmail?: string,
+  ) => Promise<void>
+  marcarJustificado: (
+    id: string,
+    payload: { justificativa: string; data: string; imagem: string | null },
     usuarioEmail?: string,
   ) => Promise<void>
   buscarHistorico: (apontamentoId: string) => Promise<HistoricoRow[]>
@@ -247,7 +268,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     // 3. Busca resoluções da tabela apontamentos
     const { data: resData } = await supabase
       .from('apontamentos')
-      .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo')
+      .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem')
 
     const resolucoes = new Map<string, Resolucao>(
       ((resData ?? []) as unknown[]).map((r) => {
@@ -401,6 +422,70 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     })
   }, [rows, recarregar])
 
+  const marcarJustificado = useCallback(async (
+    id: string,
+    payload: { justificativa: string; data: string; imagem: string | null },
+    usuarioEmail = 'desconhecido',
+  ) => {
+    const now = new Date()
+    const hora = localTimeHHmm(now)
+
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              justificado:         true,
+              justificativa:       payload.justificativa,
+              justificativaData:   payload.data,
+              justificativaImagem: payload.imagem,
+            }
+          : r,
+      ),
+    )
+
+    const row = rows.find((r) => r.id === id)
+    const { error } = await supabase
+      .from('apontamentos')
+      .upsert({
+        id,
+        veiculo_id:           row?.veiculoId      ?? '',
+        veiculo_label:        row?.veiculoLabel   ?? '',
+        prefixo:              row?.prefixo        ?? '',
+        defeito:              row?.defeito        ?? '',
+        data_apontamento:     row?.dataApontamento ?? payload.data,
+        prazo:                row?.prazo          ?? payload.data,
+        resolvido:            false,
+        justificado:          true,
+        justificativa:        payload.justificativa,
+        justificativa_data:   payload.data,
+        justificativa_imagem: payload.imagem,
+        processo:             row?.processo ?? 'Checklist',
+        base:                 row?.base ?? '',
+        coordenador:          row?.coordenador ?? '',
+        responsavel:          row?.responsavel ?? '',
+        checklist_id:         row?.checklistId ?? null,
+        nc_item_id:           row?.ncItemId ?? null,
+        nc_fotos:             row?.ncFotos ?? [],
+      })
+
+    if (error) {
+      setPersistError('Erro ao salvar justificativa: ' + error.message)
+      await recarregar()
+      return
+    }
+
+    await supabase.from('apontamento_historico').insert({
+      apontamento_id: id,
+      acao:           'editado',
+      usuario_email:  usuarioEmail,
+      data_hora:      `${payload.data}T${hora}:00`,
+      descricao:      `Justificativa: ${payload.justificativa}`,
+      reparo_valor:   null,
+      reparo_descricao: null,
+    })
+  }, [rows, recarregar])
+
   const buscarHistorico = useCallback(async (apontamentoId: string): Promise<HistoricoRow[]> => {
     const { data } = await supabase
       .from('apontamento_historico')
@@ -420,13 +505,14 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       checklistsRealizadosTotal,
       carregando,
       marcarResolvido,
+      marcarJustificado,
       buscarHistorico,
       hasByChecklist,
       persistError,
       clearPersistError,
       recarregar,
     }),
-    [rows, checklistsRealizadosTotal, carregando, marcarResolvido, buscarHistorico, hasByChecklist, persistError, clearPersistError, recarregar],
+    [rows, checklistsRealizadosTotal, carregando, marcarResolvido, marcarJustificado, buscarHistorico, hasByChecklist, persistError, clearPersistError, recarregar],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>

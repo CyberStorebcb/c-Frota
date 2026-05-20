@@ -62,6 +62,10 @@ export type ApontamentoRow = {
   checklist_id: string | null
   nc_item_id: string | null
   nc_fotos: string[]
+  justificado: boolean
+  justificativa: string | null
+  justificativa_data: string | null
+  justificativa_imagem: string | null
   created_at: string
 }
 

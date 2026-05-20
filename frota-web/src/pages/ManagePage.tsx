@@ -21,6 +21,8 @@ import {
   Truck,
   X,
   ZoomIn,
+  MessageSquareWarning,
+  Image as ImageIcon,
 } from 'lucide-react'
 import type { Apontamento } from '../apontamentos/ApontamentosContext'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
@@ -132,7 +134,7 @@ function StatPill({
 }
 
 export function ManagePage() {
-  const { rows, carregando, marcarResolvido, checklistsRealizadosTotal } = useApontamentos()
+  const { rows, carregando, marcarResolvido, marcarJustificado, checklistsRealizadosTotal } = useApontamentos()
   const { user } = useAuth()
   const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
   const [searchParams, setSearchParams] = useSearchParams()
@@ -374,6 +376,50 @@ export function ManagePage() {
   const [salvando, setSalvando] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const osFileRef = useRef<HTMLInputElement | null>(null)
+
+  // ── Modal de Justificativa ────────────────────────────────────────────────
+  const [justOpen, setJustOpen] = useState(false)
+  const [justId, setJustId] = useState<string | null>(null)
+  const [justData, setJustData] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [justTexto, setJustTexto] = useState<string>('')
+  const [justImagem, setJustImagem] = useState<string | null>(null)
+  const [salvandoJust, setSalvandoJust] = useState(false)
+  const justImgRef = useRef<HTMLInputElement | null>(null)
+
+  const openJustModal = (r: Apontamento) => {
+    if (!canMarkResolved) return
+    setJustId(r.id)
+    setJustData(r.justificativaData ?? new Date().toISOString().slice(0, 10))
+    setJustTexto(r.justificativa ?? '')
+    setJustImagem(r.justificativaImagem ?? null)
+    setJustOpen(true)
+  }
+
+  const closeJustModal = () => {
+    setJustOpen(false)
+    setJustId(null)
+    setJustData(new Date().toISOString().slice(0, 10))
+    setJustTexto('')
+    setJustImagem(null)
+    if (justImgRef.current) justImgRef.current.value = ''
+  }
+
+  const addJustImagem = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const file = files[0]!
+    const reader = new FileReader()
+    reader.onload = () => setJustImagem(String(reader.result ?? ''))
+    reader.readAsDataURL(file)
+    if (justImgRef.current) justImgRef.current.value = ''
+  }
+
+  const confirmJust = async () => {
+    if (!canMarkResolved || !justId || !justTexto.trim()) return
+    setSalvandoJust(true)
+    await marcarJustificado(justId, { justificativa: justTexto.trim(), data: justData, imagem: justImagem }, user?.email ?? 'desconhecido')
+    setSalvandoJust(false)
+    closeJustModal()
+  }
 
   const currentResolve = useMemo(
     () => (resolveId ? rows.find((r) => r.id === resolveId) ?? null : null),
@@ -769,6 +815,36 @@ export function ManagePage() {
                               <Check size={16} strokeWidth={3} className="text-emerald-600" aria-hidden />
                               Sim
                             </span>
+                          ) : r.justificado ? (
+                            <>
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1.5 text-xs font-extrabold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                                title={r.justificativa ?? 'Justificado'}
+                              >
+                                <MessageSquareWarning size={13} className="text-amber-600" aria-hidden />
+                                Justificado
+                              </span>
+                              {canMarkResolved ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openJustModal(r)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
+                                    title="Editar justificativa"
+                                  >
+                                    <MessageSquareWarning size={16} aria-hidden />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openResolveModal(r)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+                                    title="Marcar como resolvido"
+                                  >
+                                    <Check size={18} strokeWidth={3} aria-hidden />
+                                  </button>
+                                </>
+                              ) : null}
+                            </>
                           ) : (
                             <>
                               <span
@@ -779,15 +855,26 @@ export function ManagePage() {
                                 Não
                               </span>
                               {canMarkResolved ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openResolveModal(r)}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
-                                  title="Marcar como resolvido"
-                                  aria-label={`Marcar defeito ${formatDefeitoParaExibicao(r.defeito).slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
-                                >
-                                  <Check size={18} strokeWidth={3} aria-hidden />
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openJustModal(r)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
+                                    title="Adicionar justificativa"
+                                    aria-label="Justificar não resolução"
+                                  >
+                                    <MessageSquareWarning size={16} aria-hidden />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openResolveModal(r)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
+                                    title="Marcar como resolvido"
+                                    aria-label={`Marcar defeito ${formatDefeitoParaExibicao(r.defeito).slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
+                                  >
+                                    <Check size={18} strokeWidth={3} aria-hidden />
+                                  </button>
+                                </>
                               ) : null}
                             </>
                           )}
@@ -1113,6 +1200,116 @@ export function ManagePage() {
               </div>
             </div>
           </div>
+          </div>
+        </Portal>
+      ) : null}
+
+      {/* ── Modal de Justificativa ─────────────────────────────────────────── */}
+      {justOpen ? (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeJustModal} />
+            <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 bg-amber-50 px-5 py-4 dark:border-slate-800 dark:bg-amber-950/30">
+                <div className="flex items-center gap-2">
+                  <MessageSquareWarning size={18} className="text-amber-600 dark:text-amber-400" />
+                  <span className="text-sm font-extrabold text-amber-800 dark:text-amber-200">
+                    Justificativa de não resolução
+                  </span>
+                </div>
+                <button type="button" onClick={closeJustModal} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="space-y-4 p-5">
+                {/* Data */}
+                <div>
+                  <label className="mb-1 block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Data
+                  </label>
+                  <input
+                    type="date"
+                    value={justData}
+                    onChange={(e) => setJustData(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </div>
+
+                {/* Justificativa */}
+                <div>
+                  <label className="mb-1 block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Justificativa <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    value={justTexto}
+                    onChange={(e) => setJustTexto(e.target.value)}
+                    rows={4}
+                    placeholder="Descreva o motivo pelo qual o serviço não foi realizado..."
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm outline-none placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-amber-400/40 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-600"
+                  />
+                </div>
+
+                {/* Imagem opcional */}
+                <div>
+                  <label className="mb-1 block text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Imagem <span className="text-slate-400 font-normal normal-case">(opcional)</span>
+                  </label>
+                  {justImagem ? (
+                    <div className="relative w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+                      <img src={justImagem} alt="Evidência" className="max-h-48 w-full object-contain" />
+                      <button
+                        type="button"
+                        onClick={() => setJustImagem(null)}
+                        className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => justImgRef.current?.click()}
+                      className="flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-800/60"
+                    >
+                      <ImageIcon size={16} />
+                      Adicionar imagem
+                    </button>
+                  )}
+                  <input
+                    ref={justImgRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => addJustImagem(e.target.files)}
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeJustModal}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmJust()}
+                  disabled={salvandoJust || !justTexto.trim()}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-extrabold text-white shadow-soft hover:bg-amber-600 disabled:opacity-60"
+                >
+                  {salvandoJust
+                    ? <Loader2 size={18} className="animate-spin" />
+                    : <MessageSquareWarning size={18} />}
+                  {salvandoJust ? 'Salvando...' : 'Salvar justificativa'}
+                </button>
+              </div>
+            </div>
           </div>
         </Portal>
       ) : null}
