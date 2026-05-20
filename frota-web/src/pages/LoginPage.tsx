@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Loader2, Lock, LogIn, Mail, Moon, Sun } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, Loader2, Lock, LogIn, Mail, Moon, Sun } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { supabase } from '../lib/supabase'
 import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { InstagramIcon } from '../branding/InstagramIcon'
@@ -136,6 +137,28 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
+  // ── Recuperação de senha ──────────────────────────────────────────────────
+  const [recovering, setRecovering] = useState(false)
+  const [recoveryEmail, setRecoveryEmail] = useState('')
+  const [recoverySent, setRecoverySent] = useState(false)
+  const [recoveryError, setRecoveryError] = useState<string | null>(null)
+  const [recoveryPending, setRecoveryPending] = useState(false)
+
+  async function onRecoverySubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setRecoveryError(null)
+    setRecoveryPending(true)
+    const { error: err } = await supabase.auth.resetPasswordForEmail(recoveryEmail.trim(), {
+      redirectTo: `${window.location.origin}/trocar-senha`,
+    })
+    setRecoveryPending(false)
+    if (err) {
+      setRecoveryError('Não foi possível enviar o e-mail. Verifique o endereço e tente novamente.')
+    } else {
+      setRecoverySent(true)
+    }
+  }
+
   useEffect(() => {
     if (!user || location.pathname !== '/login') return
     navigate(from, { replace: true })
@@ -241,105 +264,186 @@ export function LoginPage() {
         </div>
 
         <div className="w-full max-w-[380px]">
-          <header className="mb-7 text-center lg:mb-8 lg:text-left xl:mb-10">
-            <h1 className={`text-3xl font-black tracking-tight lg:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>Acessar</h1>
-            <p className="mt-2 text-sm font-bold text-slate-500 lg:mt-3 lg:text-base">Portal CGB de gestão e apontamentos da frota</p>
-          </header>
+          {recovering ? (
+            /* ── Formulário de recuperação de senha ────────────────────── */
+            <>
+              <header className="mb-7 text-center lg:mb-8 lg:text-left xl:mb-10">
+                <h1 className={`text-3xl font-black tracking-tight lg:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>Recuperar senha</h1>
+                <p className="mt-2 text-sm font-bold text-slate-500 lg:mt-3 lg:text-base">Enviaremos um link de redefinição para o seu e-mail</p>
+              </header>
 
-          {fromRegistroEspecial ? (
-            <div
-              className="mb-6 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-center text-sm font-bold text-emerald-800 dark:text-emerald-200"
-              role="status"
-            >
-              Registo de utilizador especial concluído. Inicie sessão com o e-mail e a palavra-passe que definiu.
-            </div>
-          ) : null}
-
-          <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 xl:space-y-5">
-            <div className="group space-y-2">
-              <label htmlFor="login-email" className="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-[#b51649]">
-                E-mail corporativo
-              </label>
-              <div className="relative">
-                <Mail
-                  className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#b51649]"
-                  aria-hidden
-                />
-                <input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={pending}
-                  className={`w-full rounded-2xl border py-3.5 pl-12 pr-4 text-sm font-bold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 xl:py-4 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
-                  placeholder="voce@empresa.com.br"
-                />
-              </div>
-            </div>
-
-            <div className="group space-y-2">
-              <div className="ml-1 flex items-center justify-between">
-                <label htmlFor="login-password" className="text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-[#b51649]">
-                  Senha
-                </label>
-                <button type="button" className="text-[11px] font-black text-[#b51649] hover:underline dark:text-rose-300">
-                  Recuperar
-                </button>
-              </div>
-              <div className="relative">
-                <Lock
-                  className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#b51649]"
-                  aria-hidden
-                />
-                <input
-                  id="login-password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={pending}
-                  className={`w-full rounded-2xl border py-3.5 pl-12 pr-12 text-sm font-bold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 xl:py-4 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
-                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-
-            {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={pending}
-              className="group relative flex min-h-[52px] w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#7f1022] via-[#9f1239] to-[#b51649] py-3.5 text-base font-black text-white shadow-xl shadow-rose-950/15 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 xl:min-h-[56px] xl:py-4"
-            >
-              {pending ? (
-                <Loader2 className="animate-spin" size={24} />
+              {recoverySent ? (
+                <div className="flex flex-col items-center gap-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-5 py-6 text-center">
+                  <CheckCircle2 size={40} className="text-emerald-500" />
+                  <div>
+                    <p className="text-sm font-black text-emerald-800 dark:text-emerald-200">E-mail enviado!</p>
+                    <p className="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                      Verifique sua caixa de entrada em <span className="font-black">{recoveryEmail}</span> e clique no link para redefinir sua senha.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setRecovering(false); setRecoverySent(false); setRecoveryEmail('') }}
+                    className="mt-1 text-[11px] font-black text-[#b51649] hover:underline dark:text-rose-300"
+                  >
+                    Voltar para o login
+                  </button>
+                </div>
               ) : (
-                <>
-                  Entrar no sistema
-                  <LogIn size={20} className="transition-transform group-hover:translate-x-1" />
-                </>
+                <form onSubmit={(e) => void onRecoverySubmit(e)} className="space-y-4 xl:space-y-5">
+                  <div className="group space-y-2">
+                    <label htmlFor="recovery-email" className="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-[#b51649]">
+                      E-mail corporativo
+                    </label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#b51649]" aria-hidden />
+                      <input
+                        id="recovery-email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={recoveryEmail}
+                        onChange={(e) => setRecoveryEmail(e.target.value)}
+                        disabled={recoveryPending}
+                        className={`w-full rounded-2xl border py-3.5 pl-12 pr-4 text-sm font-bold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 xl:py-4 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
+                        placeholder="voce@empresa.com.br"
+                      />
+                    </div>
+                  </div>
+
+                  {recoveryError && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">
+                      {recoveryError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={recoveryPending}
+                    className="group relative flex min-h-[52px] w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#7f1022] via-[#9f1239] to-[#b51649] py-3.5 text-base font-black text-white shadow-xl shadow-rose-950/15 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 xl:min-h-[56px] xl:py-4"
+                  >
+                    {recoveryPending ? <Loader2 className="animate-spin" size={24} /> : 'Enviar link de recuperação'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setRecovering(false); setRecoveryError(null) }}
+                    className="flex w-full items-center justify-center gap-1.5 text-[11px] font-black text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  >
+                    <ArrowLeft size={13} />
+                    Voltar para o login
+                  </button>
+                </form>
               )}
-            </button>
-          </form>
+            </>
+          ) : (
+            /* ── Formulário de login ────────────────────────────────────── */
+            <>
+              <header className="mb-7 text-center lg:mb-8 lg:text-left xl:mb-10">
+                <h1 className={`text-3xl font-black tracking-tight lg:text-4xl ${isDark ? 'text-white' : 'text-slate-900'}`}>Acessar</h1>
+                <p className="mt-2 text-sm font-bold text-slate-500 lg:mt-3 lg:text-base">Portal CGB de gestão e apontamentos da frota</p>
+              </header>
+
+              {fromRegistroEspecial ? (
+                <div
+                  className="mb-6 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-center text-sm font-bold text-emerald-800 dark:text-emerald-200"
+                  role="status"
+                >
+                  Registo de utilizador especial concluído. Inicie sessão com o e-mail e a palavra-passe que definiu.
+                </div>
+              ) : null}
+
+              <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 xl:space-y-5">
+                <div className="group space-y-2">
+                  <label htmlFor="login-email" className="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-[#b51649]">
+                    E-mail corporativo
+                  </label>
+                  <div className="relative">
+                    <Mail
+                      className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#b51649]"
+                      aria-hidden
+                    />
+                    <input
+                      id="login-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={pending}
+                      className={`w-full rounded-2xl border py-3.5 pl-12 pr-4 text-sm font-bold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 xl:py-4 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
+                      placeholder="voce@empresa.com.br"
+                    />
+                  </div>
+                </div>
+
+                <div className="group space-y-2">
+                  <div className="ml-1 flex items-center justify-between">
+                    <label htmlFor="login-password" className="text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors group-focus-within:text-[#b51649]">
+                      Senha
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setRecovering(true); setRecoveryEmail(email); setRecoveryError(null); setRecoverySent(false) }}
+                      className="text-[11px] font-black text-[#b51649] hover:underline dark:text-rose-300"
+                    >
+                      Recuperar
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock
+                      className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-[#b51649]"
+                      aria-hidden
+                    />
+                    <input
+                      id="login-password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={pending}
+                      className={`w-full rounded-2xl border py-3.5 pl-12 pr-12 text-sm font-bold outline-none transition-all focus:border-[#b51649] focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 xl:py-4 ${isDark ? 'border-slate-800 bg-slate-900 text-white focus:bg-slate-950' : 'border-slate-200 bg-slate-50/80 text-slate-900 focus:bg-white'}`}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {error ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">
+                    {error}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="group relative flex min-h-[52px] w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#7f1022] via-[#9f1239] to-[#b51649] py-3.5 text-base font-black text-white shadow-xl shadow-rose-950/15 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 xl:min-h-[56px] xl:py-4"
+                >
+                  {pending ? (
+                    <Loader2 className="animate-spin" size={24} />
+                  ) : (
+                    <>
+                      Entrar no sistema
+                      <LogIn size={20} className="transition-transform group-hover:translate-x-1" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
 
