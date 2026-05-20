@@ -86,17 +86,15 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     if (!active) return
     const step = TOUR_STEPS[stepIndex]
     if (!step) return
-    if (location.pathname !== step.path) {
-      if (tourNavigatingRef.current) {
-        // Ainda aguardando a navegação do tour chegar — ignora.
-        return
-      }
+    if (location.pathname === step.path) {
+      // Rota destino chegou — confirma que a navegação do tour foi concluída.
+      tourNavigatingRef.current = false
+    } else if (!tourNavigatingRef.current) {
       // O usuário navegou manualmente para fora do roteiro: encerra o tour.
       setActive(false)
       clearProgress()
-    } else {
-      tourNavigatingRef.current = false
     }
+    // Se tourNavigatingRef.current === true e rota ainda não chegou, aguarda.
   }, [active, stepIndex, location.pathname])
 
   // Inicia retomando progresso salvo
