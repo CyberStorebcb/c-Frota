@@ -844,7 +844,7 @@ export function ManagePage() {
               ) : (
                 paginaRows.map((item) => {
                   const group = item.type === 'group' ? item.group : null
-                  const r = group ? group.representative : item.row
+                  const r = group ? group.representative : (item as { type: 'single'; row: Apontamento; sortKey: string }).row
                   const rowKey = group ? group.key : r.id
                   const atrasado = prazoPassou(r.prazo, r.resolvido)
                   const agendado = !r.resolvido && !!r.agendamentoData
