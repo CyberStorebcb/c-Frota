@@ -229,6 +229,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const recarregar = useCallback(async () => {
     setCarregando(true)
@@ -316,14 +317,15 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       if (prev) void supabase.removeChannel(prev)
 
       const channelName = `apontamentos-changes-${Date.now()}`
+      const scheduleRecarregar = () => {
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = setTimeout(() => { void recarregar() }, 500)
+      }
+
       const ch = supabase
         .channel(channelName)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, () => {
-          void recarregar()
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'checklists' }, () => {
-          void recarregar()
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, scheduleRecarregar)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'checklists' }, scheduleRecarregar)
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             reconnectAttemptsRef.current = 0
@@ -347,6 +349,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
     return () => {
       destroyed = true
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       if (channelRef.current) void supabase.removeChannel(channelRef.current)
     }
