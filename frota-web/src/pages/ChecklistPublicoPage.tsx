@@ -615,6 +615,7 @@ function SupervisorField({ value, onChange }: { value: string; onChange: (v: str
             onFocus={() => setOpen(true)}
             placeholder="Digite para buscar o supervisor..."
             autoComplete="off"
+            data-demo-form-field="supervisor"
             className="min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
           {reconhecido && (
@@ -917,6 +918,25 @@ function FormularioChecklist({
     return map
   }, [fleetTick])
 
+  // Refs estáveis para o player do demo — evita que re-renders do pai cancelem
+  // o preenchimento automático em andamento. Effect usa deps [] e lê tudo via refs.
+  const fleetByPlacaRef = useRef(fleetByPlaca)
+  fleetByPlacaRef.current = fleetByPlaca
+  const onConcluidoRef = useRef(onConcluido)
+  onConcluidoRef.current = onConcluido
+  const onCursorTargetRef = useRef(onCursorTarget)
+  onCursorTargetRef.current = onCursorTarget
+  const demoSpeedRef = useRef(demoMode?.speedFactor ?? 1)
+  demoSpeedRef.current = demoMode?.speedFactor ?? 1
+  const demoEnabledRef = useRef(demoMode?.enabled ?? false)
+  demoEnabledRef.current = demoMode?.enabled ?? false
+  const schemaIdRef = useRef(schema.id)
+  schemaIdRef.current = schema.id
+  const schemaCamposRef = useRef(schema.camposExtras)
+  schemaCamposRef.current = schema.camposExtras
+  const todosItensRef = useRef(todosItens)
+  todosItensRef.current = todosItens
+
   // Auto-save com debounce de 600ms para não salvar a cada keystroke
   useEffect(() => {
     if (concluido) return
@@ -958,15 +978,21 @@ function FormularioChecklist({
     }
   }, [demoMode?.enabled])
 
-  // Demo: preenchimento automático para gravação de vídeo
+  // Demo: preenchimento automático para gravação de vídeo.
+  // Deps [] — roda uma única vez por mount. Tudo lido via refs para não ser
+  // cancelado por re-renders do componente pai.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!demoMode?.enabled || concluido || demoRan.current) return
-    if (gpsPermissao === 'checking') return
+    if (!demoEnabledRef.current || demoRan.current) return
     demoRan.current = true
 
-    const profile = resolveDemoProfile(schema.id)
-    const vehicleFields = resolveDemoVehicleFields(schema.id)
-    const speed = demoMode.speedFactor
+    // Reseta o cursor do phase anterior (identify) antes de começar o formulário
+    onCursorTargetRef.current?.(null)
+
+    const schemaId = schemaIdRef.current
+    const profile = resolveDemoProfile(schemaId)
+    const vehicleFields = resolveDemoVehicleFields(schemaId)
+    const speed = demoSpeedRef.current
     let cancelled = false
     const timers: ReturnType<typeof setTimeout>[] = []
     const wait = (ms: number) =>
@@ -974,8 +1000,10 @@ function FormularioChecklist({
         timers.push(setTimeout(resolve, demoDelay(ms, speed)))
       })
 
-    // Campos de texto: efeito de digitação caractere a caractere
+    // Campos de texto: cursor + efeito de digitação caractere a caractere
     const typeField = async (fieldId: string, value: string) => {
+      onCursorTargetRef.current?.({ selector: `[data-demo-form-field="${fieldId}"]`, tap: true, key: `field-${fieldId}` })
+      await wait(DEMO_TIMING.fieldChar * 3)
       for (let i = 1; i <= value.length; i++) {
         if (cancelled) return
         setDadosVeiculo((prev) => ({ ...prev, [fieldId]: value.slice(0, i) }))
@@ -984,20 +1012,28 @@ function FormularioChecklist({
       await wait(DEMO_TIMING.fieldPause)
     }
 
-    // Campos select: preenche de uma vez com pausa visual (sem digitação)
+    // Campos select: cursor + preenche de uma vez com pausa visual
     const fillSelect = async (fieldId: string, value: string) => {
+      if (cancelled) return
+      onCursorTargetRef.current?.({ selector: `[data-demo-form-field="${fieldId}"]`, tap: true, key: `field-${fieldId}` })
+      await wait(DEMO_TIMING.fieldPause)
       if (cancelled) return
       setDadosVeiculo((prev) => ({ ...prev, [fieldId]: value }))
       await wait(DEMO_TIMING.fieldPause)
     }
 
     void (async () => {
-      await wait(DEMO_TIMING.formStart)
+      // Aguarda render inicial + carregamento do fleetByPlaca antes de começar
+      await wait(Math.max(DEMO_TIMING.formStart, 600))
 
-      // Placa: preenche placa + marca_modelo juntos (mesmo comportamento do autocomplete)
+      // Placa: cursor + preenche placa + marca_modelo juntos
+      if (cancelled) return
+      onCursorTargetRef.current?.({ selector: '[data-demo-form-field="placa"]', tap: true, key: 'field-placa' })
+      await wait(DEMO_TIMING.fieldPause)
       if (cancelled) return
       const placaNorm = normalizePlaca(vehicleFields.placa)
-      const matchedVehicle = fleetByPlaca.get(placaNorm)
+      // Lê fleetByPlaca DEPOIS do delay para garantir que está populado
+      const matchedVehicle = fleetByPlacaRef.current.get(placaNorm)
       setDadosVeiculo((p) => ({
         ...p,
         placa: placaNorm,
@@ -1006,7 +1042,7 @@ function FormularioChecklist({
       await wait(DEMO_TIMING.fieldPause * 2)
 
       // Demais campos na ordem do schema, pulando placa e marca_modelo (já preenchidos)
-      const campos = schema.camposExtras ?? []
+      const campos = schemaCamposRef.current ?? []
       for (const campo of campos) {
         if (cancelled) return
         if (campo.id === 'placa' || campo.id === 'marca_modelo') continue
@@ -1023,23 +1059,26 @@ function FormularioChecklist({
 
       await wait(DEMO_TIMING.supervisorPause)
       if (cancelled) return
+      onCursorTargetRef.current?.({ selector: '[data-demo-form-field="supervisor"]', tap: true, key: 'field-supervisor' })
+      await wait(DEMO_TIMING.fieldPause)
+      if (cancelled) return
       setSupervisor(profile.supervisor)
 
-      for (const item of todosItens) {
+      for (const item of todosItensRef.current) {
         if (cancelled) return
         itemRefs.current[item.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         setItemDestacado(item.id)
         await wait(DEMO_TIMING.itemScroll)
         if (cancelled) return
         // Cursor aponta para o botão C do item
-        onCursorTarget?.({ selector: `[data-demo-item="${item.id}"]`, tap: true, key: item.id })
+        onCursorTargetRef.current?.({ selector: `[data-demo-item="${item.id}"]`, tap: true, key: item.id })
         await wait(180)
         if (cancelled) return
         setRespostas((prev) => ({ ...prev, [item.id]: 'c' }))
         await wait(DEMO_TIMING.itemAnswer)
         setItemDestacado(null)
       }
-      onCursorTarget?.(null)
+      onCursorTargetRef.current?.(null)
 
       await wait(DEMO_TIMING.beforeSubmit)
       if (cancelled) return
@@ -1060,7 +1099,7 @@ function FormularioChecklist({
         descricaoProblema: '',
       })
       clearFormDraft()
-      onConcluido?.()
+      onConcluidoRef.current?.()
       setConcluido(true)
       setEnviando(false)
     })()
@@ -1069,7 +1108,7 @@ function FormularioChecklist({
       cancelled = true
       timers.forEach(clearTimeout)
     }
-  }, [demoMode, concluido, gpsPermissao, schema.id, schema.camposExtras, todosItens, onConcluido, fleetByPlaca])
+  }, [])
 
   useEffect(() => {
     const bump = () => setFleetTick((t) => t + 1)
@@ -1616,6 +1655,7 @@ function FormularioChecklist({
                       aria-expanded={placaSuggestOpen}
                       aria-controls={`checklist-placa-sugestoes-${schema.id}`}
                       role="combobox"
+                      data-demo-form-field="placa"
                       value={formatPlaca(dadosVeiculo.placa ?? '')}
                       onChange={(e) => {
                         onPlacaChange(e.target.value)
@@ -1867,6 +1907,7 @@ function FormularioChecklist({
                     <>
                       <input
                         list={listId}
+                        data-demo-form-field={campo.id}
                         value={dadosVeiculo[campo.id] ?? ''}
                         onChange={(e) => setDado(campo.id, e.target.value)}
                         placeholder={opcoes.length > 0 ? 'Escolher ou digitar...' : '—'}
@@ -1881,6 +1922,7 @@ function FormularioChecklist({
                   <input
                     type={campo.tipo === 'number' ? 'number' : 'text'}
                     inputMode={campo.tipo === 'number' ? 'numeric' : 'text'}
+                    data-demo-form-field={campo.id}
                     value={dadosVeiculo[campo.id] ?? ''}
                     onChange={(e) => setDado(campo.id, e.target.value)}
                     placeholder="—"

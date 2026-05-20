@@ -10,7 +10,7 @@ export type ChecklistDemoProfile = {
 }
 
 const DEMO_DEFAULTS: ChecklistDemoProfile = {
-  tipo: 'veiculo-leve',
+  tipo: 'sky',
   operador: 'Carlos Mendes',
   matricula: '1024',
   supervisor: 'JOSIEL MENESES DOS SANTOS',
@@ -18,11 +18,26 @@ const DEMO_DEFAULTS: ChecklistDemoProfile = {
   km: '45280',
 }
 
+// Mapeia o id do checklist para os tipos de veículo correspondentes no registro.
+const DEMO_TIPO_MAP: Record<string, string[]> = {
+  'sky':          ['SKY'],
+  'munck':        ['MUNCK'],
+  'picape-leve':  ['PICAPE LEVE'],
+  'picape-4x4':   ['PICAPE 4X4'],
+  'motocicleta':  ['MOTO'],
+  'veiculo-leve': ['VEICULOS LEVES'],
+}
+
+function findDemoVehicle(tipo: string) {
+  const tipos = DEMO_TIPO_MAP[tipo] ?? []
+  const ativos = getDisplayedFleetVehicles().filter((v) => v.status === 'ATIVO')
+  // Tenta casar pelo tipo do checklist; se não achar, usa qualquer veículo ativo.
+  return ativos.find((v) => tipos.includes(v.tipo)) ?? ativos[0]
+}
+
 export function resolveDemoProfile(tipoOverride?: string | null): ChecklistDemoProfile {
   const tipo = tipoOverride?.trim() || DEMO_DEFAULTS.tipo
-  const vehicle = getDisplayedFleetVehicles().find(
-    (v) => v.status === 'ATIVO' && (tipo !== 'veiculo-leve' || v.tipo === 'VEICULOS LEVES'),
-  )
+  const vehicle = findDemoVehicle(tipo)
 
   return {
     ...DEMO_DEFAULTS,
@@ -32,9 +47,7 @@ export function resolveDemoProfile(tipoOverride?: string | null): ChecklistDemoP
 }
 
 export function resolveDemoVehicleFields(tipo: string) {
-  const vehicle = getDisplayedFleetVehicles().find(
-    (v) => v.status === 'ATIVO' && (tipo !== 'veiculo-leve' || v.tipo === 'VEICULOS LEVES'),
-  )
+  const vehicle = findDemoVehicle(tipo)
 
   if (!vehicle) {
     return {
