@@ -84,8 +84,18 @@ export function TourOverlay() {
     if (!ready || !step) return
     if (!step.selector) { setRect(null); setSelectorMissing(false); return }
 
+    const selector = step.selector
+    let cancelled = false
+    const timers: number[] = []
+
+    const measure = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect()
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+    }
+
     const update = () => {
-      const el = document.querySelector(step.selector!) as HTMLElement | null
+      if (cancelled) return
+      const el = document.querySelector(selector) as HTMLElement | null
       if (!el) {
         setRect(null)
         setSelectorMissing(true)
@@ -93,16 +103,31 @@ export function TourOverlay() {
       }
       setSelectorMissing(false)
       el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
-      window.setTimeout(() => {
-        const r = el.getBoundingClientRect()
-        setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
-      }, 300)
+      timers.push(window.setTimeout(() => { if (!cancelled) measure(el) }, 300))
     }
-    update()
+
+    // Tenta encontrar o elemento de imediato; se ainda não existir (página
+    // com dados assíncronos), faz algumas re-tentativas curtas antes de
+    // marcar como ausente.
+    const tryFind = (attempt: number) => {
+      if (cancelled) return
+      const el = document.querySelector(selector) as HTMLElement | null
+      if (el) {
+        update()
+      } else if (attempt < 8) {
+        timers.push(window.setTimeout(() => tryFind(attempt + 1), 250))
+      } else {
+        setRect(null)
+        setSelectorMissing(true)
+      }
+    }
+    tryFind(0)
 
     window.addEventListener('resize', update)
     window.addEventListener('scroll', update, true)
     return () => {
+      cancelled = true
+      timers.forEach((t) => window.clearTimeout(t))
       window.removeEventListener('resize', update)
       window.removeEventListener('scroll', update, true)
     }

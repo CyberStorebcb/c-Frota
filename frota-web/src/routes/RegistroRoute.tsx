@@ -3,14 +3,20 @@ import { Car, LogIn } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { AppShellLayout } from '../components/layout/AppShell'
 import { RegistroVeiculosPage } from '../pages/RegistroVeiculosPage'
+import { TourOverlay } from '../tour/TourOverlay'
+import { TourLauncher } from '../tour/TourLauncher'
 
 export function RegistroRoute() {
   const { user } = useAuth()
 
   if (user) {
+    // Overlay/launcher do tour aqui também: /registro fica fora do shell
+    // autenticado, mas compartilha o TourProvider global montado em App.
     return (
       <AppShellLayout>
         <RegistroVeiculosPage />
+        <TourOverlay />
+        <TourLauncher />
       </AppShellLayout>
     )
   }
