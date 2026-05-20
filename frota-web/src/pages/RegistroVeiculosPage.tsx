@@ -238,6 +238,7 @@ function VehicleOverflowMenu({
   onEdit,
   supabaseVehicleIds,
   onDeleteRequest,
+  setManutencao,
 }: {
   vehicle: FleetVehicle
   menuForId: string | null
@@ -249,6 +250,7 @@ function VehicleOverflowMenu({
   onEdit?: (vehicle: FleetVehicle) => void
   supabaseVehicleIds: Set<string>
   onDeleteRequest: (id: string, placa: string, isSupabase: boolean) => void
+  setManutencao: (id: string, emManutencao: boolean) => Promise<{ ok: true } | { ok: false; message: string }>
 }) {
   const menuOpen = menuForId === vehicle.id
   const menuPosition =
@@ -1465,6 +1467,7 @@ export function RegistroVeiculosPage() {
                     onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                     supabaseVehicleIds={supabaseVehicleIds}
                     onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
+                    setManutencao={setManutencao}
                   />
                 </div>
               </div>
@@ -1727,6 +1730,7 @@ export function RegistroVeiculosPage() {
                           onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                           supabaseVehicleIds={supabaseVehicleIds}
                           onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
+                          setManutencao={setManutencao}
                         />
                       </td>
                     </tr>
