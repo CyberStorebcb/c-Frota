@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { DEMO_TIMING, demoDelay, resolveDemoProfile, type ChecklistDemoProfile } from './checklistDemoConfig'
+import type { DemoCursorTarget } from '../components/checklist/DemoCursor'
 
 export type ChecklistDemoPhase = 'select' | 'identify' | 'form' | 'done'
 
@@ -33,6 +34,7 @@ export function useChecklistDemoPlayer({
   const [demoNome, setDemoNome] = useState('')
   const [demoMatricula, setDemoMatricula] = useState('')
   const [pulseSubmit, setPulseSubmit] = useState(false)
+  const [cursorTarget, setCursorTarget] = useState<DemoCursorTarget | null>(null)
   const ranSelect = useRef(false)
   const ranIdentify = useRef(false)
 
@@ -64,9 +66,16 @@ export function useChecklistDemoPlayer({
       await wait(DEMO_TIMING.selectPause)
       if (cancelled) return
       setHighlightTipo(profile.tipo)
+      // Cursor aparece e move para o botão do checklist
+      setCursorTarget({ selector: `[data-demo-tipo="${profile.tipo}"]`, key: 'select' })
       await wait(DEMO_TIMING.selectHighlight)
       if (cancelled) return
+      // Toque
+      setCursorTarget({ selector: `[data-demo-tipo="${profile.tipo}"]`, tap: true, key: 'select-tap' })
+      await wait(300)
+      if (cancelled) return
       setHighlightTipo(null)
+      setCursorTarget(null)
       onSelectTipo(profile.tipo)
     })()
 
@@ -96,12 +105,19 @@ export function useChecklistDemoPlayer({
       })
 
     void (async () => {
+      // Cursor vai para campo nome
+      setCursorTarget({ selector: '[data-demo-field="nome"]', tap: true, key: 'id-nome' })
+      await wait(DEMO_TIMING.identifyChar * 3)
       for (let i = 1; i <= profile.operador.length; i++) {
         if (cancelled) return
         setDemoNome(profile.operador.slice(0, i))
         await wait(DEMO_TIMING.identifyChar)
       }
       await wait(DEMO_TIMING.identifyPause)
+      if (cancelled) return
+      // Cursor vai para campo matrícula
+      setCursorTarget({ selector: '[data-demo-field="matricula"]', tap: true, key: 'id-mat' })
+      await wait(DEMO_TIMING.identifyChar * 3)
       for (let i = 1; i <= profile.matricula.length; i++) {
         if (cancelled) return
         setDemoMatricula(profile.matricula.slice(0, i))
@@ -109,10 +125,13 @@ export function useChecklistDemoPlayer({
       }
       await wait(DEMO_TIMING.identifyPause)
       if (cancelled) return
+      // Cursor vai para botão confirmar
+      setCursorTarget({ selector: '[data-demo-field="submit"]', tap: true, key: 'id-submit' })
       setPulseSubmit(true)
       await wait(DEMO_TIMING.identifySubmit)
       if (cancelled) return
       setPulseSubmit(false)
+      setCursorTarget(null)
       onConfirmOperador(profile.operador, profile.matricula)
     })()
 
@@ -136,6 +155,8 @@ export function useChecklistDemoPlayer({
     demoNome,
     demoMatricula,
     pulseSubmit,
+    cursorTarget,
+    setCursorTarget,
   }
 }
 

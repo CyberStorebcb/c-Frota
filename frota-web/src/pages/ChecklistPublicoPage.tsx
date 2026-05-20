@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { createPortal } from 'react-dom'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { ChecklistPhoneFrame } from '../components/checklist/ChecklistPhoneFrame'
+import { DemoCursor } from '../components/checklist/DemoCursor'
 import { DEMO_TIMING, demoDelay, resolveDemoProfile, resolveDemoVehicleFields } from '../checklists/checklistDemoConfig'
 import { useChecklistDemoPlayer } from '../checklists/useChecklistDemoPlayer'
 import {
@@ -96,6 +97,7 @@ function TelaEscolhaChecklist({
               <button
                 key={schema.id}
                 type="button"
+                data-demo-tipo={schema.id}
                 onClick={() => onSelecionar(schema.id)}
                 className={`group flex w-full items-center gap-3 rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:border-[#b51649]/35 hover:shadow-[0_16px_35px_rgba(127,16,34,0.12)] active:scale-[.99] ${CGB_CARD} ${
                   highlightTipo === schema.id ? 'scale-[1.02] ring-2 ring-[#b51649] shadow-[0_16px_35px_rgba(181,22,73,0.25)]' : ''
@@ -232,6 +234,7 @@ function TelaIdentificacao({
                 autoFocus={!isDemo}
                 autoComplete="name"
                 readOnly={isDemo}
+                data-demo-field="nome"
                 value={nomeValue}
                 onChange={(e) => { if (!isDemo) { setNome(e.target.value); setErros((prev) => ({ ...prev, nome: undefined })) } }}
                 placeholder="Ex: João Silva"
@@ -247,6 +250,7 @@ function TelaIdentificacao({
               <input
                 value={matriculaValue}
                 readOnly={isDemo}
+                data-demo-field="matricula"
                 onChange={(e) => {
                   if (isDemo) return
                   const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 5)
@@ -265,6 +269,7 @@ function TelaIdentificacao({
 
           <button
             type="submit"
+            data-demo-field="submit"
             className={`w-full rounded-2xl py-4 text-base font-extrabold transition active:scale-[.98] ${CGB_PRIMARY_BUTTON} ${
               pulseSubmit ? 'scale-[0.98] ring-2 ring-white/40' : ''
             }`}
@@ -728,6 +733,7 @@ const ItemChecklist = memo(function ItemChecklist({
             <button
               key={valor}
               type="button"
+              data-demo-item={valor === 'c' ? item.id : undefined}
               onClick={() => onResposta(item.id, valor)}
               className={`flex h-11 w-14 items-center justify-center rounded-xl border-2 text-xs font-extrabold transition-all active:scale-95 sm:w-16 ${
                 resp === valor
@@ -817,6 +823,7 @@ function FormularioChecklist({
   onConcluido,
   onVoltar,
   demoMode,
+  onCursorTarget,
   hideSync,
 }: {
   schema: ChecklistSchemaDef
@@ -825,6 +832,7 @@ function FormularioChecklist({
   onConcluido?: () => void
   onVoltar?: () => void
   demoMode?: { enabled: boolean; speedFactor: number }
+  onCursorTarget?: (t: import('../components/checklist/DemoCursor').DemoCursorTarget | null) => void
   hideSync?: boolean
 }) {
   const todosItens = schema.grupos.flatMap((g) => g.itens)
@@ -1023,10 +1031,15 @@ function FormularioChecklist({
         setItemDestacado(item.id)
         await wait(DEMO_TIMING.itemScroll)
         if (cancelled) return
+        // Cursor aponta para o botão C do item
+        onCursorTarget?.({ selector: `[data-demo-item="${item.id}"]`, tap: true, key: item.id })
+        await wait(180)
+        if (cancelled) return
         setRespostas((prev) => ({ ...prev, [item.id]: 'c' }))
         await wait(DEMO_TIMING.itemAnswer)
         setItemDestacado(null)
       }
+      onCursorTarget?.(null)
 
       await wait(DEMO_TIMING.beforeSubmit)
       if (cancelled) return
@@ -2222,6 +2235,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
           }}
           onVoltar={isDemo ? undefined : () => { setOperador(''); setMatricula('') }}
           demoMode={isDemo ? { enabled: true, speedFactor } : undefined}
+          onCursorTarget={isDemo ? demo.setCursorTarget : undefined}
           hideSync={isDemo}
         />
       )
@@ -2230,10 +2244,13 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
 
   if (isDemo && withFrame) {
     return (
-      <ChecklistPhoneFrame key={demoKey}>
-        <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
-        {content}
-      </ChecklistPhoneFrame>
+      <>
+        <ChecklistPhoneFrame key={demoKey}>
+          <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
+          {content}
+        </ChecklistPhoneFrame>
+        <DemoCursor target={demo.cursorTarget} visible={isDemo} />
+      </>
     )
   }
 
@@ -2242,6 +2259,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
       <>
         <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
         {content}
+        <DemoCursor target={demo.cursorTarget} visible={isDemo} />
       </>
     )
   }
