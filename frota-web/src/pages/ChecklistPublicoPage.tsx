@@ -1,6 +1,9 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
+import { ChecklistPhoneFrame } from '../components/checklist/ChecklistPhoneFrame'
+import { DEMO_TIMING, demoDelay, resolveDemoProfile, resolveDemoVehicleFields } from '../checklists/checklistDemoConfig'
+import { useChecklistDemoPlayer } from '../checklists/useChecklistDemoPlayer'
 import {
   AlertTriangle,
   Camera,
@@ -70,8 +73,12 @@ function CgbHero({
 
 function TelaEscolhaChecklist({
   onSelecionar,
+  highlightTipo,
+  hideSync,
 }: {
   onSelecionar: (tipo: string) => void
+  highlightTipo?: string | null
+  hideSync?: boolean
 }) {
   return (
     <div className={`flex min-h-dvh flex-col items-center justify-center px-4 py-8 ${CHECKLIST_PAGE_BG}`}>
@@ -90,7 +97,9 @@ function TelaEscolhaChecklist({
                 key={schema.id}
                 type="button"
                 onClick={() => onSelecionar(schema.id)}
-                className={`group flex w-full items-center gap-3 rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:border-[#b51649]/35 hover:shadow-[0_16px_35px_rgba(127,16,34,0.12)] active:scale-[.99] ${CGB_CARD}`}
+                className={`group flex w-full items-center gap-3 rounded-2xl p-4 text-left transition hover:-translate-y-0.5 hover:border-[#b51649]/35 hover:shadow-[0_16px_35px_rgba(127,16,34,0.12)] active:scale-[.99] ${CGB_CARD} ${
+                  highlightTipo === schema.id ? 'scale-[1.02] ring-2 ring-[#b51649] shadow-[0_16px_35px_rgba(181,22,73,0.25)]' : ''
+                }`}
               >
                 <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#7f1022]/10 text-[#7f1022] ring-1 ring-[#7f1022]/10 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/10">
                   <ClipboardList size={20} />
@@ -111,9 +120,11 @@ function TelaEscolhaChecklist({
         Atenção ao preenchimento, pois os formulários serão avaliados e validados.
         </p>
 
-        <div className="mt-4">
-          <SyncStatus />
-        </div>
+        {!hideSync && (
+          <div className="mt-4">
+            <SyncStatus />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -126,13 +137,22 @@ function TelaIdentificacao({
   schema,
   onConfirmar,
   onVoltar,
+  demoNome,
+  demoMatricula,
+  pulseSubmit,
 }: {
   schema: ChecklistSchemaDef
   onConfirmar: (nome: string, matricula: string) => void
   onVoltar: () => void
+  demoNome?: string
+  demoMatricula?: string
+  pulseSubmit?: boolean
 }) {
+  const isDemo = demoNome !== undefined
   const [nome, setNome] = useState('')
   const [matricula, setMatricula] = useState('')
+  const nomeValue = isDemo ? demoNome : nome
+  const matriculaValue = isDemo ? (demoMatricula ?? '') : matricula
   const [erros, setErros] = useState<{ nome?: string; matricula?: string }>({})
 
   const validar = () => {
@@ -209,10 +229,11 @@ function TelaIdentificacao({
                 Nome completo *
               </label>
               <input
-                autoFocus
+                autoFocus={!isDemo}
                 autoComplete="name"
-                value={nome}
-                onChange={(e) => { setNome(e.target.value); setErros((prev) => ({ ...prev, nome: undefined })) }}
+                readOnly={isDemo}
+                value={nomeValue}
+                onChange={(e) => { if (!isDemo) { setNome(e.target.value); setErros((prev) => ({ ...prev, nome: undefined })) } }}
                 placeholder="Ex: João Silva"
                 className="mt-0.5 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
               />
@@ -224,8 +245,10 @@ function TelaIdentificacao({
                 Matrícula *
               </label>
               <input
-                value={matricula}
+                value={matriculaValue}
+                readOnly={isDemo}
                 onChange={(e) => {
+                  if (isDemo) return
                   const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 5)
                   setMatricula(onlyDigits)
                   setErros((prev) => ({ ...prev, matricula: undefined }))
@@ -242,7 +265,9 @@ function TelaIdentificacao({
 
           <button
             type="submit"
-            className={`w-full rounded-2xl py-4 text-base font-extrabold transition active:scale-[.98] ${CGB_PRIMARY_BUTTON}`}
+            className={`w-full rounded-2xl py-4 text-base font-extrabold transition active:scale-[.98] ${CGB_PRIMARY_BUTTON} ${
+              pulseSubmit ? 'scale-[0.98] ring-2 ring-white/40' : ''
+            }`}
           >
             Iniciar Checklist →
           </button>
@@ -791,12 +816,16 @@ function FormularioChecklist({
   matricula,
   onConcluido,
   onVoltar,
+  demoMode,
+  hideSync,
 }: {
   schema: ChecklistSchemaDef
   operador: string
   matricula: string
   onConcluido?: () => void
   onVoltar?: () => void
+  demoMode?: { enabled: boolean; speedFactor: number }
+  hideSync?: boolean
 }) {
   const todosItens = schema.grupos.flatMap((g) => g.itens)
   const totalItens = todosItens.length
@@ -824,7 +853,7 @@ function FormularioChecklist({
     }
   }, [schema.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const draft = readFormDraft(schema.id)
+  const draft = demoMode?.enabled ? null : readFormDraft(schema.id)
 
   const [respostas, setRespostas]         = useState<Record<string, Resposta>>(draft?.respostas ?? {})
   const [observacoes, setObservacoes]     = useState<Record<string, string>>(draft?.observacoes ?? {})
@@ -845,6 +874,7 @@ function FormularioChecklist({
   const [enviando, setEnviando]           = useState(false)
   const [erroEnvio, setErroEnvio]         = useState('')
   const [concluido, setConcluido]         = useState(false)
+  const demoRan = useRef(false)
   const [resultadoFinal, setResultadoFinal] = useState<{
     ncCount: number
     ncImperativos: number
@@ -881,6 +911,10 @@ function FormularioChecklist({
 
   // Verifica permissão de GPS ao carregar e monitora mudanças
   useEffect(() => {
+    if (demoMode?.enabled) {
+      setGpsPermissao('granted')
+      return
+    }
     if (!navigator.geolocation) {
       setGpsPermissao('granted') // sem geolocation, não bloqueia — campo manual disponível
       return
@@ -902,7 +936,89 @@ function FormularioChecklist({
     return () => {
       if (permStatus) permStatus.onchange = null
     }
-  }, [])
+  }, [demoMode?.enabled])
+
+  // Demo: preenchimento automático para gravação de vídeo
+  useEffect(() => {
+    if (!demoMode?.enabled || concluido || demoRan.current) return
+    if (gpsPermissao === 'checking') return
+    demoRan.current = true
+
+    const profile = resolveDemoProfile(schema.id)
+    const vehicleFields = resolveDemoVehicleFields(schema.id)
+    const speed = demoMode.speedFactor
+    let cancelled = false
+    const timers: ReturnType<typeof setTimeout>[] = []
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        timers.push(setTimeout(resolve, demoDelay(ms, speed)))
+      })
+
+    const typeField = async (fieldId: string, value: string) => {
+      for (let i = 1; i <= value.length; i++) {
+        if (cancelled) return
+        const partial = value.slice(0, i)
+        setDadosVeiculo((prev) => ({ ...prev, [fieldId]: partial }))
+        await wait(DEMO_TIMING.fieldChar)
+      }
+      await wait(DEMO_TIMING.fieldPause)
+    }
+
+    void (async () => {
+      await wait(DEMO_TIMING.formStart)
+
+      const fieldOrder = (schema.camposExtras ?? []).map((c) => c.id)
+      for (const fieldId of fieldOrder) {
+        if (cancelled) return
+        const value = fieldId === 'localidade' ? profile.localidade : (vehicleFields as Record<string, string>)[fieldId]
+        if (!value) continue
+        await typeField(fieldId, value)
+      }
+
+      await wait(DEMO_TIMING.supervisorPause)
+      if (cancelled) return
+      setSupervisor(profile.supervisor)
+
+      for (const item of todosItens) {
+        if (cancelled) return
+        itemRefs.current[item.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setItemDestacado(item.id)
+        await wait(DEMO_TIMING.itemScroll)
+        if (cancelled) return
+        setRespostas((prev) => ({ ...prev, [item.id]: 'c' }))
+        await wait(DEMO_TIMING.itemAnswer)
+        setItemDestacado(null)
+      }
+
+      await wait(DEMO_TIMING.beforeSubmit)
+      if (cancelled) return
+      setEnviando(true)
+      await wait(DEMO_TIMING.submitting)
+      if (cancelled) return
+
+      setResultadoFinal({
+        ncCount: 0,
+        ncImperativos: 0,
+        itensNc: [],
+        offline: false,
+        nomeSupervisor: profile.supervisor,
+        veiculo: formatPlaca(vehicleFields.placa),
+        fotosPreview: [],
+        fotosUrls: [],
+        problemas: '',
+        descricaoProblema: '',
+      })
+      clearFormDraft()
+      onConcluido?.()
+      setConcluido(true)
+      setEnviando(false)
+    })()
+
+    return () => {
+      cancelled = true
+      timers.forEach(clearTimeout)
+    }
+  }, [demoMode, concluido, gpsPermissao, schema.id, schema.camposExtras, todosItens, onConcluido])
 
   useEffect(() => {
     const bump = () => setFleetTick((t) => t + 1)
@@ -1232,6 +1348,7 @@ function FormularioChecklist({
 
   const handleEnviar = async () => {
     if (!podEnviar) return
+    if (demoMode?.enabled) return
     setEnviando(true)
     setErroEnvio('')
 
@@ -1389,7 +1506,7 @@ function FormularioChecklist({
       </header>
 
       <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
-        <SyncStatus />
+        {!hideSync && <SyncStatus />}
 
         {/* ── Legenda C / NC / NA ──────────────────────────────────── */}
         <div className={`overflow-hidden rounded-2xl ${CGB_CARD}`}>
@@ -1980,49 +2097,108 @@ function clearDraftSession() {
   catch { /* sem acesso */ }
 }
 
-export function ChecklistPublicoPage() {
-  const draft = readDraftSession()
+export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolean } = {}) {
+  const [searchParams] = useSearchParams()
+  const isDemo = forceDemo || searchParams.get('demo') === '1'
+  const withFrame = forceDemo || searchParams.get('frame') !== '0'
+  const loop = searchParams.get('loop') === '1'
+  const speedFactor = Math.max(0.25, Number(searchParams.get('speed') ?? '1') || 1)
+  const tipoParam = searchParams.get('tipo')
+
+  const draft = isDemo ? null : readDraftSession()
   const [tipoSelecionado, setTipoSelecionado] = useState<string | null>(draft?.tipo ?? null)
   const [operador, setOperador]   = useState<string | null>(draft?.operador ?? null)
   const [matricula, setMatricula] = useState<string | null>(draft?.matricula ?? null)
+  const [demoConcluido, setDemoConcluido] = useState(false)
+  const [demoKey, setDemoKey] = useState(0)
 
-  const handleTipo = (tipo: string) => {
+  const handleDemoRestart = useCallback(() => {
+    clearDraftSession()
+    clearFormDraft()
+    setTipoSelecionado(null)
+    setOperador(null)
+    setMatricula(null)
+    setDemoConcluido(false)
+    setDemoKey((k) => k + 1)
+  }, [])
+
+  const handleTipo = useCallback((tipo: string) => {
     setTipoSelecionado(tipo)
-    if (operador && matricula) writeDraftSession(tipo, operador, matricula)
-  }
+    if (!isDemo && operador && matricula) writeDraftSession(tipo, operador, matricula)
+  }, [isDemo, operador, matricula])
 
-  const handleOperador = (nome: string, mat: string) => {
+  const handleOperador = useCallback((nome: string, mat: string) => {
     setOperador(nome)
     setMatricula(mat)
-    if (tipoSelecionado) writeDraftSession(tipoSelecionado, nome, mat)
-  }
+    if (!isDemo && tipoSelecionado) writeDraftSession(tipoSelecionado, nome, mat)
+  }, [isDemo, tipoSelecionado])
+
+  const demo = useChecklistDemoPlayer({
+    enabled: isDemo,
+    speedFactor,
+    tipoOverride: tipoParam,
+    loop,
+    hasTipo: !!tipoSelecionado,
+    hasOperador: !!(operador && matricula),
+    isConcluido: demoConcluido,
+    onSelectTipo: handleTipo,
+    onConfirmOperador: handleOperador,
+    onRestart: handleDemoRestart,
+  })
+
+  useEffect(() => {
+    if (!isDemo) return
+    clearDraftSession()
+    clearFormDraft()
+  }, [isDemo, demoKey])
+
+  let content: React.ReactNode
 
   if (!tipoSelecionado) {
-    return <TelaEscolhaChecklist onSelecionar={handleTipo} />
-  }
-
-  const schema = SCHEMA_MAP[tipoSelecionado]
-  if (!schema) {
-    return <Navigate to="/checklist" replace />
-  }
-
-  if (!operador || !matricula) {
-    return (
-      <TelaIdentificacao
-        schema={schema}
-        onConfirmar={handleOperador}
-        onVoltar={() => setTipoSelecionado(null)}
+    content = (
+      <TelaEscolhaChecklist
+        onSelecionar={handleTipo}
+        highlightTipo={isDemo ? demo.highlightTipo : null}
+        hideSync={isDemo}
       />
     )
+  } else {
+    const schema = SCHEMA_MAP[tipoSelecionado]
+    if (!schema) {
+      content = <Navigate to="/checklist" replace />
+    } else if (!operador || !matricula) {
+      content = (
+        <TelaIdentificacao
+          schema={schema}
+          onConfirmar={handleOperador}
+          onVoltar={() => setTipoSelecionado(null)}
+          demoNome={isDemo ? demo.demoNome : undefined}
+          demoMatricula={isDemo ? demo.demoMatricula : undefined}
+          pulseSubmit={isDemo ? demo.pulseSubmit : false}
+        />
+      )
+    } else {
+      content = (
+        <FormularioChecklist
+          key={isDemo ? `${tipoSelecionado}-${demoKey}` : tipoSelecionado}
+          schema={schema}
+          operador={operador}
+          matricula={matricula}
+          onConcluido={() => {
+            if (isDemo) setDemoConcluido(true)
+            else clearDraftSession()
+          }}
+          onVoltar={isDemo ? undefined : () => { setOperador(''); setMatricula('') }}
+          demoMode={isDemo ? { enabled: true, speedFactor } : undefined}
+          hideSync={isDemo}
+        />
+      )
+    }
   }
 
-  return (
-    <FormularioChecklist
-      schema={schema}
-      operador={operador}
-      matricula={matricula}
-      onConcluido={clearDraftSession}
-      onVoltar={() => { setOperador(''); setMatricula('') }}
-    />
-  )
+  if (isDemo && withFrame) {
+    return <ChecklistPhoneFrame key={demoKey}>{content}</ChecklistPhoneFrame>
+  }
+
+  return <>{content}</>
 }

@@ -1,0 +1,78 @@
+import { getDisplayedFleetVehicles, formatPlaca } from '../frota/vehicleRegistry'
+
+export type ChecklistDemoProfile = {
+  tipo: string
+  operador: string
+  matricula: string
+  supervisor: string
+  localidade: string
+  km: string
+}
+
+const DEMO_DEFAULTS: ChecklistDemoProfile = {
+  tipo: 'veiculo-leve',
+  operador: 'Carlos Mendes',
+  matricula: '1024',
+  supervisor: 'JOSIEL MENESES DOS SANTOS',
+  localidade: 'Presidente Dutra - MA',
+  km: '45280',
+}
+
+export function resolveDemoProfile(tipoOverride?: string | null): ChecklistDemoProfile {
+  const tipo = tipoOverride?.trim() || DEMO_DEFAULTS.tipo
+  const vehicle = getDisplayedFleetVehicles().find(
+    (v) => v.status === 'ATIVO' && (tipo !== 'veiculo-leve' || v.tipo === 'VEICULOS LEVES'),
+  )
+
+  return {
+    ...DEMO_DEFAULTS,
+    tipo,
+    localidade: vehicle?.base?.trim() || DEMO_DEFAULTS.localidade,
+  }
+}
+
+export function resolveDemoVehicleFields(tipo: string) {
+  const vehicle = getDisplayedFleetVehicles().find(
+    (v) => v.status === 'ATIVO' && (tipo !== 'veiculo-leve' || v.tipo === 'VEICULOS LEVES'),
+  )
+
+  if (!vehicle) {
+    return {
+      placa: 'ABC1D23',
+      marca_modelo: 'VW/GOL',
+      km_atual: DEMO_DEFAULTS.km,
+      prefixo: 'BDC101',
+      localidade: DEMO_DEFAULTS.localidade,
+    }
+  }
+
+  return {
+    placa: formatPlaca(vehicle.placa),
+    marca_modelo: vehicle.modelo,
+    km_atual: DEMO_DEFAULTS.km,
+    prefixo: vehicle.prefixo && vehicle.prefixo !== 'N/A' ? vehicle.prefixo : '—',
+    localidade: vehicle.base?.trim() || DEMO_DEFAULTS.localidade,
+  }
+}
+
+/** ms base — dividido pelo fator de velocidade em tempo de execução */
+export const DEMO_TIMING = {
+  selectPause: 1800,
+  selectHighlight: 700,
+  identifyChar: 55,
+  identifyPause: 400,
+  identifySubmit: 600,
+  formStart: 500,
+  fieldChar: 35,
+  fieldPause: 280,
+  supervisorPause: 500,
+  itemScroll: 380,
+  itemAnswer: 220,
+  beforeSubmit: 700,
+  submitting: 1400,
+  conclusionHold: 4500,
+} as const
+
+export function demoDelay(ms: number, speedFactor: number): number {
+  return Math.max(16, Math.round(ms / speedFactor))
+}

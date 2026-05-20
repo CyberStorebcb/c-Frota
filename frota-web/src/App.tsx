@@ -76,6 +76,7 @@ export default function App() {
         <Route path="/registro" element={<LazyRegistroRoute />} />
         {/* Link público único para motoristas preencherem checklists */}
         <Route path="/checklist" element={<ChecklistPublicoPage />} />
+        <Route path="/checklist/demo" element={<ChecklistPublicoPage forceDemo />} />
         {/* Links antigos por tipo agora voltam para o fluxo único */}
         <Route path="/checklist/:tipo" element={<Navigate to="/checklist" replace />} />
 
