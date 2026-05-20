@@ -134,7 +134,9 @@ export function useChecklistNotifications(allVehicles: FleetVehicle[]) {
 
     void check()
     return () => clearTimeout(timer)
-  }, [])
+  // allVehicles na dep array: se a frota carrega após o mount, recalcula o total corretamente
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allVehicles])
 
   return { notifications, unreadCount, markAllRead, markRead }
 }
