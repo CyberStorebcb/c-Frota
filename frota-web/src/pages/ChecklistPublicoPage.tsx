@@ -863,7 +863,9 @@ function FormularioChecklist({
   const [localidadeGeoErro, setLocalidadeGeoErro] = useState('')
   const [localidadeCoords, setLocalidadeCoords] = useState<{ lat: number; lng: number } | null>(draft?.localidadeCoords ?? null)
   const [localidadeAccuracy, setLocalidadeAccuracy] = useState<number | null>(null)
-  const [gpsPermissao, setGpsPermissao] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking')
+  const [gpsPermissao, setGpsPermissao] = useState<'prompt' | 'granted' | 'denied' | 'checking'>(
+    demoMode?.enabled ? 'granted' : 'checking'
+  )
   const [gpsGuiaAberto, setGpsGuiaAberto] = useState(false)
   const [gpsErroCodigo, setGpsErroCodigo] = useState<1 | 2 | 3 | null>(null)
   const [dataInspecao] = useState(draft?.dataInspecao ?? new Date().toISOString().split('T')[0] ?? '')
@@ -954,25 +956,46 @@ function FormularioChecklist({
         timers.push(setTimeout(resolve, demoDelay(ms, speed)))
       })
 
+    // Campos de texto: efeito de digitação caractere a caractere
     const typeField = async (fieldId: string, value: string) => {
       for (let i = 1; i <= value.length; i++) {
         if (cancelled) return
-        const partial = value.slice(0, i)
-        setDadosVeiculo((prev) => ({ ...prev, [fieldId]: partial }))
+        setDadosVeiculo((prev) => ({ ...prev, [fieldId]: value.slice(0, i) }))
         await wait(DEMO_TIMING.fieldChar)
       }
+      await wait(DEMO_TIMING.fieldPause)
+    }
+
+    // Campos select: preenche de uma vez com pausa visual (sem digitação)
+    const fillSelect = async (fieldId: string, value: string) => {
+      if (cancelled) return
+      setDadosVeiculo((prev) => ({ ...prev, [fieldId]: value }))
       await wait(DEMO_TIMING.fieldPause)
     }
 
     void (async () => {
       await wait(DEMO_TIMING.formStart)
 
-      const fieldOrder = (schema.camposExtras ?? []).map((c) => c.id)
-      for (const fieldId of fieldOrder) {
+      // Placa: usa selecionarPlacaSugestao para preencher placa + marca_modelo juntos
+      if (cancelled) return
+      const placaNorm = normalizePlaca(vehicleFields.placa)
+      selecionarPlacaSugestao(placaNorm)
+      await wait(DEMO_TIMING.fieldPause * 2)
+
+      // Demais campos na ordem do schema, pulando placa e marca_modelo (já preenchidos)
+      const campos = schema.camposExtras ?? []
+      for (const campo of campos) {
         if (cancelled) return
-        const value = fieldId === 'localidade' ? profile.localidade : (vehicleFields as Record<string, string>)[fieldId]
+        if (campo.id === 'placa' || campo.id === 'marca_modelo') continue
+        const value = campo.id === 'localidade'
+          ? profile.localidade
+          : (vehicleFields as Record<string, string>)[campo.id] ?? ''
         if (!value) continue
-        await typeField(fieldId, value)
+        if (campo.tipo === 'select') {
+          await fillSelect(campo.id, value)
+        } else {
+          await typeField(campo.id, value)
+        }
       }
 
       await wait(DEMO_TIMING.supervisorPause)
@@ -1018,7 +1041,7 @@ function FormularioChecklist({
       cancelled = true
       timers.forEach(clearTimeout)
     }
-  }, [demoMode, concluido, gpsPermissao, schema.id, schema.camposExtras, todosItens, onConcluido])
+  }, [demoMode, concluido, gpsPermissao, schema.id, schema.camposExtras, todosItens, onConcluido, selecionarPlacaSugestao])
 
   useEffect(() => {
     const bump = () => setFleetTick((t) => t + 1)
@@ -2197,8 +2220,53 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   }
 
   if (isDemo && withFrame) {
-    return <ChecklistPhoneFrame key={demoKey}>{content}</ChecklistPhoneFrame>
+    return (
+      <ChecklistPhoneFrame key={demoKey}>
+        <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
+        {content}
+      </ChecklistPhoneFrame>
+    )
+  }
+
+  if (isDemo) {
+    return (
+      <>
+        <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
+        {content}
+      </>
+    )
   }
 
   return <>{content}</>
+}
+
+function ChecklistDemoBanner({
+  phase,
+  onRestart,
+}: {
+  phase: string
+  onRestart: () => void
+}) {
+  const labels: Record<string, string> = {
+    select: 'Escolhendo checklist…',
+    identify: 'Identificação…',
+    form: 'Preenchendo formulário…',
+    done: 'Concluído!',
+  }
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[100] flex justify-center p-3">
+      <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#0b1020]/95 px-4 py-2 text-xs font-bold text-white shadow-lg ring-1 ring-white/15 backdrop-blur-sm">
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+        <span>Modo vídeo — {labels[phase] ?? phase}</span>
+        <button
+          type="button"
+          onClick={onRestart}
+          className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide transition hover:bg-white/20"
+        >
+          Reiniciar
+        </button>
+      </div>
+    </div>
+  )
 }
