@@ -688,6 +688,7 @@ export function ManagePage() {
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
           <button
             type="button"
+            data-tour="manage-filtros-btn"
             onClick={() => setFiltrosVisiveis((v) => {
               const next = !v
               try { localStorage.setItem('frota.filtros.manage', String(next)) } catch { /* ignore */ }

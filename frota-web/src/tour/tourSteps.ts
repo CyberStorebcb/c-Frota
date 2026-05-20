@@ -92,10 +92,10 @@ export const TOUR_STEPS: TourStep[] = [
   {
     path: '/gerenciar',
     area: 'Gerenciar',
-    selector: '[data-tour="manage-filtros"]',
+    selector: '[data-tour="manage-filtros-btn"]',
     title: '🔍 Filtros Avançados',
     content:
-      'Filtre por veículo, base, supervisor, gerência e intervalo de datas. Os filtros ativos são destacados e podem ser limpos de uma só vez.',
+      'Clique em "Mostrar filtros" para filtrar por veículo, base, supervisor, gerência e intervalo de datas. Os filtros ativos são destacados e podem ser limpos de uma só vez.',
     placement: 'bottom',
   },
   {
