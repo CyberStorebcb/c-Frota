@@ -36,6 +36,7 @@ let ambientBuffer: AudioBuffer | null = null
 let ambientSource: AudioBufferSourceNode | null = null
 let voiceSource: AudioBufferSourceNode | null = null
 let ambientActive = false
+let stopGeneration = 0  // incrementado a cada stop; startAmbientBed verifica antes de prosseguir
 
 export function configureDemoNarrator(partial: Partial<NarratorConfig>) {
   config = { ...config, ...partial }
@@ -133,11 +134,15 @@ async function startAmbientBed() {
   if (!config.enabled || !unlocked) return
   if (ambientActive) return
 
+  const genAtStart = stopGeneration
+
   const ctx = await ensureAudioGraph()
   if (!ctx || !ambientGain) return
+  if (stopGeneration !== genAtStart) return  // stop foi chamado durante o await
 
   const buffer = await fetchAmbientBuffer(ctx)
   if (!buffer) return
+  if (stopGeneration !== genAtStart) return  // stop foi chamado durante o fetch/decode
 
   teardownAmbientSource()
 
@@ -156,6 +161,8 @@ async function startAmbientBed() {
 }
 
 function stopAmbientBed() {
+  const gen = ++stopGeneration
+
   if (!ambientActive || !ambientGain || !audioCtx) {
     teardownAmbientSource()
     return
@@ -168,7 +175,7 @@ function stopAmbientBed() {
   ambientGain.gain.linearRampToValueAtTime(0, now + AMBIENT_FADE_OUT_SEC)
 
   window.setTimeout(() => {
-    if (ambientActive) teardownAmbientSource()
+    if (gen === stopGeneration && ambientActive) teardownAmbientSource()
   }, AMBIENT_FADE_OUT_SEC * 1000 + 50)
 }
 

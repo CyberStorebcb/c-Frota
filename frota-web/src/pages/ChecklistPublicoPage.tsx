@@ -2600,8 +2600,10 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
 
   useEffect(() => {
     configureDemoNarrator({ enabled: isDemo && narrationEnabled, speedFactor })
-    return () => stopDemoNarration()
   }, [isDemo, narrationEnabled, speedFactor])
+
+  // Para o áudio apenas quando o componente desmonta de verdade
+  useEffect(() => () => stopDemoNarration(), [])
 
   const handleStartDemo = useCallback(() => {
     void unlockDemoNarrator().then(() => setDemoStarted(true))
