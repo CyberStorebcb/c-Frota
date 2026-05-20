@@ -4,6 +4,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import { ChecklistPhoneFrame } from '../components/checklist/ChecklistPhoneFrame'
 import { DemoCursor } from '../components/checklist/DemoCursor'
 import { DEMO_TIMING, demoDelay, resolveDemoProfile, resolveDemoVehicleFields } from '../checklists/checklistDemoConfig'
+import { configureDemoNarrator, finishDemoNarration, isDemoNarratorUnlocked, narrateDemoStep, stopDemoNarration, unlockDemoNarrator } from '../checklists/demoNarrator'
 import { useChecklistDemoPlayer } from '../checklists/useChecklistDemoPlayer'
 import {
   AlertTriangle,
@@ -307,9 +308,16 @@ function TelaIdentificacao({
 }
 
 function scrollChecklistViewportToTop() {
-  const scroller = document.querySelector('.overscroll-contain') as HTMLElement | null
+  const scroller = document.querySelector('.checklist-phone-scroll, .overscroll-contain') as HTMLElement | null
   if (scroller) scroller.scrollTo({ top: 0, behavior: 'instant' })
   else window.scrollTo({ top: 0, behavior: 'instant' })
+}
+
+function checklistPortalRoot(embeddedInFrame?: boolean) {
+  if (embeddedInFrame) {
+    return document.getElementById('checklist-phone-screen') ?? document.body
+  }
+  return document.body
 }
 
 // ---------------------------------------------------------------------------
@@ -378,8 +386,8 @@ function TelaConclusao({
   return (
     <>
     <div
-      className={`flex flex-col items-center justify-start bg-slate-50 px-4 dark:bg-slate-950 ${
-        embeddedInFrame ? 'min-h-full py-4 pt-8' : 'min-h-dvh py-10'
+      className={`flex flex-col items-center justify-start bg-slate-50 px-3 dark:bg-slate-950 sm:px-4 ${
+        embeddedInFrame ? 'min-h-full overflow-x-hidden py-4 pt-12' : 'min-h-dvh overflow-x-hidden py-10'
       }`}
       style={
         embeddedInFrame
@@ -540,11 +548,12 @@ function TelaConclusao({
 
     {isDemo && demoWhatsappOpen && createPortal(
       <div
-        className="fixed inset-0 z-[99999] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+        data-demo-whatsapp-modal
+        className={`${embeddedInFrame ? 'absolute' : 'fixed'} inset-0 z-[99999] flex items-end justify-center bg-black/60 p-3 backdrop-blur-sm sm:items-center sm:p-4`}
         onClick={() => setDemoWhatsappOpen(false)}
       >
         <div
-          className="w-full max-w-sm overflow-hidden rounded-3xl bg-[#ECE5DD] shadow-2xl"
+          className="flex max-h-[min(88dvh,100%)] w-full max-w-sm flex-col overflow-hidden rounded-3xl bg-[#ECE5DD] shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Cabeçalho estilo WhatsApp */}
@@ -562,7 +571,7 @@ function TelaConclusao({
           </div>
 
           {/* Balão de mensagem */}
-          <div className="max-h-[60vh] overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-[#DCF8C6] px-4 py-3 shadow-sm">
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">
                 {[
@@ -598,7 +607,7 @@ function TelaConclusao({
           </div>
         </div>
       </div>,
-      document.body
+      checklistPortalRoot(embeddedInFrame),
     )}
     </>
   )
@@ -860,22 +869,22 @@ const ItemChecklist = memo(function ItemChecklist({
   return (
     <div
       ref={itemRef}
-      className={`px-4 py-3 transition-colors duration-300 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800/80' : ''} ${bgClass}`}
+      className={`px-3 py-2.5 transition-colors duration-300 sm:px-4 sm:py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-800/80' : ''} ${bgClass}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-2 pt-0.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-2 pt-0.5">
           <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-extrabold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
             {numero}
           </span>
           {item.imperativo && (
             <span className="shrink-0 text-sm leading-tight" title="Item impeditivo — NC impede condução">🚫</span>
           )}
-          <span className="text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
+          <span className="break-words text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
             {item.label}
           </span>
         </div>
 
-        <div className="flex shrink-0 gap-1.5">
+        <div className="flex shrink-0 gap-1 self-end sm:gap-1.5">
           {([
             { valor: 'c'  as const, label: 'C',  activeClass: 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-200 shadow-sm' },
             { valor: 'nc' as const, label: 'NC', activeClass: 'bg-rose-500 border-rose-500 text-white shadow-rose-200 shadow-sm' },
@@ -887,7 +896,7 @@ const ItemChecklist = memo(function ItemChecklist({
               data-demo-item={valor === 'c' ? item.id : undefined}
               data-demo-item-nc={valor === 'nc' ? item.id : undefined}
               onClick={() => onResposta(item.id, valor)}
-              className={`flex h-11 w-14 items-center justify-center rounded-xl border-2 text-xs font-extrabold transition-all active:scale-95 sm:w-16 ${
+              className={`flex h-9 w-10 items-center justify-center rounded-xl border-2 text-[11px] font-extrabold transition-all active:scale-95 sm:h-11 sm:w-14 md:w-16 ${
                 resp === valor
                   ? activeClass
                   : 'border-slate-200 bg-white/70 text-slate-400 hover:border-[#b51649]/40 hover:text-[#7f1022] dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-500 dark:hover:border-rose-400/40 dark:hover:text-rose-200'
@@ -1177,8 +1186,28 @@ function FormularioChecklist({
     // Tempo para o cursor percorrer a animação CSS (450ms) + margem
     const CURSOR_TRAVEL = 520
 
+    const scrollTo = (selector: string) => {
+      onCursorTargetRef.current?.(null)
+      const scroller = document.querySelector('.checklist-phone-scroll, .overscroll-contain') as HTMLElement | null
+      const root = scroller ?? document.body
+      const el = root.querySelector(selector) as HTMLElement | null
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+
+    const waitForSelector = async (selector: string, maxMs = 4000) => {
+      const started = Date.now()
+      while (Date.now() - started < maxMs) {
+        if (!demoActiveRef.current) return false
+        if (document.querySelector(selector)) return true
+        await wait(80)
+      }
+      return false
+    }
+
     // Campos de texto: cursor move → aguarda chegada → digita caractere a caractere
     const typeField = async (fieldId: string, value: string, setter?: (v: string) => void) => {
+      scrollTo(`[data-demo-form-field="${fieldId}"]`)
+      await wait(DEMO_TIMING.itemScroll)
       onCursorTargetRef.current?.({ selector: `[data-demo-form-field="${fieldId}"]`, tap: true, key: `field-${fieldId}` })
       await wait(CURSOR_TRAVEL) // espera o cursor chegar antes de começar
       for (let i = 1; i <= value.length; i++) {
@@ -1193,6 +1222,8 @@ function FormularioChecklist({
     // Campos select: cursor move → aguarda chegada → preenche de uma vez
     const fillSelect = async (fieldId: string, value: string) => {
       if (!demoActiveRef.current) return
+      scrollTo(`[data-demo-form-field="${fieldId}"]`)
+      await wait(DEMO_TIMING.itemScroll)
       onCursorTargetRef.current?.({ selector: `[data-demo-form-field="${fieldId}"]`, tap: true, key: `field-${fieldId}` })
       await wait(CURSOR_TRAVEL) // espera o cursor chegar antes de preencher
       if (!demoActiveRef.current) return
@@ -1203,6 +1234,9 @@ function FormularioChecklist({
     void (async () => {
       // Aguarda React terminar os remounts da transição identify→form (pode levar ~1s)
       await wait(Math.max(DEMO_TIMING.formStart, 1500))
+
+      await narrateDemoStep('dados-veiculo')
+      if (!demoActiveRef.current) return
 
       // Placa: cursor + preenche placa + marca_modelo juntos
       if (!demoActiveRef.current) return
@@ -1256,7 +1290,12 @@ function FormularioChecklist({
         }
       }
 
-      // Supervisor: cursor no campo → digita "Italo" → sugestão aparece → cursor clica nela
+      // Supervisor: rola até o campo → cursor → digita → seleciona sugestão
+      if (!demoActiveRef.current) return
+      await narrateDemoStep('supervisor')
+      if (!demoActiveRef.current) return
+      scrollTo('[data-demo-form-field="supervisor"]')
+      await wait(DEMO_TIMING.itemScroll)
       if (!demoActiveRef.current) return
       await wait(DEMO_TIMING.supervisorPause)
       if (!demoActiveRef.current) return
@@ -1271,8 +1310,8 @@ function FormularioChecklist({
         setSupervisor(supervisorQuery.slice(0, i))
         await wait(DEMO_TIMING.identifyChar * 1.5)
       }
-      // Aguarda o portal renderizar com a sugestão filtrada
-      await wait(400)
+      // Aguarda o portal renderizar com a sugestão filtrada (campo visível na tela)
+      await wait(DEMO_TIMING.itemScroll)
       if (!demoActiveRef.current) return
       // Cursor vai até a sugestão no dropdown (portal no body)
       const NOME_COMPLETO = 'ITALO BRUNO DA SILVA FONTES'
@@ -1310,6 +1349,9 @@ function FormularioChecklist({
 
       let demoNcItem: (typeof demoItens)[number] | null = null
 
+      await narrateDemoStep('itens-intro')
+      if (!demoActiveRef.current) return
+
       for (let idx = 0; idx < demoItens.length; idx++) {
         const item = demoItens[idx]!
         if (!demoActiveRef.current) return
@@ -1321,6 +1363,8 @@ function FormularioChecklist({
 
         if (idx === DEMO_NC_INDEX) {
           // Item NC imperativo: cursor no botão NC → espera chegar → marca NC
+          await narrateDemoStep('item-nc-imperativo')
+          if (!demoActiveRef.current) return
           demoNcItem = item
           onCursorTargetRef.current?.({ selector: `[data-demo-item-nc="${item.id}"]`, tap: true, key: `nc-${item.id}` })
           await wait(CURSOR_TRAVEL)
@@ -1355,16 +1399,9 @@ function FormularioChecklist({
       }
       onCursorTargetRef.current?.(null)
 
-      // Helper: scrolla um elemento visível para o centro da tela
-      const scrollTo = (selector: string) => {
-        onCursorTargetRef.current?.(null)
-        const scroller = document.querySelector('.overscroll-contain') as HTMLElement | null
-        const root = scroller ?? document.body
-        const el = root.querySelector(selector) as HTMLElement | null
-        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-
       // Problemas adicionais (scroll + cursor + digitação)
+      if (!demoActiveRef.current) return
+      await narrateDemoStep('problemas')
       if (!demoActiveRef.current) return
       scrollTo('[data-demo-form-field="problemas"]')
       await wait(DEMO_TIMING.itemScroll)
@@ -1372,6 +1409,8 @@ function FormularioChecklist({
       if (!demoActiveRef.current) return
 
       // NR12: scroll até o botão → cursor → arquivo aparece
+      await narrateDemoStep('evidencia-nr12')
+      if (!demoActiveRef.current) return
       scrollTo('[data-demo-form-field="nr12"]')
       await wait(DEMO_TIMING.itemScroll)
       if (!demoActiveRef.current) return
@@ -1383,6 +1422,8 @@ function FormularioChecklist({
       await wait(DEMO_TIMING.fieldPause * 2)
 
       // Botão Enviar: scroll até ele → cursor → clique → loading
+      if (!demoActiveRef.current) return
+      await narrateDemoStep('enviar')
       if (!demoActiveRef.current) return
       scrollTo('[data-demo-form-field="enviar"]')
       await wait(DEMO_TIMING.itemScroll)
@@ -1411,21 +1452,36 @@ function FormularioChecklist({
         descricaoProblema: '',
       })
       clearFormDraft()
-      onConcluidoRef.current?.()
       setConcluido(true)
       setEnviando(false)
 
-      // Aguarda a tela final renderizar, rola ao topo e abre o modal WhatsApp
-      await wait(1400)
+      // Tela final → abre WhatsApp → narração → só então marca demo concluído (evita loop cortar)
+      await wait(DEMO_TIMING.conclusionScreen)
       if (!demoActiveRef.current) return
       scrollChecklistViewportToTop()
-      await wait(500)
+      await wait(DEMO_TIMING.itemScroll)
+      if (!demoActiveRef.current) return
+
+      await waitForSelector('[data-demo-whatsapp-btn]')
       if (!demoActiveRef.current) return
       onCursorTargetRef.current?.({ selector: '[data-demo-whatsapp-btn]', tap: true, key: 'whatsapp-btn' })
       await wait(CURSOR_TRAVEL)
       if (!demoActiveRef.current) return
       onCursorTargetRef.current?.(null)
       setDemoAutoWhatsapp(true)
+
+      await wait(DEMO_TIMING.conclusionWhatsappOpen)
+      if (!demoActiveRef.current) return
+      await waitForSelector('[data-demo-whatsapp-modal]')
+      if (!demoActiveRef.current) return
+
+      await narrateDemoStep('conclusao-whatsapp')
+      if (!demoActiveRef.current) return
+      await wait(DEMO_TIMING.conclusionWhatsappHold)
+      if (!demoActiveRef.current) return
+
+      onConcluidoRef.current?.()
+      await finishDemoNarration()
     })()
 
     return () => {
@@ -1525,6 +1581,7 @@ function FormularioChecklist({
   )
   const evidenciaNr12Ok = !schema.temEvidencia || arquivos.length > 0
   const podEnviar = tudo100 && camposPreenchidos && evidenciaNr12Ok
+  const mostrarBarraEnvio = tudo100 || enviando
 
   // Mapa: itemId → número sequencial global (calculado uma vez)
   const numeroItemMap = useMemo(() => {
@@ -1871,11 +1928,14 @@ function FormularioChecklist({
   }
 
   return (
-    <div className={`min-h-dvh ${CHECKLIST_PAGE_BG}`} style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
+    <div
+      className={`${embeddedInFrame ? 'min-h-full overflow-x-hidden' : 'min-h-dvh overflow-x-hidden'} ${CHECKLIST_PAGE_BG}`}
+      style={mostrarBarraEnvio ? { paddingBottom: embeddedInFrame ? 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' : 'calc(5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+    >
 
       {/* ── Header fixo ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1020] px-4 py-3 text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] dark:bg-slate-950">
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1020] px-3 py-3 text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] dark:bg-slate-950 sm:px-4">
+        <div className={`mx-auto flex items-center gap-3 ${embeddedInFrame ? 'max-w-full' : 'max-w-2xl'}`}>
           {onVoltar ? (
             <button
               type="button"
@@ -1916,7 +1976,7 @@ function FormularioChecklist({
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+      <div className={`mx-auto space-y-4 px-3 pt-4 sm:px-4 ${embeddedInFrame ? 'max-w-full' : 'max-w-2xl'}`}>
         {!hideSync && <SyncStatus />}
 
         {/* ── Legenda C / NC / NA ──────────────────────────────────── */}
@@ -2303,11 +2363,11 @@ function FormularioChecklist({
               </div>
 
               {/* Rótulos das colunas */}
-              <div className="flex items-center justify-between border-b border-slate-100 bg-white/70 px-4 py-1.5 dark:border-slate-800 dark:bg-slate-900/30">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-white/70 px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900/30 sm:px-4">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#7f1022]/50 dark:text-rose-200/50">#  Item</span>
-                <div className="flex gap-2">
+                <div className="flex gap-1 sm:gap-2">
                   {['C', 'NC', 'NA'].map((l) => (
-                    <span key={l} className="w-14 text-center text-[10px] font-extrabold uppercase tracking-widest text-[#7f1022]/50 sm:w-16 dark:text-rose-200/50">
+                    <span key={l} className="w-10 text-center text-[10px] font-extrabold uppercase tracking-widest text-[#7f1022]/50 sm:w-14 md:w-16 dark:text-rose-200/50">
                       {l}
                     </span>
                   ))}
@@ -2448,9 +2508,13 @@ function FormularioChecklist({
 
       </div>
 
-      {/* ── Barra de envio fixa ──────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-[#0b1020] px-4 pt-3 text-white shadow-[0_-18px_45px_rgba(15,23,42,0.18)] dark:bg-slate-950" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+      {/* ── Barra de envio fixa (só após todos os itens respondidos) ─── */}
+      {mostrarBarraEnvio && (
+      <div
+        className={`${embeddedInFrame ? 'sticky' : 'fixed'} bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-[#0b1020] px-3 pt-3 text-white shadow-[0_-18px_45px_rgba(15,23,42,0.18)] dark:bg-slate-950 sm:px-4`}
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className={`mx-auto flex items-center justify-between gap-3 ${embeddedInFrame ? 'max-w-full' : 'max-w-2xl'}`}>
           <div className="min-w-0">
             {erroEnvio ? (
               <p className="text-sm font-extrabold text-rose-500">{erroEnvio}</p>
@@ -2489,6 +2553,7 @@ function FormularioChecklist({
           </button>
         </div>
       </div>
+      )}
     </div>
   )
 }
@@ -2523,6 +2588,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   const loop = searchParams.get('loop') === '1'
   const speedFactor = Math.max(0.25, Number(searchParams.get('speed') ?? '1') || 1)
   const tipoParam = searchParams.get('tipo')
+  const narrationEnabled = searchParams.get('narration') !== '0'
 
   const draft = isDemo ? null : readDraftSession()
   const [tipoSelecionado, setTipoSelecionado] = useState<string | null>(draft?.tipo ?? null)
@@ -2530,16 +2596,32 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   const [matricula, setMatricula] = useState<string | null>(draft?.matricula ?? null)
   const [demoConcluido, setDemoConcluido] = useState(false)
   const [demoKey, setDemoKey] = useState(0)
+  const [demoStarted, setDemoStarted] = useState(() => !isDemo || !narrationEnabled)
+
+  useEffect(() => {
+    configureDemoNarrator({ enabled: isDemo && narrationEnabled, speedFactor })
+    return () => stopDemoNarration()
+  }, [isDemo, narrationEnabled, speedFactor])
+
+  const handleStartDemo = useCallback(() => {
+    void unlockDemoNarrator().then(() => setDemoStarted(true))
+  }, [])
 
   const handleDemoRestart = useCallback(() => {
+    stopDemoNarration()
     clearDraftSession()
     clearFormDraft()
     setTipoSelecionado(null)
     setOperador(null)
     setMatricula(null)
     setDemoConcluido(false)
+    if (isDemoNarratorUnlocked() || !narrationEnabled) {
+      setDemoStarted(true)
+    } else {
+      setDemoStarted(false)
+    }
     setDemoKey((k) => k + 1)
-  }, [])
+  }, [narrationEnabled])
 
   const handleTipo = useCallback((tipo: string) => {
     setTipoSelecionado(tipo)
@@ -2556,7 +2638,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   }, [isDemo])
 
   const demo = useChecklistDemoPlayer({
-    enabled: isDemo,
+    enabled: isDemo && demoStarted,
     speedFactor,
     tipoOverride: tipoParam,
     loop,
@@ -2614,7 +2696,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
             else clearDraftSession()
           }}
           onVoltar={isDemo ? undefined : () => { setOperador(''); setMatricula('') }}
-          demoMode={isDemo ? { enabled: true, speedFactor } : undefined}
+          demoMode={isDemo && demoStarted ? { enabled: true, speedFactor } : undefined}
           onCursorTarget={isDemo ? demo.setCursorTarget : undefined}
           hideSync={isDemo}
           embeddedInFrame={embeddedInFrame}
@@ -2627,10 +2709,15 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
     return (
       <>
         <ChecklistPhoneFrame key={demoKey}>
+          {narrationEnabled && !demoStarted && (
+            <ChecklistDemoStartOverlay onStart={handleStartDemo} embeddedInFrame />
+          )}
+          {!demoStarted && (
+            <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} embeddedInFrame narrationEnabled={narrationEnabled} />
+          )}
           {content}
         </ChecklistPhoneFrame>
-        <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
-        <DemoCursor target={demo.cursorTarget} visible={isDemo} />
+        <DemoCursor target={demo.cursorTarget} visible={isDemo && demoStarted} />
       </>
     )
   }
@@ -2638,9 +2725,14 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   if (isDemo) {
     return (
       <>
-        <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
+        {narrationEnabled && !demoStarted && (
+          <ChecklistDemoStartOverlay onStart={handleStartDemo} />
+        )}
+        {!demoStarted && (
+          <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} narrationEnabled={narrationEnabled} />
+        )}
         {content}
-        <DemoCursor target={demo.cursorTarget} visible={isDemo} />
+        <DemoCursor target={demo.cursorTarget} visible={isDemo && demoStarted} />
       </>
     )
   }
@@ -2648,12 +2740,50 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   return <>{content}</>
 }
 
+function ChecklistDemoStartOverlay({
+  onStart,
+  embeddedInFrame = false,
+}: {
+  onStart: () => void
+  embeddedInFrame?: boolean
+}) {
+  return (
+    <div
+      className={`z-50 flex items-center justify-center bg-[#0b1020]/92 p-6 backdrop-blur-sm ${
+        embeddedInFrame ? 'absolute inset-0 rounded-[2.1rem]' : 'fixed inset-0'
+      }`}
+    >
+      <div className="max-w-xs text-center">
+        <p className="text-lg font-black text-white">Demo do Checklist</p>
+        <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-300">
+          Narração passo a passo sincronizada com o preenchimento automático.
+        </p>
+        <button
+          type="button"
+          onClick={onStart}
+          className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#c81e55] px-6 text-sm font-extrabold text-white shadow-lg transition hover:bg-[#a81848] active:scale-95"
+        >
+          <span aria-hidden>▶</span>
+          Iniciar com narração
+        </button>
+        <p className="mt-3 text-[11px] font-semibold text-slate-500">
+          Clique para liberar o áudio no navegador
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function ChecklistDemoBanner({
   phase,
   onRestart,
+  embeddedInFrame = false,
+  narrationEnabled = true,
 }: {
   phase: string
   onRestart: () => void
+  embeddedInFrame?: boolean
+  narrationEnabled?: boolean
 }) {
   const labels: Record<string, string> = {
     select: 'Escolhendo checklist…',
@@ -2663,14 +2793,19 @@ function ChecklistDemoBanner({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-[100] flex justify-center p-3">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#0b1020]/95 px-4 py-2 text-xs font-bold text-white shadow-lg ring-1 ring-white/15 backdrop-blur-sm">
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-        <span>Modo vídeo — {labels[phase] ?? phase}</span>
+    <div className={`pointer-events-none z-40 flex justify-center ${embeddedInFrame ? 'sticky top-0 p-2 pt-9' : 'fixed inset-x-0 top-0 p-3'}`}>
+      <div className="pointer-events-auto flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full bg-[#0b1020]/95 px-3 py-1.5 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/15 backdrop-blur-sm sm:gap-3 sm:px-4 sm:py-2 sm:text-xs">
+        <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400" />
+        <span className="truncate">Modo vídeo — {labels[phase] ?? phase}</span>
+        {narrationEnabled && (
+          <span className="hidden shrink-0 text-[9px] font-bold uppercase tracking-wide text-emerald-400/90 sm:inline">
+            🔊 Narração
+          </span>
+        )}
         <button
           type="button"
           onClick={onRestart}
-          className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide transition hover:bg-white/20"
+          className="shrink-0 rounded-full bg-white/10 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wide transition hover:bg-white/20 sm:px-2.5 sm:text-[10px]"
         >
           Reiniciar
         </button>

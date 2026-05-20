@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { DEMO_TIMING, demoDelay, resolveDemoProfile, type ChecklistDemoProfile } from './checklistDemoConfig'
+import { narrateDemoStep } from './demoNarrator'
 import type { DemoCursorTarget } from '../components/checklist/DemoCursor'
 
 export type ChecklistDemoPhase = 'select' | 'identify' | 'form' | 'done'
@@ -63,6 +64,8 @@ export function useChecklistDemoPlayer({
       })
 
     void (async () => {
+      await narrateDemoStep('select-checklist')
+      if (cancelled) return
       await wait(DEMO_TIMING.selectPause)
       if (cancelled) return
       setHighlightTipo(profile.tipo)
@@ -105,6 +108,8 @@ export function useChecklistDemoPlayer({
       })
 
     void (async () => {
+      await narrateDemoStep('identify')
+      if (cancelled) return
       // Cursor vai para campo nome
       setCursorTarget({ selector: '[data-demo-field="nome"]', tap: true, key: 'id-nome' })
       await wait(DEMO_TIMING.identifyChar * 3)

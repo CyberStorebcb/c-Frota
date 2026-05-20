@@ -87,6 +87,12 @@ export const DEMO_TIMING = {
   itemAnswer: 220,
   beforeSubmit: 700,
   submitting: 1400,
+  /** Tela de conclusão renderizada antes de abrir o WhatsApp */
+  conclusionScreen: 1200,
+  /** Modal WhatsApp visível antes da narração final */
+  conclusionWhatsappOpen: 900,
+  /** Tempo para ler a mensagem no modal antes de encerrar o demo */
+  conclusionWhatsappHold: 6500,
   conclusionHold: 4500,
 } as const
 

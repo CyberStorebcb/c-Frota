@@ -11,7 +11,7 @@ type Pos = { x: number; y: number }
 function getCenter(selector: string): Pos | null {
   // Procura dentro do scroll container do phone frame primeiro, depois no body
   // (necessário para portais como o dropdown de supervisor)
-  const scroller = document.querySelector('.overscroll-contain') as HTMLElement | null
+  const scroller = document.querySelector('.checklist-phone-scroll, .overscroll-contain') as HTMLElement | null
   const el = (scroller?.querySelector(selector) ?? document.body.querySelector(selector)) as HTMLElement | null
   if (!el) return null
   const r = el.getBoundingClientRect()
