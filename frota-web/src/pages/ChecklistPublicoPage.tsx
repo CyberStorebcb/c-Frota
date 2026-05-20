@@ -976,10 +976,15 @@ function FormularioChecklist({
     void (async () => {
       await wait(DEMO_TIMING.formStart)
 
-      // Placa: usa selecionarPlacaSugestao para preencher placa + marca_modelo juntos
+      // Placa: preenche placa + marca_modelo juntos (mesmo comportamento do autocomplete)
       if (cancelled) return
       const placaNorm = normalizePlaca(vehicleFields.placa)
-      selecionarPlacaSugestao(placaNorm)
+      const matchedVehicle = fleetByPlaca.get(placaNorm)
+      setDadosVeiculo((p) => ({
+        ...p,
+        placa: placaNorm,
+        marca_modelo: matchedVehicle ? matchedVehicle.modelo : vehicleFields.marca_modelo,
+      }))
       await wait(DEMO_TIMING.fieldPause * 2)
 
       // Demais campos na ordem do schema, pulando placa e marca_modelo (já preenchidos)
@@ -1041,7 +1046,7 @@ function FormularioChecklist({
       cancelled = true
       timers.forEach(clearTimeout)
     }
-  }, [demoMode, concluido, gpsPermissao, schema.id, schema.camposExtras, todosItens, onConcluido, selecionarPlacaSugestao])
+  }, [demoMode, concluido, gpsPermissao, schema.id, schema.camposExtras, todosItens, onConcluido, fleetByPlaca])
 
   useEffect(() => {
     const bump = () => setFleetTick((t) => t + 1)
