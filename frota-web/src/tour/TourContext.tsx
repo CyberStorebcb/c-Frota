@@ -136,7 +136,9 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     pendingIndexRef.current = -1
     setStepIndex(saved)
     setActive(true)
-  }, [])
+    const targetPath = TOUR_STEPS[saved]?.path ?? '/'
+    navigate(targetPath)
+  }, [navigate])
 
   // Inicia sempre do zero
   const startFresh = useCallback(() => {
@@ -144,7 +146,9 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     pendingIndexRef.current = -1
     setStepIndex(0)
     setActive(true)
-  }, [])
+    const firstPath = TOUR_STEPS[0]?.path ?? '/'
+    navigate(firstPath)
+  }, [navigate])
 
   const stop = useCallback(() => {
     setActive(false)
@@ -156,10 +160,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const resetTour = useCallback(() => {
     clearProgress()
     pendingIndexRef.current = -1
+    setFinished(false)
     setStepIndex(0)
     setActive(true)
-    setFinished(false)
-  }, [])
+    const firstPath = TOUR_STEPS[0]?.path ?? '/'
+    navigate(firstPath)
+  }, [navigate])
 
   const next = useCallback(() => {
     setStepIndex((i) => {
