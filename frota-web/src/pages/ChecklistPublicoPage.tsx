@@ -297,6 +297,8 @@ function TelaConclusao({
   fotosUrls,
   problemas,
   descricaoProblema,
+  isDemo,
+  autoOpenWhatsapp,
 }: {
   ncImperativos: number
   ncCount: number
@@ -309,11 +311,18 @@ function TelaConclusao({
   fotosUrls: string[]
   problemas: string
   descricaoProblema: string
+  isDemo?: boolean
+  autoOpenWhatsapp?: boolean
 }) {
   const { theme } = useTheme()
   const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
   const bloqueado = ncImperativos > 0
   const comNc = ncCount > 0
+  const [demoWhatsappOpen, setDemoWhatsappOpen] = useState(false)
+
+  useEffect(() => {
+    if (autoOpenWhatsapp) setDemoWhatsappOpen(true)
+  }, [autoOpenWhatsapp])
 
   const whatsappLink = comNc
     ? buildWhatsappLink({
@@ -331,6 +340,7 @@ function TelaConclusao({
     : null
 
   return (
+    <>
     <div className="flex min-h-dvh flex-col items-center justify-start bg-slate-50 px-4 py-10 dark:bg-slate-950">
       <div className="flex w-full max-w-sm flex-col items-center gap-5 text-center">
         <BrandLogo tone={footerTone} variant="horizontal" className="!max-h-9 opacity-90" />
@@ -390,21 +400,35 @@ function TelaConclusao({
                 📡 Sem internet — as fotos serão sincronizadas depois. A mensagem de texto pode ser enviada agora normalmente.
               </p>
             )}
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold text-white shadow-md transition active:scale-95 ${
-                bloqueado
-                  ? 'bg-rose-600 shadow-rose-200 hover:bg-rose-700 dark:shadow-rose-900/40'
-                  : 'bg-[#25D366] shadow-green-200 hover:bg-[#1ebe5d] dark:shadow-green-900/40'
-              }`}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-              Alertar no whatsapp
-            </a>
+            {isDemo ? (
+              <button
+                type="button"
+                data-demo-whatsapp-btn
+                onClick={() => setDemoWhatsappOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-extrabold text-white shadow-md shadow-rose-200 transition active:scale-95 hover:bg-rose-700 dark:shadow-rose-900/40"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                Alertar no whatsapp
+              </button>
+            ) : (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold text-white shadow-md transition active:scale-95 ${
+                  bloqueado
+                    ? 'bg-rose-600 shadow-rose-200 hover:bg-rose-700 dark:shadow-rose-900/40'
+                    : 'bg-[#25D366] shadow-green-200 hover:bg-[#1ebe5d] dark:shadow-green-900/40'
+                }`}
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                Alertar no whatsapp
+              </a>
+            )}
           </div>
         )}
 
@@ -457,6 +481,72 @@ function TelaConclusao({
         <p className="text-xs font-semibold text-slate-400">Você já pode fechar esta página.</p>
       </div>
     </div>
+
+    {/* Modal de prévia da mensagem WhatsApp — exclusivo modo demo */}
+
+    {isDemo && demoWhatsappOpen && createPortal(
+      <div
+        className="fixed inset-0 z-[99999] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+        onClick={() => setDemoWhatsappOpen(false)}
+      >
+        <div
+          className="w-full max-w-sm overflow-hidden rounded-3xl bg-[#ECE5DD] shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Cabeçalho estilo WhatsApp */}
+          <div className="flex items-center gap-3 bg-[#075E54] px-4 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-sm font-extrabold text-white">
+              {nomeSupervisor.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-extrabold text-white">{nomeSupervisor}</p>
+              <p className="text-[10px] text-white/70">online</p>
+            </div>
+            <button type="button" onClick={() => setDemoWhatsappOpen(false)} className="text-white/80 hover:text-white">
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Balão de mensagem */}
+          <div className="max-h-[60vh] overflow-y-auto p-4">
+            <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-[#DCF8C6] px-4 py-3 shadow-sm">
+              <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">
+                {[
+                  `🚫 VEICULO IMPEDIDO`,
+                  ``,
+                  `Olá, ${nomeSupervisor}!`,
+                  `O operador *${operador}* acabou de concluir um checklist com *${ncCount} item(s) NC*.`,
+                  `Veículo: *${veiculo || 'não informado'}*`,
+                  ``,
+                  `🚫 *${ncImperativos} item(s) impeditivo(s)* — veículo impedido de operar até correção.`,
+                  ``,
+                  `*Itens com NC:*`,
+                  ...itensNc.map((it) => `${it.imperativo ? '🚫' : '⚠️'} ${it.label}`),
+                  ...(problemas ? [``, `📋 *Problemas adicionais:* ${problemas}`] : []),
+                  ``,
+                  `Por favor, verifique e tome as providencias necessarias.`,
+                ].join('\n')}
+              </p>
+              <p className="mt-1 text-right text-[10px] text-slate-500">agora ✓✓</p>
+            </div>
+          </div>
+
+          {/* Rodapé estilo WhatsApp */}
+          <div className="flex items-center gap-2 border-t border-slate-200 bg-[#F0F0F0] px-4 py-3">
+            <div className="flex-1 rounded-full bg-white px-4 py-2 text-sm text-slate-400">
+              Mensagem
+            </div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#075E54]">
+              <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   )
 }
 
@@ -558,11 +648,16 @@ const SUPERVISORES = Object.keys(SUPERVISOR_WHATSAPP)
   .sort((a, b) => a.localeCompare(b, 'pt-BR'))
   .map((nome) => ({ label: nome }))
 
-function SupervisorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function SupervisorField({ value, onChange, forceOpen }: { value: string; onChange: (v: string) => void; forceOpen?: boolean }) {
   const [open, setOpen] = useState(false)
   const [portalStyle, setPortalStyle] = useState<React.CSSProperties>({})
   const cardRef = useRef<HTMLDivElement>(null)
   const reconhecido = value.trim().length > 0 && isSupervisorReconhecido(value)
+
+  // Demo: abre/fecha dropdown conforme sinalização externa
+  useEffect(() => {
+    if (forceOpen !== undefined) setOpen(forceOpen)
+  }, [forceOpen])
 
   const sugestoes = value.trim().length === 0
     ? SUPERVISORES
@@ -648,6 +743,7 @@ function SupervisorField({ value, onChange }: { value: string; onChange: (v: str
             <button
               key={s.label}
               type="button"
+              data-demo-supervisor-option={s.label}
               onMouseDown={(e) => {
                 e.preventDefault()
                 onChange(s.label)
@@ -735,6 +831,7 @@ const ItemChecklist = memo(function ItemChecklist({
               key={valor}
               type="button"
               data-demo-item={valor === 'c' ? item.id : undefined}
+              data-demo-item-nc={valor === 'nc' ? item.id : undefined}
               onClick={() => onResposta(item.id, valor)}
               className={`flex h-11 w-14 items-center justify-center rounded-xl border-2 text-xs font-extrabold transition-all active:scale-95 sm:w-16 ${
                 resp === valor
@@ -756,6 +853,7 @@ const ItemChecklist = memo(function ItemChecklist({
             </label>
             <textarea
               rows={2}
+              data-demo-item-obs={item.id}
               value={obs}
               onChange={(e) => onObs(item.id, e.target.value)}
               placeholder="O que foi encontrado de errado? Seja específico..."
@@ -836,7 +934,21 @@ function FormularioChecklist({
   onCursorTarget?: (t: import('../components/checklist/DemoCursor').DemoCursorTarget | null) => void
   hideSync?: boolean
 }) {
-  const todosItens = schema.grupos.flatMap((g) => g.itens)
+  // No modo demo limita os itens visíveis para manter o vídeo ágil
+  const DEMO_MAX_ITENS = demoMode?.enabled ? 10 : Infinity
+  const gruposDemo = demoMode?.enabled
+    ? (() => {
+        let restante = DEMO_MAX_ITENS
+        return schema.grupos.map((g) => {
+          if (restante <= 0) return { ...g, itens: [] }
+          const itens = g.itens.slice(0, restante)
+          restante -= itens.length
+          return { ...g, itens }
+        }).filter((g) => g.itens.length > 0)
+      })()
+    : schema.grupos
+
+  const todosItens = gruposDemo.flatMap((g) => g.itens)
   const totalItens = todosItens.length
 
   // Mapeamento checklist → tipo de veículo no registro
@@ -877,6 +989,7 @@ function FormularioChecklist({
   )
   const [gpsGuiaAberto, setGpsGuiaAberto] = useState(false)
   const [gpsErroCodigo, setGpsErroCodigo] = useState<1 | 2 | 3 | null>(null)
+  const [supervisorDropdownOpen, setSupervisorDropdownOpen] = useState<boolean | undefined>(undefined)
   const [dataInspecao] = useState(draft?.dataInspecao ?? new Date().toISOString().split('T')[0] ?? '')
   const [problemas, setProblemas]         = useState(draft?.problemas ?? '')
   const [descricaoProblema, setDescricaoProblema] = useState(draft?.descricaoProblema ?? '')
@@ -885,7 +998,9 @@ function FormularioChecklist({
   const [enviando, setEnviando]           = useState(false)
   const [erroEnvio, setErroEnvio]         = useState('')
   const [concluido, setConcluido]         = useState(false)
+  const [demoAutoWhatsapp, setDemoAutoWhatsapp] = useState(false)
   const demoRan = useRef(false)
+  const demoActiveRef = useRef(false) // true enquanto o async demo está rodando — NÃO resetado pelo cleanup
   const [resultadoFinal, setResultadoFinal] = useState<{
     ncCount: number
     ncImperativos: number
@@ -993,44 +1108,51 @@ function FormularioChecklist({
     const profile = resolveDemoProfile(schemaId)
     const vehicleFields = resolveDemoVehicleFields(schemaId)
     const speed = demoSpeedRef.current
-    let cancelled = false
+
+    // demoActiveRef.current = true enquanto o async roda.
+    // Nunca é resetado pelo cleanup — só pelo restart (demoKey muda → novo mount).
+    demoActiveRef.current = true
     const timers: ReturnType<typeof setTimeout>[] = []
     const wait = (ms: number) =>
       new Promise<void>((resolve) => {
         timers.push(setTimeout(resolve, demoDelay(ms, speed)))
       })
 
-    // Campos de texto: cursor + efeito de digitação caractere a caractere
-    const typeField = async (fieldId: string, value: string) => {
+    // Tempo para o cursor percorrer a animação CSS (450ms) + margem
+    const CURSOR_TRAVEL = 520
+
+    // Campos de texto: cursor move → aguarda chegada → digita caractere a caractere
+    const typeField = async (fieldId: string, value: string, setter?: (v: string) => void) => {
       onCursorTargetRef.current?.({ selector: `[data-demo-form-field="${fieldId}"]`, tap: true, key: `field-${fieldId}` })
-      await wait(DEMO_TIMING.fieldChar * 3)
+      await wait(CURSOR_TRAVEL) // espera o cursor chegar antes de começar
       for (let i = 1; i <= value.length; i++) {
-        if (cancelled) return
-        setDadosVeiculo((prev) => ({ ...prev, [fieldId]: value.slice(0, i) }))
+        if (!demoActiveRef.current) return
+        if (setter) setter(value.slice(0, i))
+        else setDadosVeiculo((prev) => ({ ...prev, [fieldId]: value.slice(0, i) }))
         await wait(DEMO_TIMING.fieldChar)
       }
       await wait(DEMO_TIMING.fieldPause)
     }
 
-    // Campos select: cursor + preenche de uma vez com pausa visual
+    // Campos select: cursor move → aguarda chegada → preenche de uma vez
     const fillSelect = async (fieldId: string, value: string) => {
-      if (cancelled) return
+      if (!demoActiveRef.current) return
       onCursorTargetRef.current?.({ selector: `[data-demo-form-field="${fieldId}"]`, tap: true, key: `field-${fieldId}` })
-      await wait(DEMO_TIMING.fieldPause)
-      if (cancelled) return
+      await wait(CURSOR_TRAVEL) // espera o cursor chegar antes de preencher
+      if (!demoActiveRef.current) return
       setDadosVeiculo((prev) => ({ ...prev, [fieldId]: value }))
       await wait(DEMO_TIMING.fieldPause)
     }
 
     void (async () => {
-      // Aguarda render inicial + carregamento do fleetByPlaca antes de começar
-      await wait(Math.max(DEMO_TIMING.formStart, 600))
+      // Aguarda React terminar os remounts da transição identify→form (pode levar ~1s)
+      await wait(Math.max(DEMO_TIMING.formStart, 1500))
 
       // Placa: cursor + preenche placa + marca_modelo juntos
-      if (cancelled) return
+      if (!demoActiveRef.current) return
       onCursorTargetRef.current?.({ selector: '[data-demo-form-field="placa"]', tap: true, key: 'field-placa' })
-      await wait(DEMO_TIMING.fieldPause)
-      if (cancelled) return
+      await wait(CURSOR_TRAVEL) // espera cursor chegar antes de preencher
+      if (!demoActiveRef.current) return
       const placaNorm = normalizePlaca(vehicleFields.placa)
       // Lê fleetByPlaca DEPOIS do delay para garantir que está populado
       const matchedVehicle = fleetByPlacaRef.current.get(placaNorm)
@@ -1044,11 +1166,32 @@ function FormularioChecklist({
       // Demais campos na ordem do schema, pulando placa e marca_modelo (já preenchidos)
       const campos = schemaCamposRef.current ?? []
       for (const campo of campos) {
-        if (cancelled) return
+        if (!demoActiveRef.current) return
         if (campo.id === 'placa' || campo.id === 'marca_modelo') continue
-        const value = campo.id === 'localidade'
-          ? profile.localidade
-          : (vehicleFields as Record<string, string>)[campo.id] ?? ''
+
+        if (campo.id === 'localidade') {
+          // Demonstração: clicar no GPS → loading fake → apagar → digitar manualmente
+          onCursorTargetRef.current?.({ selector: '[data-demo-form-field="gps-btn"]', tap: true, key: 'field-gps-btn' })
+          await wait(CURSOR_TRAVEL)
+          if (!demoActiveRef.current) return
+          // Simula loading do GPS
+          setLocalidadeGeoLoading(true)
+          setDadosVeiculo((p) => ({ ...p, localidade: '' }))
+          await wait(1800) // tempo de "buscando GPS..."
+          if (!demoActiveRef.current) return
+          // GPS "retorna" coordenadas
+          setLocalidadeGeoLoading(false)
+          setDadosVeiculo((p) => ({ ...p, localidade: '-4.523, -44.301' }))
+          await wait(1200)
+          if (!demoActiveRef.current) return
+          // Apaga e digita manualmente para mostrar que também funciona assim
+          setDadosVeiculo((p) => ({ ...p, localidade: '' }))
+          await wait(400)
+          await typeField('localidade', profile.localidade)
+          continue
+        }
+
+        const value = (vehicleFields as Record<string, string>)[campo.id] ?? ''
         if (!value) continue
         if (campo.tipo === 'select') {
           await fillSelect(campo.id, value)
@@ -1057,55 +1200,181 @@ function FormularioChecklist({
         }
       }
 
+      // Supervisor: cursor no campo → digita "Italo" → sugestão aparece → cursor clica nela
+      if (!demoActiveRef.current) return
       await wait(DEMO_TIMING.supervisorPause)
-      if (cancelled) return
+      if (!demoActiveRef.current) return
       onCursorTargetRef.current?.({ selector: '[data-demo-form-field="supervisor"]', tap: true, key: 'field-supervisor' })
+      await wait(CURSOR_TRAVEL)
+      if (!demoActiveRef.current) return
+      // Digita "Italo" letra a letra — abre dropdown forçado para o demo ver as sugestões
+      const supervisorQuery = 'Italo'
+      setSupervisorDropdownOpen(true)
+      for (let i = 1; i <= supervisorQuery.length; i++) {
+        if (!demoActiveRef.current) return
+        setSupervisor(supervisorQuery.slice(0, i))
+        await wait(DEMO_TIMING.identifyChar * 1.5)
+      }
+      // Aguarda o portal renderizar com a sugestão filtrada
+      await wait(400)
+      if (!demoActiveRef.current) return
+      // Cursor vai até a sugestão no dropdown (portal no body)
+      const NOME_COMPLETO = 'ITALO BRUNO DA SILVA FONTES'
+      onCursorTargetRef.current?.({ selector: `[data-demo-supervisor-option="${NOME_COMPLETO}"]`, tap: true, key: 'supervisor-option' })
+      await wait(CURSOR_TRAVEL)
+      if (!demoActiveRef.current) return
+      // "Clica" na sugestão — fecha dropdown
+      setSupervisor(NOME_COMPLETO)
+      setSupervisorDropdownOpen(false)
       await wait(DEMO_TIMING.fieldPause)
-      if (cancelled) return
-      setSupervisor(profile.supervisor)
 
-      for (const item of todosItensRef.current) {
-        if (cancelled) return
+      // Demo: limita a 10 itens para manter o vídeo ágil.
+      // O 2º item (índice 1) recebe NC imperativo + foto fake.
+      const DEMO_MAX_ITENS = 10
+      const DEMO_NC_INDEX = 1   // sky-02 (Pneus) — imperativo
+      const demoItens = todosItensRef.current.slice(0, DEMO_MAX_ITENS)
+
+      // Gera um File de imagem colorida via canvas (sem precisar de arquivo real)
+      const makeFakeImage = (label: string, color: string): File => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 400; canvas.height = 300
+        const ctx = canvas.getContext('2d')!
+        ctx.fillStyle = color
+        ctx.fillRect(0, 0, 400, 300)
+        ctx.fillStyle = '#fff'
+        ctx.font = 'bold 22px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(label, 200, 155)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+        const bytes = atob(dataUrl.split(',')[1]!)
+        const arr = new Uint8Array(bytes.length)
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+        return new File([arr], `${label.replace(/\s+/g, '_')}.jpg`, { type: 'image/jpeg' })
+      }
+
+      let demoNcItem: (typeof demoItens)[number] | null = null
+
+      for (let idx = 0; idx < demoItens.length; idx++) {
+        const item = demoItens[idx]!
+        if (!demoActiveRef.current) return
         itemRefs.current[item.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         setItemDestacado(item.id)
         await wait(DEMO_TIMING.itemScroll)
-        if (cancelled) return
-        // Cursor aponta para o botão C do item
-        onCursorTargetRef.current?.({ selector: `[data-demo-item="${item.id}"]`, tap: true, key: item.id })
-        await wait(180)
-        if (cancelled) return
-        setRespostas((prev) => ({ ...prev, [item.id]: 'c' }))
-        await wait(DEMO_TIMING.itemAnswer)
+        if (!demoActiveRef.current) return
+
+        if (idx === DEMO_NC_INDEX) {
+          // Item NC imperativo: cursor no botão NC → espera chegar → marca NC
+          demoNcItem = item
+          onCursorTargetRef.current?.({ selector: `[data-demo-item-nc="${item.id}"]`, tap: true, key: `nc-${item.id}` })
+          await wait(CURSOR_TRAVEL)
+          if (!demoActiveRef.current) return
+          setRespostas((prev) => ({ ...prev, [item.id]: 'nc' }))
+          await wait(DEMO_TIMING.itemAnswer)
+          // Observação obrigatória: cursor na textarea → digita descrição
+          onCursorTargetRef.current?.({ selector: `[data-demo-item-obs="${item.id}"]`, tap: true, key: `obs-${item.id}` })
+          await wait(CURSOR_TRAVEL)
+          if (!demoActiveRef.current) return
+          const obsText = 'Sulcos abaixo do mínimo legal, risco de aquaplanagem'
+          for (let i = 1; i <= obsText.length; i++) {
+            if (!demoActiveRef.current) return
+            setObservacoes((prev) => ({ ...prev, [item.id]: obsText.slice(0, i) }))
+            await wait(DEMO_TIMING.fieldChar)
+          }
+          await wait(DEMO_TIMING.fieldPause)
+          if (!demoActiveRef.current) return
+          // Foto fake no item NC
+          const fakeItemFoto = makeFakeImage('Pneu danificado', '#7f1022')
+          setFotosItem((prev) => ({ ...prev, [item.id]: [fakeItemFoto] }))
+          await wait(DEMO_TIMING.fieldPause)
+        } else {
+          // Item conforme: cursor no botão C → espera chegar → marca C
+          onCursorTargetRef.current?.({ selector: `[data-demo-item="${item.id}"]`, tap: true, key: item.id })
+          await wait(CURSOR_TRAVEL)
+          if (!demoActiveRef.current) return
+          setRespostas((prev) => ({ ...prev, [item.id]: 'c' }))
+          await wait(DEMO_TIMING.itemAnswer)
+        }
         setItemDestacado(null)
       }
       onCursorTargetRef.current?.(null)
 
+      // Helper: scrolla um elemento visível para o centro da tela
+      const scrollTo = (selector: string) => {
+        const scroller = document.querySelector('.overscroll-contain') as HTMLElement | null
+        const root = scroller ?? document.body
+        const el = root.querySelector(selector) as HTMLElement | null
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+
+      // Problemas adicionais (scroll + cursor + digitação)
+      if (!demoActiveRef.current) return
+      scrollTo('[data-demo-form-field="problemas"]')
+      await wait(DEMO_TIMING.itemScroll)
+      await typeField('problemas', 'Pneu dianteiro esquerdo com desgaste irregular', setProblemas)
+      if (!demoActiveRef.current) return
+
+      // NR12: scroll até o botão → cursor → arquivo aparece
+      scrollTo('[data-demo-form-field="nr12"]')
+      await wait(DEMO_TIMING.itemScroll)
+      if (!demoActiveRef.current) return
+      onCursorTargetRef.current?.({ selector: '[data-demo-form-field="nr12"]', tap: true, key: 'field-nr12' })
+      await wait(CURSOR_TRAVEL)
+      if (!demoActiveRef.current) return
+      const fakeNr12 = makeFakeImage('Evidência NR-12', '#1e3a5f')
+      setArquivos([fakeNr12])
+      await wait(DEMO_TIMING.fieldPause * 2)
+
+      // Botão Enviar: scroll até ele → cursor → clique → loading
+      if (!demoActiveRef.current) return
+      scrollTo('[data-demo-form-field="enviar"]')
+      await wait(DEMO_TIMING.itemScroll)
+      onCursorTargetRef.current?.({ selector: '[data-demo-form-field="enviar"]', tap: true, key: 'field-enviar' })
+      await wait(CURSOR_TRAVEL)
+      if (!demoActiveRef.current) return
+      onCursorTargetRef.current?.(null)
       await wait(DEMO_TIMING.beforeSubmit)
-      if (cancelled) return
+      if (!demoActiveRef.current) return
       setEnviando(true)
       await wait(DEMO_TIMING.submitting)
-      if (cancelled) return
+      if (!demoActiveRef.current) return
 
+      const ncItemLabel = demoNcItem ? (demoNcItem.label ?? demoNcItem.id) : 'Pneus'
+      const fakePreview = URL.createObjectURL(makeFakeImage('Pneu danificado', '#7f1022'))
       setResultadoFinal({
-        ncCount: 0,
-        ncImperativos: 0,
-        itensNc: [],
+        ncCount: 1,
+        ncImperativos: 1,
+        itensNc: [{ label: ncItemLabel, imperativo: true, obs: 'Sulcos abaixo do mínimo legal, risco de aquaplanagem' }],
         offline: false,
         nomeSupervisor: profile.supervisor,
         veiculo: formatPlaca(vehicleFields.placa),
-        fotosPreview: [],
+        fotosPreview: [fakePreview],
         fotosUrls: [],
-        problemas: '',
+        problemas: 'Pneu dianteiro esquerdo com desgaste irregular',
         descricaoProblema: '',
       })
       clearFormDraft()
       onConcluidoRef.current?.()
       setConcluido(true)
       setEnviando(false)
+
+      // Aguarda a tela final renderizar, depois mostra o modal WhatsApp
+      await wait(1400)
+      if (!demoActiveRef.current) return
+      scrollTo('[data-demo-whatsapp-btn]')
+      await wait(600)
+      if (!demoActiveRef.current) return
+      onCursorTargetRef.current?.({ selector: '[data-demo-whatsapp-btn]', tap: true, key: 'whatsapp-btn' })
+      await wait(CURSOR_TRAVEL)
+      if (!demoActiveRef.current) return
+      onCursorTargetRef.current?.(null)
+      setDemoAutoWhatsapp(true)
     })()
 
     return () => {
-      cancelled = true
+      // Para o async em andamento e permite que o próximo mount (StrictMode
+      // ou restart via demoKey) inicie um novo ciclo limpo.
+      demoActiveRef.current = false
+      demoRan.current = false
       timers.forEach(clearTimeout)
     }
   }, [])
@@ -1527,6 +1796,8 @@ function FormularioChecklist({
         fotosUrls={resultadoFinal.fotosUrls}
         problemas={resultadoFinal.problemas}
         descricaoProblema={resultadoFinal.descricaoProblema}
+        isDemo={demoMode?.enabled}
+        autoOpenWhatsapp={demoAutoWhatsapp}
       />
     )
   }
@@ -1743,6 +2014,7 @@ function FormularioChecklist({
                       <input
                         type="text"
                         inputMode="text"
+                        data-demo-form-field="localidade"
                         value={dadosVeiculo.localidade ?? ''}
                         onChange={(e) => {
                           setLocalidadeGeoErro('')
@@ -1754,6 +2026,7 @@ function FormularioChecklist({
                       />
                       <button
                         type="button"
+                        data-demo-form-field="gps-btn"
                         onClick={pedirLocalizacao}
                         disabled={localidadeGeoLoading}
                         className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#7f1022]/35 bg-[#7f1022]/[0.08] px-3 py-2 text-[11px] font-extrabold uppercase tracking-wide text-[#7f1022] transition hover:bg-[#7f1022]/15 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
@@ -1943,11 +2216,11 @@ function FormularioChecklist({
 
         {/* ── Supervisor ───────────────────────────────────────────── */}
         {schema.temSupervisor && (
-          <SupervisorField value={supervisor} onChange={setSupervisor} />
+          <SupervisorField value={supervisor} onChange={setSupervisor} forceOpen={supervisorDropdownOpen} />
         )}
 
         {/* ── Grupos de itens ──────────────────────────────────────── */}
-        {schema.grupos.map((grupo) => {
+        {gruposDemo.map((grupo) => {
           const respondidosGrupo = grupo.itens.filter((it) => respostas[it.id] != null).length
           const grupoCompleto    = respondidosGrupo === grupo.itens.length
 
@@ -2017,6 +2290,7 @@ function FormularioChecklist({
             <div className="px-4 py-3">
               <textarea
                 rows={4}
+                data-demo-form-field="problemas"
                 value={problemas}
                 onChange={(e) => setProblemas(e.target.value)}
                 placeholder="Ex: 'Barulho no câmbio ao trocar de marcha' ou 'Nenhum problema adicional'..."
@@ -2076,6 +2350,7 @@ function FormularioChecklist({
                   <input ref={fileRef} type="file" multiple accept="image/*,.pdf" className="hidden" onChange={handleArquivos} />
                   <button
                     type="button"
+                    data-demo-form-field="nr12"
                     onClick={() => fileRef.current?.click()}
                     className="inline-flex items-center gap-2 rounded-xl border border-[#7f1022]/20 bg-[#7f1022]/[0.08] px-4 py-2.5 text-sm font-extrabold text-[#7f1022] transition hover:bg-[#7f1022]/[0.12] dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200"
                   >
@@ -2142,6 +2417,7 @@ function FormularioChecklist({
           </div>
           <button
             type="button"
+            data-demo-form-field="enviar"
             onClick={handleEnviar}
             disabled={!podEnviar || enviando}
             className={`h-12 shrink-0 rounded-xl px-6 text-sm font-extrabold text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${

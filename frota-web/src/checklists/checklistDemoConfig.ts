@@ -7,15 +7,17 @@ export type ChecklistDemoProfile = {
   supervisor: string
   localidade: string
   km: string
+  horimetro: string
 }
 
 const DEMO_DEFAULTS: ChecklistDemoProfile = {
   tipo: 'sky',
   operador: 'Carlos Mendes',
   matricula: '1024',
-  supervisor: 'JOSIEL MENESES DOS SANTOS',
+  supervisor: 'ITALO BRUNO DA SILVA FONTES',
   localidade: 'Presidente Dutra - MA',
   km: '45280',
+  horimetro: '3821',
 }
 
 // Mapeia o id do checklist para os tipos de veículo correspondentes no registro.
@@ -54,6 +56,7 @@ export function resolveDemoVehicleFields(tipo: string) {
       placa: 'ABC1D23',
       marca_modelo: 'VW/GOL',
       km_atual: DEMO_DEFAULTS.km,
+      horimetro: DEMO_DEFAULTS.horimetro,
       prefixo: 'BDC101',
       localidade: DEMO_DEFAULTS.localidade,
     }
@@ -63,6 +66,7 @@ export function resolveDemoVehicleFields(tipo: string) {
     placa: formatPlaca(vehicle.placa),
     marca_modelo: vehicle.modelo,
     km_atual: DEMO_DEFAULTS.km,
+    horimetro: DEMO_DEFAULTS.horimetro,
     prefixo: vehicle.prefixo && vehicle.prefixo !== 'N/A' ? vehicle.prefixo : '—',
     localidade: vehicle.base?.trim() || DEMO_DEFAULTS.localidade,
   }

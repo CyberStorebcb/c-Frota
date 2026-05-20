@@ -9,10 +9,10 @@ export type DemoCursorTarget = {
 type Pos = { x: number; y: number }
 
 function getCenter(selector: string): Pos | null {
-  // Procura dentro do scroll container do phone frame primeiro
+  // Procura dentro do scroll container do phone frame primeiro, depois no body
+  // (necessário para portais como o dropdown de supervisor)
   const scroller = document.querySelector('.overscroll-contain') as HTMLElement | null
-  const root = scroller ?? document.body
-  const el = root.querySelector(selector) as HTMLElement | null
+  const el = (scroller?.querySelector(selector) ?? document.body.querySelector(selector)) as HTMLElement | null
   if (!el) return null
   const r = el.getBoundingClientRect()
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
