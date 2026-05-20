@@ -51,22 +51,23 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState(false)
   const [finished, setFinished] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-  // Guarda o email do último login para detectar nova sessão
   const lastLoginEmailRef = useRef<string | null>(null)
+
+  // Índice aguardando a rota chegar antes de ser aplicado ao state.
+  // -1 = nenhuma navegação pendente.
+  const pendingIndexRef = useRef<number>(-1)
 
   // ── Auto-start: reinicia do zero a cada novo login do usuário demo ────────
   useEffect(() => {
     if (!user?.email) {
-      // Usuário deslogou — reseta para detectar próximo login
       lastLoginEmailRef.current = null
       return
     }
     if (!shouldAutoStartTour(user.email)) return
     if (lastLoginEmailRef.current === user.email) return
-    // Novo login detectado: começa sempre do passo 0
     lastLoginEmailRef.current = user.email
     clearProgress()
-    tourNavigatingRef.current = true
+    pendingIndexRef.current = -1
     setStepIndex(0)
     setActive(true)
     setFinished(false)
@@ -77,30 +78,62 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     if (active) saveProgress(stepIndex)
   }, [active, stepIndex])
 
-  // ── Navegação automática quando o passo muda de rota ────────────────────
-  // tourNavigatingRef = true indica que a navegação foi iniciada pelo tour,
-  // não pelo usuário — evita que o tour se encerre ao navegar entre passos.
-  const tourNavigatingRef = useRef(false)
-
+  // ── Confirma stepIndex quando a rota destino chega ───────────────────────
+  // Quando next()/prev() precisam trocar de rota, eles apenas chamam navigate()
+  // e guardam o índice em pendingIndexRef. Este efeito aplica o índice ao state
+  // somente depois que o React Router confirma que a nova rota chegou, garantindo
+  // que o overlay exiba o conteúdo do step certo para a página certa.
   useEffect(() => {
     if (!active) return
+
+    const pending = pendingIndexRef.current
+    if (pending >= 0) {
+      const targetStep = TOUR_STEPS[pending]
+      if (targetStep && location.pathname === targetStep.path) {
+        // Rota chegou: aplica o índice agora.
+        pendingIndexRef.current = -1
+        setStepIndex(pending)
+      }
+      // Ainda em trânsito — aguarda a próxima mudança de location.
+      return
+    }
+
+    // Sem navegação pendente: verifica se o usuário saiu manualmente da rota.
     const step = TOUR_STEPS[stepIndex]
-    if (!step) return
-    if (location.pathname === step.path) {
-      // Rota destino chegou — confirma que a navegação do tour foi concluída.
-      tourNavigatingRef.current = false
-    } else if (!tourNavigatingRef.current) {
-      // O usuário navegou manualmente para fora do roteiro: encerra o tour.
+    if (step && location.pathname !== step.path) {
       setActive(false)
       clearProgress()
     }
-    // Se tourNavigatingRef.current === true e rota ainda não chegou, aguarda.
   }, [active, stepIndex, location.pathname])
+
+  const isDemo = shouldAutoStartTour(user?.email)
+
+  // ── Helpers para navegar entre steps ────────────────────────────────────
+  function applyIndex(current: number, target: number) {
+    if (target >= TOUR_STEPS.length) {
+      setActive(false)
+      clearProgress()
+      if (isDemo) setFinished(true)
+      return
+    }
+    if (target < 0) return
+
+    const curStep = TOUR_STEPS[current]
+    const targetStep = TOUR_STEPS[target]
+    if (targetStep && curStep && targetStep.path !== curStep.path) {
+      // Troca de rota: navega primeiro, aplica índice só quando a rota chegar.
+      pendingIndexRef.current = target
+      navigate(targetStep.path)
+    } else {
+      // Mesma rota: aplica imediatamente.
+      setStepIndex(target)
+    }
+  }
 
   // Inicia retomando progresso salvo
   const start = useCallback(() => {
     const saved = loadProgress()
-    tourNavigatingRef.current = true
+    pendingIndexRef.current = -1
     setStepIndex(saved)
     setActive(true)
   }, [])
@@ -108,7 +141,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   // Inicia sempre do zero
   const startFresh = useCallback(() => {
     clearProgress()
-    tourNavigatingRef.current = true
+    pendingIndexRef.current = -1
     setStepIndex(0)
     setActive(true)
   }, [])
@@ -117,60 +150,52 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     setActive(false)
     setFinished(false)
     clearProgress()
+    pendingIndexRef.current = -1
   }, [])
 
   const resetTour = useCallback(() => {
     clearProgress()
-    tourNavigatingRef.current = true
+    pendingIndexRef.current = -1
     setStepIndex(0)
     setActive(true)
     setFinished(false)
   }, [])
 
-  const isDemo = shouldAutoStartTour(user?.email)
-
   const next = useCallback(() => {
     setStepIndex((i) => {
-      const n = i + 1
-      if (n >= TOUR_STEPS.length) {
-        setActive(false)
-        clearProgress()
-        if (isDemo) setFinished(true)
-        return i
-      }
-      const nextStep = TOUR_STEPS[n]
+      applyIndex(i, i + 1)
+      // Se houve troca de rota, o stepIndex permanece em `i` até a rota chegar.
+      // Se mesma rota, applyIndex já chamou setStepIndex(i+1) — retornar i aqui
+      // seria sobrescrito pelo setStepIndex interno, mas React batcha as atualizações,
+      // então retornamos i+1 apenas quando não há troca de rota.
+      const nextStep = TOUR_STEPS[i + 1]
       const curStep = TOUR_STEPS[i]
-      if (nextStep && curStep && nextStep.path !== curStep.path) {
-        tourNavigatingRef.current = true
-        navigate(nextStep.path)
-      }
-      return n
+      const sameRoute = !nextStep || !curStep || nextStep.path === curStep.path
+      return sameRoute ? Math.min(i + 1, TOUR_STEPS.length - 1) : i
     })
-  }, [navigate])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const prev = useCallback(() => {
     setStepIndex((i) => {
-      const n = Math.max(0, i - 1)
-      const prevStep = TOUR_STEPS[n]
+      const target = Math.max(0, i - 1)
+      applyIndex(i, target)
+      const prevStep = TOUR_STEPS[target]
       const curStep = TOUR_STEPS[i]
-      if (prevStep && curStep && prevStep.path !== curStep.path) {
-        tourNavigatingRef.current = true
-        navigate(prevStep.path)
-      }
-      return n
+      const sameRoute = !prevStep || !curStep || prevStep.path === curStep.path
+      return sameRoute ? target : i
     })
-  }, [navigate])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const goTo = useCallback((i: number) => {
-    if (i < 0 || i >= TOUR_STEPS.length) return
-    const curStep = TOUR_STEPS[stepIndex]
-    const targetStep = TOUR_STEPS[i]
-    if (targetStep && curStep && targetStep.path !== curStep.path) {
-      tourNavigatingRef.current = true
-      navigate(targetStep.path)
-    }
-    setStepIndex(i)
-  }, [navigate, stepIndex])
+  const goTo = useCallback((target: number) => {
+    if (target < 0 || target >= TOUR_STEPS.length) return
+    setStepIndex((i) => {
+      applyIndex(i, target)
+      const targetStep = TOUR_STEPS[target]
+      const curStep = TOUR_STEPS[i]
+      const sameRoute = !targetStep || !curStep || targetStep.path === curStep.path
+      return sameRoute ? target : i
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo<TourCtx>(
     () => ({
