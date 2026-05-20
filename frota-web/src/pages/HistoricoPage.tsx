@@ -1,10 +1,30 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, CalendarCheck2, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CalendarCheck2, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
 import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import { buildHistoricoResolvidoEntries, type HistoricoResolvidoEntry } from '../apontamentos/groupApontamentos'
 import { Portal } from '../components/ui/Portal'
+
+function DefeitoSeveridadeIcon({ imperativo, size = 14 }: { imperativo: boolean; size?: number }) {
+  if (imperativo) {
+    return (
+      <span
+        title="Impeditivo — impede condução do veículo"
+        className="inline-flex shrink-0 leading-none select-none"
+        style={{ fontSize: size }}
+        aria-hidden
+      >
+        🚫
+      </span>
+    )
+  }
+  return (
+    <span title="Não impeditivo — precisa de atenção" className="inline-flex shrink-0">
+      <AlertCircle size={size} className="text-amber-600 dark:text-amber-400" aria-hidden />
+    </span>
+  )
+}
 
 function formatDateBR(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -848,6 +868,7 @@ export function HistoricoPage() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
                 <th className="px-4 py-3">Veículo</th>
+                <th className="px-2 py-3" title="Severidade">Sev.</th>
                 <th className="px-4 py-3">Defeito</th>
                 <th className="px-4 py-3">Serviço</th>
                 <th className="px-4 py-3">Apontado em</th>
@@ -859,7 +880,7 @@ export function HistoricoPage() {
             <tbody className="font-semibold text-slate-800 dark:text-slate-200">
               {historico.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
                     Nenhum defeito resolvido no histórico. Marque itens como resolvidos em{' '}
                     <Link to="/gerenciar" className="font-extrabold text-brand-600 underline dark:text-brand-400">
                       Gerenciar
@@ -884,6 +905,9 @@ export function HistoricoPage() {
                           <span className="font-mono text-xs tracking-tight">{r.veiculoLabel}</span>
                         </span>
                       </div>
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      <DefeitoSeveridadeIcon imperativo={r.imperativo} size={15} />
                     </td>
                     <td className="max-w-[300px] px-4 py-3 text-xs leading-snug sm:text-sm">{formatDefeitoParaExibicao(r.defeito)}</td>
                     <td className="max-w-[340px] px-4 py-3 text-xs leading-snug text-slate-700 dark:text-slate-300 sm:text-sm">

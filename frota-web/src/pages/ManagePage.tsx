@@ -166,6 +166,7 @@ export function ManagePage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes'>('apontamentos')
+  const [severidade, setSeveridade] = useState<'todos' | 'imperativo' | 'atencao'>('todos')
   const [vehicleId, setVehicleId] = useState(() => searchParams.get('veiculo') ?? 'todos')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
     if (searchParams.get('veiculo')) return true
@@ -330,8 +331,10 @@ export function ManagePage() {
     if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
     if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
     if (visao === 'entrantes') list = list.filter((r) => isDefeitoEntrante(r, nowMs))
+    if (severidade === 'imperativo') list = list.filter((r) => r.imperativo)
+    if (severidade === 'atencao') list = list.filter((r) => !r.imperativo)
     return list
-  }, [rowsMatchingFiltros, visao])
+  }, [rowsMatchingFiltros, visao, severidade])
 
   const stats = useMemo(() => {
     const pendentes = rowsMatchingFiltros.filter((r) => !r.resolvido).length
@@ -786,16 +789,46 @@ export function ManagePage() {
         <p className="mt-4 px-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           Defeitos repetidos (mesma placa e item de checklist) aparecem em uma linha — clique na linha para ver o histórico.
         </p>
-        <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-          <span className="inline-flex items-center gap-1.5">
-            <DefeitoSeveridadeIcon imperativo />
-            Impeditivo
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Severidade:
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <DefeitoSeveridadeIcon imperativo={false} />
+          <button
+            type="button"
+            onClick={() => { setSeveridade('todos'); setPagina(1) }}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
+              severidade === 'todos'
+                ? 'border-slate-400 bg-slate-800 text-white dark:border-slate-500 dark:bg-slate-700'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+            }`}
+          >
+            Todos
+          </button>
+          <button
+            type="button"
+            onClick={() => { setSeveridade('imperativo'); setPagina(1) }}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
+              severidade === 'imperativo'
+                ? 'border-rose-500 bg-rose-600 text-white dark:border-rose-500 dark:bg-rose-700'
+                : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50'
+            }`}
+          >
+            <DefeitoSeveridadeIcon imperativo size={12} />
+            Impeditivos
+          </button>
+          <button
+            type="button"
+            onClick={() => { setSeveridade('atencao'); setPagina(1) }}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
+              severidade === 'atencao'
+                ? 'border-amber-500 bg-amber-500 text-white dark:border-amber-500 dark:bg-amber-600'
+                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50'
+            }`}
+          >
+            <DefeitoSeveridadeIcon imperativo={false} size={12} />
             Precisa de atenção
-          </span>
-        </p>
+          </button>
+        </div>
         <div
           ref={tabelaRef}
           data-tour="manage-table"
