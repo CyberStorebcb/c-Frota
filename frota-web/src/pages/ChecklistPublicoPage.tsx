@@ -1848,7 +1848,7 @@ function FormularioChecklist({
                 Evidência NR12 *
               </p>
               <p className="mt-0.5 text-xs font-semibold text-rose-100/85">
-                Obrigatório — anexe fotos ou PDFs da inspeção geral (máx. 10 arquivos · imagens até 155 KB, ajuste automático)
+                Obrigatório — anexe fotos ou PDFs da inspeção geral (máx. 10 arquivos · imagens até 800 KB, ajuste automático)
               </p>
             </div>
             <div className="px-4 py-3">
