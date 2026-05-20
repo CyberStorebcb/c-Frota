@@ -56,6 +56,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     if (autoStartedFor.current === user.email) return
     autoStartedFor.current = user.email
     const saved = loadProgress()
+    tourNavigatingRef.current = true
     setStepIndex(saved)
     setActive(true)
   }, [user?.email])
@@ -66,18 +67,32 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, [active, stepIndex])
 
   // ── Navegação automática quando o passo muda de rota ────────────────────
+  // tourNavigatingRef = true indica que a navegação foi iniciada pelo tour,
+  // não pelo usuário — evita que o tour se encerre ao navegar entre passos.
+  const tourNavigatingRef = useRef(false)
+
   useEffect(() => {
     if (!active) return
     const step = TOUR_STEPS[stepIndex]
     if (!step) return
     if (location.pathname !== step.path) {
-      navigate(step.path)
+      if (tourNavigatingRef.current) {
+        // Ainda aguardando a navegação do tour chegar — ignora.
+        return
+      }
+      // O usuário navegou manualmente para fora do roteiro: encerra o tour.
+      setActive(false)
+      clearProgress()
+      try { localStorage.setItem(STORAGE_COMPLETED, 'true') } catch { /* ignore */ }
+    } else {
+      tourNavigatingRef.current = false
     }
-  }, [active, stepIndex, location.pathname, navigate])
+  }, [active, stepIndex, location.pathname])
 
   // Inicia retomando progresso salvo
   const start = useCallback(() => {
     const saved = loadProgress()
+    tourNavigatingRef.current = true
     setStepIndex(saved)
     setActive(true)
   }, [])
@@ -85,6 +100,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   // Inicia sempre do zero
   const startFresh = useCallback(() => {
     clearProgress()
+    tourNavigatingRef.current = true
     setStepIndex(0)
     setActive(true)
   }, [])
@@ -104,18 +120,39 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         try { localStorage.setItem(STORAGE_COMPLETED, 'true') } catch { /* ignore */ }
         return i
       }
+      const nextStep = TOUR_STEPS[n]
+      const curStep = TOUR_STEPS[i]
+      if (nextStep && curStep && nextStep.path !== curStep.path) {
+        tourNavigatingRef.current = true
+        navigate(nextStep.path)
+      }
       return n
     })
-  }, [])
+  }, [navigate])
 
   const prev = useCallback(() => {
-    setStepIndex((i) => Math.max(0, i - 1))
-  }, [])
+    setStepIndex((i) => {
+      const n = Math.max(0, i - 1)
+      const prevStep = TOUR_STEPS[n]
+      const curStep = TOUR_STEPS[i]
+      if (prevStep && curStep && prevStep.path !== curStep.path) {
+        tourNavigatingRef.current = true
+        navigate(prevStep.path)
+      }
+      return n
+    })
+  }, [navigate])
 
   const goTo = useCallback((i: number) => {
     if (i < 0 || i >= TOUR_STEPS.length) return
+    const curStep = TOUR_STEPS[stepIndex]
+    const targetStep = TOUR_STEPS[i]
+    if (targetStep && curStep && targetStep.path !== curStep.path) {
+      tourNavigatingRef.current = true
+      navigate(targetStep.path)
+    }
     setStepIndex(i)
-  }, [])
+  }, [navigate, stepIndex])
 
   const value = useMemo<TourCtx>(
     () => ({
