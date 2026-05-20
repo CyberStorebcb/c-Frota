@@ -1,15 +1,55 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, SkipForward, X, Sparkles, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, SkipForward, X, Sparkles, AlertCircle, RotateCcw, LogOut } from 'lucide-react'
 import { useTour } from './TourContext'
 import { useLocation } from 'react-router-dom'
 import { TOUR_AREAS } from './tourSteps'
+import { useAuth } from '../auth/AuthContext'
 
 type Rect = { top: number; left: number; width: number; height: number }
 
 const PAD = 10
 
+function TourFinishedModal() {
+  const { resetTour } = useTour()
+  const { logout } = useAuth()
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-3xl border border-slate-700/80 bg-slate-900 p-8 shadow-2xl text-center">
+        <div className="mb-5 flex justify-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/15">
+            <Sparkles size={32} className="text-brand-400" />
+          </div>
+        </div>
+        <h2 className="text-xl font-black text-slate-100">Tour concluído!</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+          Esta é uma conta de demonstração. Para continuar, reinicie o tour ou saia da conta.
+        </p>
+        <div className="mt-7 flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={resetTour}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 py-3 text-sm font-extrabold text-white shadow-lg shadow-brand-500/30 transition hover:bg-brand-600"
+          >
+            <RotateCcw size={16} />
+            Reiniciar tour
+          </button>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 py-3 text-sm font-extrabold text-slate-300 transition hover:bg-slate-700 hover:text-white"
+          >
+            <LogOut size={16} />
+            Sair da conta
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function TourOverlay() {
-  const { active, step, stepIndex, total, next, prev, stop } = useTour()
+  const { active, finished, step, stepIndex, total, next, prev, stop } = useTour()
   const location = useLocation()
   const [rect, setRect] = useState<Rect | null>(null)
   const [ready, setReady] = useState(false)
@@ -68,6 +108,7 @@ export function TourOverlay() {
     }
   }, [ready, step])
 
+  if (finished) return <TourFinishedModal />
   if (!active || !step) return null
 
   const hasSpotlight = !!step.selector && rect !== null && !selectorMissing

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 
 type TourCtx = {
   active: boolean
+  finished: boolean
   stepIndex: number
   step: TourStep | null
   total: number
@@ -48,6 +49,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [active, setActive] = useState(false)
+  const [finished, setFinished] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   // Guarda o email do último login para detectar nova sessão
   const lastLoginEmailRef = useRef<string | null>(null)
@@ -67,6 +69,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     tourNavigatingRef.current = true
     setStepIndex(0)
     setActive(true)
+    setFinished(false)
   }, [user?.email])
 
   // ── Persiste progresso sempre que o passo muda (enquanto ativo) ──────────
@@ -114,6 +117,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   const stop = useCallback(() => {
     setActive(false)
+    setFinished(false)
     clearProgress()
   }, [])
 
@@ -122,7 +126,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     tourNavigatingRef.current = true
     setStepIndex(0)
     setActive(true)
+    setFinished(false)
   }, [])
+
+  const isDemo = shouldAutoStartTour(user?.email)
 
   const next = useCallback(() => {
     setStepIndex((i) => {
@@ -130,6 +137,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       if (n >= TOUR_STEPS.length) {
         setActive(false)
         clearProgress()
+        if (isDemo) setFinished(true)
         return i
       }
       const nextStep = TOUR_STEPS[n]
@@ -169,6 +177,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<TourCtx>(
     () => ({
       active,
+      finished,
       stepIndex,
       step: active ? TOUR_STEPS[stepIndex] ?? null : null,
       total: TOUR_STEPS.length,
@@ -180,7 +189,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       prev,
       goTo,
     }),
-    [active, stepIndex, start, startFresh, stop, resetTour, next, prev, goTo],
+    [active, finished, stepIndex, start, startFresh, stop, resetTour, next, prev, goTo],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
