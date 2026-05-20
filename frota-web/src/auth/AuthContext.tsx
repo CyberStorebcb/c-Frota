@@ -107,12 +107,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Atualiza o perfil após confirmar que a senha foi trocada com sucesso.
     // Tenta via RPC service-role primeiro, depois via update direto.
     if (user) {
-      const { error: profileError, count } = await supabase
+      const { error: profileError, data: profileData } = await supabase
         .from('profiles')
         .update({ must_change_password: false })
         .eq('id', user.id)
-        .select('id', { count: 'exact', head: true })
-      if (profileError || count === 0) {
+        .select('id')
+      if (profileError || !profileData?.length) {
         // Fallback: tenta via RPC (se existir) ou ignora — o estado local ainda é atualizado
         await supabase.rpc('clear_must_change_password', { user_id: user.id }).maybeSingle()
       }

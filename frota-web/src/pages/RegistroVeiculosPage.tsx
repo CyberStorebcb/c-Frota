@@ -43,7 +43,6 @@ import {
   isEmbeddedCatalogFleetVehicleId,
   normalizePlaca,
   removeFleetVehicle,
-  setFleetVehicleStatus,
   VEHICLE_TYPE_IDS,
   type FleetVehicle,
   type VehicleStatus,
@@ -239,6 +238,7 @@ function VehicleOverflowMenu({
   supabaseVehicleIds,
   onDeleteRequest,
   setManutencao,
+  setStatus,
 }: {
   vehicle: FleetVehicle
   menuForId: string | null
