@@ -208,7 +208,7 @@ type Ctx = {
   ) => Promise<void>
   marcarJustificado: (
     id: string,
-    payload: { justificativa: string; data: string; imagem: string | null },
+    payload: { justificativa: string; data: string; imagem: string | null; agendamentoData: string | null },
     usuarioEmail?: string,
   ) => Promise<void>
   buscarHistorico: (apontamentoId: string) => Promise<HistoricoRow[]>

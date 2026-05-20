@@ -47,6 +47,11 @@ function mk(
     descricaoProblema:    '',
     imperativo:           false,
     horaApontamento:      '',
+    justificado:          false,
+    justificativa:        null,
+    justificativaData:    null,
+    justificativaImagem:  null,
+    agendamentoData:      null,
   }
 }
 
