@@ -54,11 +54,11 @@ export const TOUR_STEPS: TourStep[] = [
   {
     path: '/',
     area: 'Dashboard',
-    selector: '[data-tour="dashboard-recorrentes"]',
-    title: '🔁 Alerta de Defeitos Recorrentes',
+    selector: '[data-tour="notification-bell"]',
+    title: '🔔 Sininho de Notificações',
     content:
-      'Quando um defeito aparece no checklist 3 ou mais dias seguidos no mesmo veículo, este painel de alerta é exibido automaticamente. Clique em "Ver no Gerenciar" para agir direto no defeito.',
-    placement: 'top',
+      'O sininho alerta quando veículos não realizaram o checklist nos horários programados (10h, 16h e 18h). Clique para ver quais veículos estão pendentes e navegar direto para os detalhes.',
+    placement: 'bottom',
     waitMs: 400,
   },
 
@@ -202,16 +202,6 @@ export const TOUR_STEPS: TourStep[] = [
       'O cadastro mestre da frota. Usuários autorizados adicionam veículos manualmente ou importam planilhas Excel. A lista é paginada (24 por página em grid, 50 na tabela) para não pesar com frotas grandes.',
     waitMs: 800,
   },
-  {
-    path: '/registro',
-    area: 'Registro',
-    selector: '[data-tour="registro-actions"]',
-    title: '➕ Importação e Cadastro',
-    content:
-      'Os botões "Importar Excel" e "Novo veículo" aparecem apenas para usuários com permissão de modificar a base. Para os demais, a página é somente leitura.',
-    placement: 'bottom',
-  },
-
   // ─── Usuários ──────────────────────────────────────────────────────────
   {
     path: '/usuarios',

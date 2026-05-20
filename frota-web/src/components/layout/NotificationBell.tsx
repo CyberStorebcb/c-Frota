@@ -53,6 +53,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={toggle}
+        data-tour="notification-bell"
         className="relative inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
         aria-label="Notificações"
       >
