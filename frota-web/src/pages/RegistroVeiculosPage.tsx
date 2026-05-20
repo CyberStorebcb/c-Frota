@@ -788,10 +788,6 @@ export function RegistroVeiculosPage() {
     placasComImpedimento,
   ])
 
-  const filteredActive = useMemo(
-    () => filteredVehicles.filter((v) => v.status !== 'INATIVO'),
-    [filteredVehicles],
-  )
   const filteredInactive = useMemo(
     () => filteredVehicles.filter((v) => v.status === 'INATIVO'),
     [filteredVehicles],
