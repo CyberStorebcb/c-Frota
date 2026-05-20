@@ -476,7 +476,7 @@ export function RegistroVeiculosPage() {
   const [colFilterOrgResp, setColFilterOrgResp] = useState('')
   const [colFilterLocalBase, setColFilterLocalBase] = useState('')
   const [colFilterCoordSup, setColFilterCoordSup] = useState('')
-  const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus | 'MANUTENÇÃO'>('ALL')
+  const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus | 'MANUTENÇÃO' | 'IMPEDIDO'>('ALL')
   // Import Excel modal
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [importRows, setImportRows] = useState<ImportRow[]>([])
@@ -720,6 +720,8 @@ export function RegistroVeiculosPage() {
       }
       if (colFilterStatus === 'MANUTENÇÃO') {
         if (!v.emManutencao) return false
+      } else if (colFilterStatus === 'IMPEDIDO') {
+        if (!placasComImpedimento.has(normalizePlaca(v.placa))) return false
       } else if (colFilterStatus !== 'ALL' && v.status !== colFilterStatus) {
         return false
       }
@@ -1607,13 +1609,14 @@ export function RegistroVeiculosPage() {
                   <select
                     id="flt-status-col"
                     value={colFilterStatus}
-                    onChange={(e) => setColFilterStatus(e.target.value as 'ALL' | VehicleStatus | 'MANUTENÇÃO')}
+                    onChange={(e) => setColFilterStatus(e.target.value as 'ALL' | VehicleStatus | 'MANUTENÇÃO' | 'IMPEDIDO')}
                     className={selectFilterCenterClass}
                   >
                     <option value="ALL">Todos</option>
                     <option value="ATIVO">Ativo</option>
                     <option value="INATIVO">Inativo</option>
                     <option value="MANUTENÇÃO">Manut.</option>
+                    <option value="IMPEDIDO">Impedido</option>
                   </select>
                 </th>
                 <th className="px-2 py-2 pr-4 text-right align-top">
