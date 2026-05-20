@@ -10,6 +10,8 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Download,
   FileSpreadsheet,
@@ -224,6 +226,53 @@ function vehicleToFormData(vehicle: FleetVehicle) {
     base: vehicle.base === 'N/A' ? '' : vehicle.base,
     ano: vehicle.ano || new Date().getFullYear().toString(),
   }
+}
+
+function PaginationBar({
+  pagina,
+  totalPaginas,
+  total,
+  pageSize,
+  onChange,
+}: {
+  pagina: number
+  totalPaginas: number
+  total: number
+  pageSize: number
+  onChange: (p: number) => void
+}) {
+  const from = (pagina - 1) * pageSize + 1
+  const to = Math.min(pagina * pageSize, total)
+  return (
+    <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+        {from}–{to} de {total} veículos
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={pagina === 1}
+          onClick={() => onChange(pagina - 1)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          aria-label="Página anterior"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="min-w-[4rem] text-center text-xs font-extrabold text-slate-700 dark:text-slate-300">
+          {pagina} / {totalPaginas}
+        </span>
+        <button
+          type="button"
+          disabled={pagina === totalPaginas}
+          onClick={() => onChange(pagina + 1)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          aria-label="Próxima página"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function AttentionBadge({ compact = false }: { compact?: boolean }) {
@@ -748,6 +797,16 @@ export function RegistroVeiculosPage() {
     [filteredVehicles],
   )
 
+  const [pagina, setPagina] = useState(1)
+  // Grid: 24 (múltiplo de 3 colunas). Lista: 50.
+  const pageSize = layoutMode === 'grid' ? 24 : 50
+  const totalPaginas = Math.max(1, Math.ceil(filteredVehicles.length / pageSize))
+  // Garante que a página não fique fora do intervalo quando filtros mudam
+  const paginaSegura = Math.min(pagina, totalPaginas)
+  const paginaVehicles = filteredVehicles.slice((paginaSegura - 1) * pageSize, paginaSegura * pageSize)
+  const paginaActive = paginaVehicles.filter((v) => v.status !== 'INATIVO')
+  const paginaInactive = paginaVehicles.filter((v) => v.status === 'INATIVO')
+
   const clearListColumnFilters = () => {
     setColFilterPlaca('')
     setColFilterModeloPrefixo('')
@@ -755,6 +814,7 @@ export function RegistroVeiculosPage() {
     setColFilterLocalBase('')
     setColFilterCoordSup('')
     setColFilterStatus('ALL')
+    setPagina(1)
   }
 
   const applyApontamentoCardFilter = (filter: 'ATENÇÃO' | 'IMPEDIDO') => {
@@ -764,6 +824,7 @@ export function RegistroVeiculosPage() {
     setColFilterLocalBase('')
     setColFilterCoordSup('')
     setColFilterStatus((prev) => (prev === filter ? 'ALL' : filter))
+    setPagina(1)
     setLayout('list')
     window.setTimeout(() => {
       fleetTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -934,6 +995,7 @@ export function RegistroVeiculosPage() {
 
   const setLayout = (mode: 'grid' | 'list') => {
     setLayoutMode(mode)
+    setPagina(1)
     try {
       localStorage.setItem(LAYOUT_STORAGE_KEY, mode)
     } catch {
@@ -1440,7 +1502,7 @@ export function RegistroVeiculosPage() {
       {filteredVehicles.length > 0 && layoutMode === 'grid' ? (
         <>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredActive.map((vehicle) => {
+          {paginaActive.map((vehicle) => {
             const typeInfo =
               VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
               VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
@@ -1546,7 +1608,7 @@ export function RegistroVeiculosPage() {
             )
           })}
         </div>
-        {filteredInactive.length > 0 && (
+        {paginaInactive.length > 0 && (
           <>
             <div className="mt-6 flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
@@ -1559,7 +1621,7 @@ export function RegistroVeiculosPage() {
               <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
             </div>
             <div className="mt-4 grid gap-4 opacity-60 md:grid-cols-2 lg:grid-cols-3">
-              {filteredInactive.map((vehicle) => {
+              {paginaInactive.map((vehicle) => {
                 const typeInfo =
                   VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
                   VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
@@ -1617,6 +1679,15 @@ export function RegistroVeiculosPage() {
               })}
             </div>
           </>
+        )}
+        {totalPaginas > 1 && (
+          <PaginationBar
+            pagina={paginaSegura}
+            totalPaginas={totalPaginas}
+            total={filteredVehicles.length}
+            pageSize={pageSize}
+            onChange={setPagina}
+          />
         )}
         </>
       ) : null}
@@ -1778,7 +1849,7 @@ export function RegistroVeiculosPage() {
                 </tr>
               ) : (
                 <>
-                {filteredActive.map((vehicle) => {
+                {paginaActive.map((vehicle) => {
                   const typeInfo =
                     VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
                     VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
@@ -1888,7 +1959,7 @@ export function RegistroVeiculosPage() {
                     </tr>
                   )
                 })}
-                {filteredInactive.length > 0 && (
+                {paginaInactive.length > 0 && (
                   <>
                     <tr>
                       <td colSpan={8} className="border-b border-slate-200 bg-slate-100/80 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/60">
@@ -1900,7 +1971,7 @@ export function RegistroVeiculosPage() {
                         </div>
                       </td>
                     </tr>
-                    {filteredInactive.map((vehicle) => {
+                    {paginaInactive.map((vehicle) => {
                       const typeInfo =
                         VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
                         VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
@@ -1991,6 +2062,17 @@ export function RegistroVeiculosPage() {
               )}
             </tbody>
           </table>
+          {totalPaginas > 1 && (
+            <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+              <PaginationBar
+                pagina={paginaSegura}
+                totalPaginas={totalPaginas}
+                total={filteredVehicles.length}
+                pageSize={pageSize}
+                onChange={setPagina}
+              />
+            </div>
+          )}
         </div>
       ) : null}
 
