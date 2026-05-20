@@ -153,7 +153,12 @@ export function LoginPage() {
     })
     setRecoveryPending(false)
     if (err) {
-      setRecoveryError('Não foi possível enviar o e-mail. Verifique o endereço e tente novamente.')
+      const isRateLimit = err.status === 429 || err.message?.toLowerCase().includes('rate') || err.message?.toLowerCase().includes('too many')
+      setRecoveryError(
+        isRateLimit
+          ? 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.'
+          : 'Não foi possível enviar o e-mail. Verifique o endereço e tente novamente.'
+      )
     } else {
       setRecoverySent(true)
     }
