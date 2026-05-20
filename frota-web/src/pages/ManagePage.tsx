@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
+  CalendarClock,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -377,6 +378,16 @@ export function ManagePage() {
   const fileRef = useRef<HTMLInputElement | null>(null)
   const osFileRef = useRef<HTMLInputElement | null>(null)
 
+  // ── Modal de Agenda ───────────────────────────────────────────────────────
+  const [agendaOpen, setAgendaOpen] = useState(false)
+
+  const agendados = useMemo(() =>
+    rows
+      .filter((r) => !r.resolvido && r.agendamentoData)
+      .sort((a, b) => (a.agendamentoData! > b.agendamentoData! ? 1 : -1)),
+    [rows],
+  )
+
   // ── Modal de Justificativa ────────────────────────────────────────────────
   const [justOpen, setJustOpen] = useState(false)
   const [justId, setJustId] = useState<string | null>(null)
@@ -546,6 +557,19 @@ export function ManagePage() {
             <TrendingUp size={18} />
             Evolução
           </Link>
+          <button
+            type="button"
+            onClick={() => setAgendaOpen(true)}
+            className="relative inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
+          >
+            <CalendarClock size={18} />
+            Agenda
+            {agendados.length > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-extrabold text-white">
+                {agendados.length}
+              </span>
+            )}
+          </button>
           <Link
             to="/gerenciar/historico"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
@@ -765,10 +789,16 @@ export function ManagePage() {
               ) : (
                 paginaRows.map((r) => {
                   const atrasado = prazoPassou(r.prazo, r.resolvido)
+                  const agendado = !r.resolvido && !!r.agendamentoData
                   return (
                     <tr
                       key={r.id}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40"
+                      className={[
+                        'border-b last:border-0',
+                        agendado
+                          ? 'border-amber-200/70 bg-amber-50/60 hover:bg-amber-50 dark:border-amber-800/30 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
+                          : 'border-slate-100 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40',
+                      ].join(' ')}
                     >
                       <td className="align-middle px-4 py-3">
                         <span className="inline-flex flex-col items-center gap-1.5">
@@ -1214,6 +1244,131 @@ export function ManagePage() {
               </div>
             </div>
           </div>
+          </div>
+        </Portal>
+      ) : null}
+
+      {/* ── Painel de Agenda ──────────────────────────────────────────────── */}
+      {agendaOpen ? (
+        <Portal>
+          <button
+            type="button"
+            className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setAgendaOpen(false) }}
+            aria-label="Fechar agenda"
+          />
+          <div className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain">
+            <div className="flex min-h-[100dvh] justify-center p-4 py-6 sm:items-center sm:py-8">
+              <div
+                className="my-auto flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+                onPointerDown={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Agenda de correções"
+              >
+                {/* Header */}
+                <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-amber-50 px-5 py-4 dark:border-slate-800 dark:bg-amber-950/30">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock size={18} className="text-amber-600 dark:text-amber-400" />
+                    <div>
+                      <div className="text-sm font-extrabold text-amber-800 dark:text-amber-200">
+                        Agenda de correções
+                      </div>
+                      <div className="text-xs font-semibold text-amber-700/70 dark:text-amber-400/70">
+                        {agendados.length === 0
+                          ? 'Nenhum item agendado'
+                          : `${agendados.length} item${agendados.length > 1 ? 's' : ''} aguardando correção`}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAgendaOpen(false)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-white text-slate-600 hover:bg-amber-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                    aria-label="Fechar"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="max-h-[min(70dvh,32rem)] overflow-y-auto">
+                  {agendados.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-400 dark:text-slate-500">
+                      <CalendarClock size={36} strokeWidth={1.5} />
+                      <p className="text-sm font-semibold">Nenhuma correção agendada no momento.</p>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {agendados.map((r) => {
+                        const dataBR = new Date(r.agendamentoData! + 'T12:00:00').toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                        const isVencida = r.agendamentoData! < new Date().toISOString().slice(0, 10)
+                        return (
+                          <li key={r.id} className="flex items-start gap-3 px-5 py-4">
+                            <div className={[
+                              'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm',
+                              isVencida ? 'bg-rose-500' : 'bg-amber-500',
+                            ].join(' ')}>
+                              <CalendarClock size={16} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-mono text-xs font-extrabold text-slate-700 dark:text-slate-200">
+                                  {r.prefixo || r.veiculoLabel}
+                                </span>
+                                <span className={[
+                                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold',
+                                  isVencida
+                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+                                ].join(' ')}>
+                                  📅 {dataBR}
+                                  {isVencida ? ' · vencida' : ''}
+                                </span>
+                              </div>
+                              <p className="mt-0.5 text-xs font-semibold leading-snug text-slate-600 dark:text-slate-300">
+                                {formatDefeitoParaExibicao(r.defeito)}
+                              </p>
+                              {r.justificativa && (
+                                <p className="mt-1 text-[11px] font-semibold italic text-slate-400 dark:text-slate-500 line-clamp-2">
+                                  "{r.justificativa}"
+                                </p>
+                              )}
+                            </div>
+                            {canMarkResolved && (
+                              <button
+                                type="button"
+                                onClick={() => { setAgendaOpen(false); openResolveModal(r) }}
+                                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-extrabold text-white shadow-sm hover:bg-emerald-700"
+                                title="Marcar como resolvido"
+                              >
+                                <Check size={13} strokeWidth={3} />
+                                Resolver
+                              </button>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex shrink-0 justify-end border-t border-slate-200 bg-slate-50/90 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+                  <button
+                    type="button"
+                    onClick={() => setAgendaOpen(false)}
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </Portal>
       ) : null}
