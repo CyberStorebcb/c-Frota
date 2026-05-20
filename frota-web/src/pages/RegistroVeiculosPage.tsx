@@ -226,31 +226,49 @@ function vehicleToFormData(vehicle: FleetVehicle) {
   }
 }
 
+function AttentionBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+      <AlertCircle size={compact ? 10 : 11} />
+      {compact ? 'Atenção' : 'Precisa de atenção'}
+    </span>
+  )
+}
+
+function ImpedidoBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+      <Ban size={compact ? 10 : 11} />
+      Impedido
+    </span>
+  )
+}
+
 function VehicleOverflowMenu({
   vehicle,
   menuForId,
   setMenuForId,
   refresh,
+  reloadFleet,
   showNotification,
   placement = 'up',
   isAdmin = false,
   onEdit,
   supabaseVehicleIds,
   onDeleteRequest,
-  setManutencao,
   setStatus,
 }: {
   vehicle: FleetVehicle
   menuForId: string | null
   setMenuForId: (id: string | null) => void
   refresh: () => void
+  reloadFleet: () => void
   showNotification: (message: string, type: 'success' | 'error') => void
   placement?: 'up' | 'down'
   isAdmin?: boolean
   onEdit?: (vehicle: FleetVehicle) => void
   supabaseVehicleIds: Set<string>
   onDeleteRequest: (id: string, placa: string, isSupabase: boolean) => void
-  setManutencao: (id: string, emManutencao: boolean) => Promise<{ ok: true } | { ok: false; message: string }>
   setStatus: (id: string, status: VehicleStatus) => Promise<{ ok: true } | { ok: false; message: string }>
 }) {
   const menuOpen = menuForId === vehicle.id
@@ -300,7 +318,7 @@ function VehicleOverflowMenu({
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
               onClick={() => {
                 void setStatus(vehicle.id, 'ATIVO').then(() => {
-                  refresh(); setMenuForId(null)
+                  refresh(); reloadFleet(); setMenuForId(null)
                   showNotification('Estado: ativo.', 'success')
                 })
               }}
@@ -315,42 +333,12 @@ function VehicleOverflowMenu({
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
               onClick={() => {
                 void setStatus(vehicle.id, 'INATIVO').then(() => {
-                  refresh(); setMenuForId(null)
+                  refresh(); reloadFleet(); setMenuForId(null)
                   showNotification('Veículo marcado como inativo.', 'success')
                 })
               }}
             >
               Marcar inativo
-            </button>
-          )}
-          {isAdmin && supabaseVehicleIds.has(vehicle.id) && !vehicle.emManutencao && (
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
-              onClick={() => {
-                void setManutencao(vehicle.id, true).then(() => {
-                  refresh(); setMenuForId(null)
-                  showNotification('Veículo marcado como em manutenção.', 'success')
-                })
-              }}
-            >
-              Marcar em manutenção
-            </button>
-          )}
-          {isAdmin && supabaseVehicleIds.has(vehicle.id) && vehicle.emManutencao && (
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
-              onClick={() => {
-                void setManutencao(vehicle.id, false).then(() => {
-                  refresh(); setMenuForId(null)
-                  showNotification('Manutenção removida.', 'success')
-                })
-              }}
-            >
-              Remover da manutenção
             </button>
           )}
           {isAdmin && !isEmbeddedCatalogFleetVehicleId(vehicle.id) ? (
@@ -456,7 +444,7 @@ function defaultForm() {
  * Controlo da frota: cadastro e listagem de veículos (UI alinhada ao painel operacional).
  */
 export function RegistroVeiculosPage() {
-  const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setManutencao, setStatus, reload: reloadSupabase } = useSupabaseVehicles()
+  const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setStatus, reload: reloadSupabase } = useSupabaseVehicles()
   const { reload: reloadFleet } = useFleet()
   const supabaseVehicleIds = useMemo(() => new Set(supabaseVehicles.map((v) => v.id)), [supabaseVehicles])
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
@@ -469,6 +457,7 @@ export function RegistroVeiculosPage() {
   const [filterType, setFilterType] = useState<'ALL' | VehicleTipo>('ALL')
   const [moreTypeMenuOpen, setMoreTypeMenuOpen] = useState(false)
   const moreTypeMenuRef = useRef<HTMLDivElement>(null)
+  const fleetTableRef = useRef<HTMLDivElement>(null)
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [formData, setFormData] = useState(defaultForm)
   const [menuForId, setMenuForId] = useState<string | null>(null)
@@ -479,7 +468,7 @@ export function RegistroVeiculosPage() {
   const [colFilterOrgResp, setColFilterOrgResp] = useState('')
   const [colFilterLocalBase, setColFilterLocalBase] = useState('')
   const [colFilterCoordSup, setColFilterCoordSup] = useState('')
-  const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus | 'MANUTENÇÃO' | 'IMPEDIDO'>('ALL')
+  const [colFilterStatus, setColFilterStatus] = useState<'ALL' | VehicleStatus | 'ATENÇÃO' | 'IMPEDIDO'>('ALL')
   // Import Excel modal
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [importRows, setImportRows] = useState<ImportRow[]>([])
@@ -589,7 +578,13 @@ export function RegistroVeiculosPage() {
 
   /** Set de placas normalizadas com pelo menos um NC imperativo não resolvido. */
   const placasComImpedimento = useMemo(
-    () => new Set(apontamentosRows.filter((r) => !r.resolvido && r.imperativo).map((r) => r.placa)),
+    () => new Set(apontamentosRows.filter((r) => !r.resolvido && r.imperativo).map((r) => normalizePlaca(r.placa)).filter(Boolean)),
+    [apontamentosRows],
+  )
+
+  /** Placas com NC não impeditivo pendente (Precisam de atenção). */
+  const placasComAtencao = useMemo(
+    () => new Set(apontamentosRows.filter((r) => !r.resolvido && !r.imperativo).map((r) => normalizePlaca(r.placa)).filter(Boolean)),
     [apontamentosRows],
   )
 
@@ -699,10 +694,8 @@ export function RegistroVeiculosPage() {
     })
   }, [vehicles, search, filterType])
 
-  /** Em lista, aplica ainda os filtros por coluna; na grelha ignora-os. */
+  /** Filtros por coluna (lista) e filtro de apontamento (cards Atenção / Impedido). */
   const filteredVehicles = useMemo(() => {
-    if (layoutMode !== 'list') return globallyFilteredVehicles
-
     const fp = normalizePlaca(colFilterPlaca)
     const fm = colFilterModeloPrefixo.trim().toLowerCase()
     const fo = colFilterOrgResp.trim().toLowerCase()
@@ -710,6 +703,16 @@ export function RegistroVeiculosPage() {
     const fc = colFilterCoordSup.trim().toLowerCase()
 
     return globallyFilteredVehicles.filter((v) => {
+      if (colFilterStatus === 'ATENÇÃO') {
+        if (!placasComAtencao.has(normalizePlaca(v.placa))) return false
+      } else if (colFilterStatus === 'IMPEDIDO') {
+        if (!placasComImpedimento.has(normalizePlaca(v.placa))) return false
+      } else if (colFilterStatus !== 'ALL' && v.status !== colFilterStatus) {
+        return false
+      }
+
+      if (layoutMode !== 'list') return true
+
       if (fp && !normalizePlaca(v.placa).includes(fp)) return false
       if (fm) {
         const blob = `${v.modelo} ${v.prefixo}`.toLowerCase()
@@ -720,13 +723,6 @@ export function RegistroVeiculosPage() {
       if (fc) {
         const blob = `${v.coordenador || ''} ${v.supervisor || ''}`.toLowerCase()
         if (!blob.includes(fc)) return false
-      }
-      if (colFilterStatus === 'MANUTENÇÃO') {
-        if (!v.emManutencao) return false
-      } else if (colFilterStatus === 'IMPEDIDO') {
-        if (!placasComImpedimento.has(normalizePlaca(v.placa))) return false
-      } else if (colFilterStatus !== 'ALL' && v.status !== colFilterStatus) {
-        return false
       }
       return true
     })
@@ -739,6 +735,8 @@ export function RegistroVeiculosPage() {
     colFilterLocalBase,
     colFilterCoordSup,
     colFilterStatus,
+    placasComAtencao,
+    placasComImpedimento,
   ])
 
   const filteredActive = useMemo(
@@ -759,6 +757,19 @@ export function RegistroVeiculosPage() {
     setColFilterStatus('ALL')
   }
 
+  const applyApontamentoCardFilter = (filter: 'ATENÇÃO' | 'IMPEDIDO') => {
+    setColFilterPlaca('')
+    setColFilterModeloPrefixo('')
+    setColFilterOrgResp('')
+    setColFilterLocalBase('')
+    setColFilterCoordSup('')
+    setColFilterStatus((prev) => (prev === filter ? 'ALL' : filter))
+    setLayout('list')
+    window.setTimeout(() => {
+      fleetTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }
+
   const listColFiltersActive = Boolean(
     colFilterPlaca.trim() ||
       colFilterModeloPrefixo.trim() ||
@@ -773,7 +784,7 @@ export function RegistroVeiculosPage() {
     () => ({
       total: vehicles.length,
       ativos: vehicles.filter(
-        (v) => isOperacionalAtivosDashboardKpi(v.placa, v.prefixo),
+        (v) => isOperacionalAtivosDashboardKpi(v.placa, v.prefixo, v.status),
       ).length,
       manutencao: vehicles.filter((v) => v.emManutencao).length,
     }),
@@ -1101,6 +1112,8 @@ export function RegistroVeiculosPage() {
                 label: 'Precisam de atenção',
                 value: apontamentosCarregando ? '—' : ncNaoImpeditivosPendentes,
                 Icon: AlertCircle,
+                filter: 'ATENÇÃO' as const,
+                activeRing: 'ring-2 ring-amber-500/80 ring-offset-2 ring-offset-slate-950 dark:ring-amber-400/70',
                 card:
                   'border-amber-200/90 bg-gradient-to-br from-white via-white to-amber-50/90 shadow-amber-500/[0.06] dark:border-amber-500/25 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/35 dark:shadow-amber-950/25',
                 orb: 'bg-amber-400/25 dark:bg-amber-500/12',
@@ -1111,17 +1124,36 @@ export function RegistroVeiculosPage() {
                 label: 'Com impedimento',
                 value: apontamentosCarregando ? '—' : ncImpeditivosPendentes,
                 Icon: Ban,
+                filter: 'IMPEDIDO' as const,
+                activeRing: 'ring-2 ring-rose-500/80 ring-offset-2 ring-offset-slate-950 dark:ring-rose-400/70',
                 card:
                   'border-rose-200/90 bg-gradient-to-br from-white via-white to-rose-50/90 shadow-rose-500/[0.06] dark:border-rose-500/25 dark:from-slate-900 dark:via-slate-900 dark:to-rose-950/35 dark:shadow-rose-950/25',
                 orb: 'bg-rose-400/25 dark:bg-rose-500/12',
                 iconWrap:
                   'bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-lg shadow-rose-600/25 ring-2 ring-white/30 dark:from-rose-600 dark:to-red-800 dark:shadow-rose-950/35 dark:ring-rose-400/20',
               },
-            ] satisfies { label: string; value: number | string; Icon: typeof List; card: string; orb: string; iconWrap: string }[]
-          ).map(({ label, value, Icon, card, orb, iconWrap }) => (
-            <div
+            ] satisfies {
+              label: string
+              value: number | string
+              Icon: typeof List
+              filter?: 'ATENÇÃO' | 'IMPEDIDO'
+              activeRing?: string
+              card: string
+              orb: string
+              iconWrap: string
+            }[]
+          ).map(({ label, value, Icon, filter, activeRing, card, orb, iconWrap }) => {
+            const isCardFilterActive = filter != null && colFilterStatus === filter
+            const CardTag = filter ? 'button' : 'div'
+            return (
+            <CardTag
               key={label}
-              className={`group relative overflow-hidden rounded-3xl border p-6 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${card}`}
+              type={filter ? 'button' : undefined}
+              onClick={filter ? () => applyApontamentoCardFilter(filter) : undefined}
+              title={filter ? `Filtrar tabela: ${label.toLowerCase()}` : undefined}
+              className={`group relative w-full overflow-hidden rounded-3xl border p-6 text-left shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${card} ${
+                filter ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50' : ''
+              } ${isCardFilterActive && activeRing ? activeRing : ''}`}
             >
               <div
                 className={`pointer-events-none absolute -left-12 -bottom-12 size-36 rounded-full opacity-40 blur-3xl transition-opacity duration-300 group-hover:opacity-70 ${orb}`}
@@ -1144,8 +1176,8 @@ export function RegistroVeiculosPage() {
                   <p className="text-4xl font-black tabular-nums tracking-tight text-slate-900 dark:text-white">{value}</p>
                 </div>
               </div>
-            </div>
-          ))}
+            </CardTag>
+          )})}
         </div>
 
         {/* Link discreto para aba Removidos */}
@@ -1414,13 +1446,17 @@ export function RegistroVeiculosPage() {
               VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
             const Icon = typeInfo.icon
 
+            const placaNorm = normalizePlaca(vehicle.placa)
+            const comImpedimento = placasComImpedimento.has(placaNorm)
+            const precisaAtencao = placasComAtencao.has(placaNorm)
+
             return (
               <div
                 key={vehicle.id}
                 className={`group relative overflow-hidden rounded-3xl border p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl ${
-                  placasComImpedimento.has(normalizePlaca(vehicle.placa))
+                  comImpedimento
                     ? 'border-rose-300 bg-rose-50 hover:border-rose-400 hover:shadow-rose-200/40 dark:border-rose-800/60 dark:bg-rose-950/25 dark:hover:border-rose-700'
-                    : vehicle.emManutencao
+                    : precisaAtencao
                     ? 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-amber-200/40 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:border-amber-800'
                     : vehicle.status === 'INATIVO'
                     ? 'border-slate-300 bg-slate-100 hover:border-slate-400 hover:shadow-slate-200/40 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-slate-600'
@@ -1447,12 +1483,8 @@ export function RegistroVeiculosPage() {
                       {vehicle.status === 'ATIVO' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
                       {vehicle.status}
                     </div>
-                    {vehicle.emManutencao && (
-                      <div className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                        <Wrench size={11} />
-                        MANUTENÇÃO
-                      </div>
-                    )}
+                    {comImpedimento && <ImpedidoBadge />}
+                    {precisaAtencao && <AttentionBadge />}
                   </div>
                 </div>
 
@@ -1500,13 +1532,13 @@ export function RegistroVeiculosPage() {
                     menuForId={menuForId}
                     setMenuForId={setMenuForId}
                     refresh={refresh}
+                    reloadFleet={reloadFleet}
                     showNotification={showNotification}
                     placement="up"
                     isAdmin={canRegisterVehicle}
                     onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                     supabaseVehicleIds={supabaseVehicleIds}
                     onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
-                    setManutencao={setManutencao}
                     setStatus={setStatus}
                   />
                 </div>
@@ -1551,13 +1583,13 @@ export function RegistroVeiculosPage() {
                           menuForId={menuForId}
                           setMenuForId={setMenuForId}
                           refresh={refresh}
+                          reloadFleet={reloadFleet}
                           showNotification={showNotification}
                           placement="up"
                           isAdmin={canRegisterVehicle}
                           onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                           supabaseVehicleIds={supabaseVehicleIds}
                           onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
-                          setManutencao={setManutencao}
                           setStatus={setStatus}
                         />
                       </div>
@@ -1590,14 +1622,17 @@ export function RegistroVeiculosPage() {
       ) : null}
 
       {layoutMode === 'list' ? (
-        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div
+          ref={fleetTableRef}
+          className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+        >
           <table className="w-full min-w-[720px] border-collapse text-center text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3">Placa</th>
                 <th className="px-4 py-3">Modelo / Prefixo</th>
-                <th className="hidden px-4 py-3 md:table-cell">Órgão / Resp.</th>
+                <th className="hidden px-4 py-3 md:table-cell">Responsável</th>
                 <th className="hidden px-4 py-3 lg:table-cell">Local / Base</th>
                 <th className="hidden px-4 py-3 xl:table-cell">Coord. / Sup.</th>
                 <th className="px-4 py-3">Estado</th>
@@ -1652,14 +1687,14 @@ export function RegistroVeiculosPage() {
                 </th>
                 <th className="hidden px-2 py-2 align-top md:table-cell">
                   <label className="sr-only" htmlFor="flt-org-col">
-                    Filtrar órgão ou responsável
+                    Filtrar responsável
                   </label>
                   <input
                     id="flt-org-col"
                     type="text"
                     value={colFilterOrgResp}
                     onChange={(e) => setColFilterOrgResp(e.target.value)}
-                    placeholder="Órgão / resp.…"
+                    placeholder="Responsável…"
                     className={inputFilterClass}
                   />
                 </th>
@@ -1696,13 +1731,13 @@ export function RegistroVeiculosPage() {
                   <select
                     id="flt-status-col"
                     value={colFilterStatus}
-                    onChange={(e) => setColFilterStatus(e.target.value as 'ALL' | VehicleStatus | 'MANUTENÇÃO' | 'IMPEDIDO')}
+                    onChange={(e) => setColFilterStatus(e.target.value as 'ALL' | VehicleStatus | 'ATENÇÃO' | 'IMPEDIDO')}
                     className={selectFilterCenterClass}
                   >
                     <option value="ALL">Todos</option>
                     <option value="ATIVO">Ativo</option>
                     <option value="INATIVO">Inativo</option>
-                    <option value="MANUTENÇÃO">Manut.</option>
+                    <option value="ATENÇÃO">Atenção</option>
                     <option value="IMPEDIDO">Impedido</option>
                   </select>
                 </th>
@@ -1748,14 +1783,17 @@ export function RegistroVeiculosPage() {
                     VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
                     VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
                   const Icon = typeInfo.icon
+                  const placaNorm = normalizePlaca(vehicle.placa)
+                  const comImpedimento = placasComImpedimento.has(placaNorm)
+                  const precisaAtencao = placasComAtencao.has(placaNorm)
 
                   return (
                     <tr
                       key={vehicle.id}
                       className={`border-b transition-colors ${
-                        placasComImpedimento.has(normalizePlaca(vehicle.placa))
+                        comImpedimento
                           ? 'border-rose-200 bg-rose-50/70 hover:bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/25 dark:hover:bg-rose-950/35'
-                          : vehicle.emManutencao
+                          : precisaAtencao
                           ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
                           : vehicle.status === 'INATIVO'
                           ? 'border-slate-200 bg-slate-100/60 hover:bg-slate-100 dark:border-slate-800/80 dark:bg-slate-900/40 dark:hover:bg-slate-800/40'
@@ -1827,12 +1865,8 @@ export function RegistroVeiculosPage() {
                             {vehicle.status === 'ATIVO' ? <CheckCircle2 size={10} /> : <Ban size={10} />}
                             {vehicle.status}
                           </span>
-                          {vehicle.emManutencao && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              <Wrench size={10} />
-                              MANUT.
-                            </span>
-                          )}
+                          {comImpedimento && <ImpedidoBadge compact />}
+                          {precisaAtencao && <AttentionBadge compact />}
                         </div>
                       </td>
                       <td className="relative px-2 py-3 pr-4 text-right align-middle">
@@ -1841,13 +1875,13 @@ export function RegistroVeiculosPage() {
                           menuForId={menuForId}
                           setMenuForId={setMenuForId}
                           refresh={refresh}
+                          reloadFleet={reloadFleet}
                           showNotification={showNotification}
                           placement="down"
                           isAdmin={canRegisterVehicle}
                           onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                           supabaseVehicleIds={supabaseVehicleIds}
                           onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
-                          setManutencao={setManutencao}
                           setStatus={setStatus}
                         />
                       </td>
@@ -1938,13 +1972,13 @@ export function RegistroVeiculosPage() {
                               menuForId={menuForId}
                               setMenuForId={setMenuForId}
                               refresh={refresh}
+                              reloadFleet={reloadFleet}
                               showNotification={showNotification}
                               placement="down"
                               isAdmin={canRegisterVehicle}
                               onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
                               supabaseVehicleIds={supabaseVehicleIds}
                               onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
-                              setManutencao={setManutencao}
                               setStatus={setStatus}
                             />
                           </td>

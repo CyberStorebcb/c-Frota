@@ -39,28 +39,9 @@ function R(p: Partial<Apontamento> & Pick<Apontamento, 'id'>): Apontamento {
 }
 
 describe('filterResolvidosParaEvolucao', () => {
-  it('filtra por processo', () => {
-    const rows: Apontamento[] = [
-      R({ id: '1', resolvido: true, dataResolvido: '2026-02-01', processo: 'Checklist' }),
-      R({ id: '2', resolvido: true, dataResolvido: '2026-02-02', processo: 'Corretiva' }),
-      R({ id: '3', resolvido: false, dataResolvido: null, processo: 'Checklist' }),
-    ]
-    const f = {
-      processo: 'Checklist',
-      base: 'todos',
-      coordenador: 'todos',
-      responsavel: 'todos',
-      prefixo: 'todos',
-      data: 'todos' as const,
-    }
-    const out = filterResolvidosParaEvolucao(rows, f)
-    expect(out.map((x) => x.id)).toEqual(['1'])
-  })
-
   it('ignora não resolvidos', () => {
     const rows = [R({ id: '1', resolvido: false, dataResolvido: null })]
     const out = filterResolvidosParaEvolucao(rows, {
-      processo: 'todos',
       base: 'todos',
       coordenador: 'todos',
       responsavel: 'todos',

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { RequireAuth } from './components/auth/RequireAuth'
 import { RequireSuperAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
@@ -64,6 +64,15 @@ const TrocarSenhaPage = lazy(() =>
   import('./pages/TrocarSenhaPage').then((m) => ({ default: m.TrocarSenhaPage })),
 )
 
+/** Links antigos /checklist/:tipo — exceto /checklist/demo */
+function ChecklistTipoRedirect() {
+  const { tipo } = useParams<{ tipo: string }>()
+  if (tipo === 'demo') {
+    return <ChecklistPublicoPage forceDemo />
+  }
+  return <Navigate to="/checklist" replace />
+}
+
 export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -74,11 +83,10 @@ export default function App() {
         <Route path="/privacidade" element={<PrivacyPage />} />
         <Route path="/registro-especial" element={<RegistroEspecialPage />} />
         <Route path="/registro" element={<LazyRegistroRoute />} />
-        {/* Link público único para motoristas preencherem checklists */}
-        <Route path="/checklist" element={<ChecklistPublicoPage />} />
+        {/* Checklist público — rotas mais específicas primeiro */}
         <Route path="/checklist/demo" element={<ChecklistPublicoPage forceDemo />} />
-        {/* Links antigos por tipo agora voltam para o fluxo único */}
-        <Route path="/checklist/:tipo" element={<Navigate to="/checklist" replace />} />
+        <Route path="/checklist/:tipo" element={<ChecklistTipoRedirect />} />
+        <Route path="/checklist" element={<ChecklistPublicoPage />} />
 
         {/* Troca de senha obrigatória (autenticado mas bloqueado) */}
         <Route element={<RequireAuth />}>

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
+  AlertCircle,
   AlertTriangle,
   CalendarClock,
   Check,
@@ -28,10 +29,14 @@ import {
 import type { Apontamento } from '../apontamentos/ApontamentosContext'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
+import {
+  buildManageTableRows,
+  findRecorrenteSiblingIds,
+  type ApontamentoGroup,
+} from '../apontamentos/groupApontamentos'
 import { useAuth } from '../auth/AuthContext'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
-import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { Portal } from '../components/ui/Portal'
@@ -76,6 +81,26 @@ function parseCurrency(masked: string): number | null {
   const raw = masked.replace(/\./g, '').replace(',', '.')
   const n = parseFloat(raw)
   return Number.isFinite(n) ? n : null
+}
+
+function DefeitoSeveridadeIcon({ imperativo, size = 14 }: { imperativo: boolean; size?: number }) {
+  if (imperativo) {
+    return (
+      <span
+        title="Impeditivo — impede condução do veículo"
+        className="inline-flex shrink-0 leading-none select-none"
+        style={{ fontSize: size }}
+        aria-hidden
+      >
+        🚫
+      </span>
+    )
+  }
+  return (
+    <span title="Não impeditivo — precisa de atenção" className="inline-flex shrink-0">
+      <AlertCircle size={size} className="text-amber-600 dark:text-amber-400" aria-hidden />
+    </span>
+  )
 }
 
 
@@ -148,7 +173,6 @@ export function ManagePage() {
     catch { return false }
   })
   const [query, setQuery] = useState('')
-  const [processo, setProcesso] = useState('todos')
   const [base, setBase] = useState('todos')
   const [coordenador, setCoordenador] = useState('todos')
   const [responsavel, setResponsavel] = useState('todos')
@@ -159,6 +183,7 @@ export function ManagePage() {
   const [dataOrdem, setDataOrdem] = useState<'asc' | 'desc'>('asc')
   const [pageSizeStr, setPageSizeStr] = useState('25')
   const pageSize = Number(pageSizeStr) || 25
+  const [historyGroup, setHistoryGroup] = useState<ApontamentoGroup | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const tabelaRef = useRef<HTMLDivElement | null>(null)
   const syncedVehicleFromUrlRef = useRef<string | null>(null)
@@ -252,7 +277,6 @@ export function ManagePage() {
     let list = rows
     if (urlChecklist) list = list.filter((r) => r.checklistId === urlChecklist)
     if (vehicleId !== 'todos') list = list.filter((r) => apontamentoMatchesVehicleFilter(r, vehicleFilter))
-    if (processo !== 'todos') list = list.filter((r) => matchesProcessoFilter(r.processo, processo))
     if (base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, base))
     if (coordenador !== 'todos') list = list.filter((r) => matchesCoordenadorFilter(r.coordenador, coordenador))
     if (responsavel !== 'todos') list = list.filter((r) => r.responsavel === responsavel)
@@ -299,7 +323,7 @@ export function ManagePage() {
       (a, b) =>
         dir * (new Date(a.dataApontamento).getTime() - new Date(b.dataApontamento).getTime()),
     )
-  }, [rows, vehicleFilter, processo, base, coordenador, responsavel, supervisor, prefixo, data, query, dataOrdem, urlChecklist])
+  }, [rows, vehicleFilter, base, coordenador, responsavel, supervisor, prefixo, data, query, dataOrdem, urlChecklist])
 
   const sortedFiltered = useMemo(() => {
     let list = rowsMatchingFiltros
@@ -316,14 +340,19 @@ export function ManagePage() {
     return { total: rowsMatchingFiltros.length, pendentes, resolvidos, entrantes }
   }, [rowsMatchingFiltros, nowMs])
 
-  const totalFiltrados = sortedFiltered.length
+  const tableRowsAll = useMemo(
+    () => buildManageTableRows(sortedFiltered, true, dataOrdem),
+    [sortedFiltered, dataOrdem],
+  )
+
+  const totalFiltrados = tableRowsAll.length
   const totalPaginas = Math.max(1, Math.ceil(totalFiltrados / pageSize))
   const paginaEfetiva = Math.min(Math.max(1, pagina), totalPaginas)
 
   const paginaRows = useMemo(() => {
     const start = (paginaEfetiva - 1) * pageSize
-    return sortedFiltered.slice(start, start + pageSize)
-  }, [sortedFiltered, paginaEfetiva, pageSize])
+    return tableRowsAll.slice(start, start + pageSize)
+  }, [tableRowsAll, paginaEfetiva, pageSize])
 
   const irParaPagina = (p: number) => {
     const next = Math.min(Math.max(1, p), totalPaginas)
@@ -333,7 +362,6 @@ export function ManagePage() {
 
   const filtrosAtivos =
     vehicleId !== 'todos' ||
-    processo !== 'todos' ||
     base !== 'todos' ||
     coordenador !== 'todos' ||
     responsavel !== 'todos' ||
@@ -343,7 +371,6 @@ export function ManagePage() {
 
   const limparFiltros = () => {
     setVehicleId('todos')
-    setProcesso('todos')
     setBase('todos')
     setCoordenador('todos')
     setResponsavel('todos')
@@ -369,6 +396,7 @@ export function ManagePage() {
 
   const [resolveOpen, setResolveOpen] = useState(false)
   const [resolveId, setResolveId] = useState<string | null>(null)
+  const [resolveGroupIds, setResolveGroupIds] = useState<string[] | null>(null)
   const [resolveValor, setResolveValor] = useState<string>('')
   const [resolveData, setResolveData] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [resolveDescricao, setResolveDescricao] = useState<string>('')
@@ -444,9 +472,11 @@ export function ManagePage() {
     [rows, resolveId],
   )
 
-  const openResolveModal = (r: Apontamento) => {
+  const openResolveModal = (r: Apontamento, groupIds?: string[]) => {
     if (!canMarkResolved) return
+    const ids = groupIds?.length ? groupIds : findRecorrenteSiblingIds(rows, r.id)
     setResolveId(r.id)
+    setResolveGroupIds(ids.length > 1 ? ids : null)
     const digits = r.reparoValor != null ? String(Math.round(r.reparoValor * 100)) : ''
     setResolveValor(digits ? formatCurrency(digits) : '')
     setResolveData(r.dataResolvido ?? new Date().toISOString().slice(0, 10))
@@ -459,6 +489,7 @@ export function ManagePage() {
   const closeResolveModal = () => {
     setResolveOpen(false)
     setResolveId(null)
+    setResolveGroupIds(null)
     setResolveValor('')
     setResolveData(new Date().toISOString().slice(0, 10))
     setResolveDescricao('')
@@ -506,15 +537,32 @@ export function ManagePage() {
     const v = resolveValor.trim()
     const valor = v ? parseCurrency(v) : null
     const desc = resolveDescricao.trim()
-    await marcarResolvido(resolveId, {
+    const payload = {
       valor: Number.isFinite(valor ?? NaN) ? valor : null,
       dataResolvido: resolveData || null,
       descricao: desc ? desc : null,
       imagens: resolveImgs,
       osArquivo: resolveOsFile?.data ?? null,
-    })
+    }
+    const ids = resolveGroupIds?.length ? resolveGroupIds : [resolveId]
+    for (const id of ids) {
+      const isPrimary = id === resolveId
+      await marcarResolvido(
+        id,
+        isPrimary
+          ? payload
+          : {
+              valor: null,
+              descricao: null,
+              imagens: [],
+              osArquivo: null,
+              dataResolvido: payload.dataResolvido,
+            },
+      )
+    }
     setSalvando(false)
     closeResolveModal()
+    setHistoryGroup(null)
   }
 
   useEffect(() => {
@@ -641,18 +689,12 @@ export function ManagePage() {
         <div data-tour="manage-filtros" className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
             <div className="flex flex-col gap-3 p-4">
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
                 <Select
                   label="Filtrar por veículo"
                   value={vehicleId}
                   options={vehicleOptions}
                   onChange={(v) => { setVehicleId(v); setPagina(1) }}
-                />
-                <Select
-                  label="Processo"
-                  value={processo}
-                  options={PROCESSO_FILTER_SELECT_OPTIONS}
-                  onChange={(v) => { setProcesso(v); setPagina(1) }}
                 />
                 <Select
                   label="Base"
@@ -741,10 +783,23 @@ export function ManagePage() {
             </Link>
           </div>
         )}
+        <p className="mt-4 px-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          Defeitos repetidos (mesma placa e item de checklist) aparecem em uma linha — clique na linha para ver o histórico.
+        </p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          <span className="inline-flex items-center gap-1.5">
+            <DefeitoSeveridadeIcon imperativo />
+            Impeditivo
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <DefeitoSeveridadeIcon imperativo={false} />
+            Precisa de atenção
+          </span>
+        </p>
         <div
           ref={tabelaRef}
           data-tour="manage-table"
-          className={`mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}
+          className={`mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}
         >
           <table className="min-w-[1040px] w-full border-collapse text-center text-sm">
             <thead>
@@ -778,7 +833,7 @@ export function ManagePage() {
               </tr>
             </thead>
             <tbody className="font-semibold text-slate-800 dark:text-slate-200">
-              {sortedFiltered.length === 0 ? (
+              {tableRowsAll.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-10 text-center text-slate-500 dark:text-slate-400">
                     {visao === 'entrantes'
@@ -787,17 +842,25 @@ export function ManagePage() {
                   </td>
                 </tr>
               ) : (
-                paginaRows.map((r) => {
+                paginaRows.map((item) => {
+                  const group = item.type === 'group' ? item.group : null
+                  const r = group ? group.representative : item.row
+                  const rowKey = group ? group.key : r.id
                   const atrasado = prazoPassou(r.prazo, r.resolvido)
                   const agendado = !r.resolvido && !!r.agendamentoData
+                  const stopRowClick = (e: MouseEvent) => e.stopPropagation()
                   return (
                     <tr
-                      key={r.id}
+                      key={rowKey}
+                      onClick={group ? () => setHistoryGroup(group) : undefined}
                       className={[
                         'border-b last:border-0',
+                        group ? 'cursor-pointer' : '',
                         agendado
                           ? 'border-amber-200/70 bg-amber-50/60 hover:bg-amber-50 dark:border-amber-800/30 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
-                          : 'border-slate-100 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40',
+                          : group
+                            ? 'border-sky-200/60 bg-sky-50/40 hover:bg-sky-50/80 dark:border-sky-900/35 dark:bg-sky-950/15 dark:hover:bg-sky-950/25'
+                            : 'border-slate-100 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40',
                       ].join(' ')}
                     >
                       <td className="align-middle px-4 py-3">
@@ -822,12 +885,38 @@ export function ManagePage() {
                         <span className="mx-auto block max-w-full truncate">{r.coordenador}</span>
                       </td>
                       <td className="max-w-[220px] px-4 py-3 align-middle text-xs leading-snug sm:text-sm">
-                        {formatDefeitoParaExibicao(r.defeito)}
+                        <div className="flex flex-col items-center gap-1">
+                          {group ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                              <History size={10} aria-hidden />
+                              Recorrente
+                            </span>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1.5">
+                            <DefeitoSeveridadeIcon imperativo={r.imperativo} />
+                            <span>{formatDefeitoParaExibicao(r.defeito)}</span>
+                          </span>
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
-                        <div>{formatDateBR(r.dataApontamento)}</div>
-                        {r.horaApontamento && (
-                          <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">{r.horaApontamento}</div>
+                        {group ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-black tabular-nums text-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
+                              {group.count}×
+                            </span>
+                            <div>{formatDateBR(r.dataApontamento)}</div>
+                            {r.horaApontamento ? (
+                              <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">{r.horaApontamento}</div>
+                            ) : null}
+                            <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">último apontamento</div>
+                          </div>
+                        ) : (
+                          <>
+                            <div>{formatDateBR(r.dataApontamento)}</div>
+                            {r.horaApontamento && (
+                              <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">{r.horaApontamento}</div>
+                            )}
+                          </>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
@@ -842,7 +931,7 @@ export function ManagePage() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3 align-middle" onClick={stopRowClick}>
                         <div className="flex items-center justify-center gap-2">
                           {r.resolvido ? (
                             <span
@@ -872,7 +961,7 @@ export function ManagePage() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => openJustModal(r)}
+                                    onClick={(e) => { stopRowClick(e); openJustModal(r) }}
                                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
                                     title="Editar justificativa"
                                   >
@@ -880,7 +969,10 @@ export function ManagePage() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => openResolveModal(r)}
+                                    onClick={(e) => {
+                                      stopRowClick(e)
+                                      openResolveModal(r, group?.ocorrencias.map((o) => o.id))
+                                    }}
                                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
                                     title="Marcar como resolvido"
                                   >
@@ -902,7 +994,7 @@ export function ManagePage() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => openJustModal(r)}
+                                    onClick={(e) => { stopRowClick(e); openJustModal(r) }}
                                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
                                     title="Adicionar justificativa"
                                     aria-label="Justificar não resolução"
@@ -911,7 +1003,10 @@ export function ManagePage() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => openResolveModal(r)}
+                                    onClick={(e) => {
+                                      stopRowClick(e)
+                                      openResolveModal(r, group?.ocorrencias.map((o) => o.id))
+                                    }}
                                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
                                     title="Marcar como resolvido"
                                     aria-label={`Marcar defeito ${formatDefeitoParaExibicao(r.defeito).slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
@@ -948,7 +1043,7 @@ export function ManagePage() {
                 </span>
                 {' de '}
                 <span className="font-extrabold text-slate-700 dark:text-slate-300">{totalFiltrados}</span>
-                {' registro(s). Ordem na coluna '}
+                {' linha(s). Ordem na coluna '}
                 <span className="font-extrabold">&quot;Data de apontamento&quot;</span>
                 {': '}
                 <span className="font-extrabold">
@@ -1020,12 +1115,24 @@ export function ManagePage() {
               <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 pb-3 pt-4 dark:border-slate-800">
                 <div className="min-w-0 pr-2">
                   <div className="text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
-                    Marcar como resolvido
+                    {resolveGroupIds && resolveGroupIds.length > 1
+                      ? `Resolver o mesmo defeito (${resolveGroupIds.length} apontamentos)`
+                      : 'Marcar como resolvido'}
                   </div>
                   <div className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                     {currentResolve ? (
                       <>
-                        <span className="font-extrabold">{currentResolve.prefixo}</span> — {formatDefeitoParaExibicao(currentResolve.defeito)}
+                        <span className="font-extrabold">{currentResolve.prefixo}</span>
+                        {' — '}
+                        <span className="inline-flex items-center gap-1.5">
+                          <DefeitoSeveridadeIcon imperativo={currentResolve.imperativo} size={13} />
+                          {formatDefeitoParaExibicao(currentResolve.defeito)}
+                        </span>
+                        {resolveGroupIds && resolveGroupIds.length > 1 ? (
+                          <span className="mt-1 block text-xs font-semibold text-sky-600 dark:text-sky-400">
+                            É o mesmo problema apontado em dias diferentes. Ao confirmar, todas as {resolveGroupIds.length} ocorrências serão marcadas como resolvidas.
+                          </span>
+                        ) : null}
                       </>
                     ) : (
                       'Informe o valor e anexe evidências.'
@@ -1330,7 +1437,8 @@ export function ManagePage() {
                                   {isVencida ? ' · vencida' : ''}
                                 </span>
                               </div>
-                              <p className="mt-0.5 text-xs font-semibold leading-snug text-slate-600 dark:text-slate-300">
+                              <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-semibold leading-snug text-slate-600 dark:text-slate-300">
+                                <DefeitoSeveridadeIcon imperativo={r.imperativo} size={13} />
                                 {formatDefeitoParaExibicao(r.defeito)}
                               </p>
                               {r.justificativa && (
@@ -1500,6 +1608,126 @@ export function ManagePage() {
               </div>
             </div>
           </div>
+        </Portal>
+      ) : null}
+
+      {historyGroup ? (
+        <Portal>
+          <button
+            type="button"
+            className="fixed inset-0 z-[9998] bg-black/45"
+            onClick={() => setHistoryGroup(null)}
+            aria-label="Fechar histórico"
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-[9999] flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Histórico do defeito recorrente"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400">
+                  <History size={18} aria-hidden />
+                  <span className="text-[11px] font-black uppercase tracking-wider">Histórico recorrente</span>
+                </div>
+                <h2 className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                  {historyGroup.representative.veiculoLabel}
+                </h2>
+                <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                  <DefeitoSeveridadeIcon imperativo={historyGroup.representative.imperativo} size={15} />
+                  {formatDefeitoParaExibicao(historyGroup.representative.defeito)}
+                </p>
+                <p className="mt-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                  {historyGroup.count} apontamento(s)
+                  {historyGroup.diasConsecutivos > 1
+                    ? ` · ${historyGroup.diasConsecutivos} dias consecutivos`
+                    : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryGroup(null)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+                aria-label="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <ol className="space-y-3">
+                {historyGroup.ocorrencias.map((o, idx) => (
+                  <li
+                    key={o.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/50"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-900 dark:text-white">
+                          {formatDateBR(o.dataApontamento)}
+                          {o.horaApontamento ? (
+                            <span className="ml-2 text-xs font-bold text-slate-500 dark:text-slate-400">{o.horaApontamento}</span>
+                          ) : null}
+                        </p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          Ocorrência {historyGroup.count - idx} de {historyGroup.count}
+                        </p>
+                      </div>
+                      {idx === 0 ? (
+                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black uppercase text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                          Mais recente
+                        </span>
+                      ) : null}
+                    </div>
+                    {o.checklistId ? (
+                      <Link
+                        to={`/gerenciar?checklist=${encodeURIComponent(o.checklistId)}`}
+                        onClick={() => setHistoryGroup(null)}
+                        className="mt-3 inline-flex items-center gap-1 text-xs font-extrabold text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        <ExternalLink size={12} aria-hidden />
+                        Ver checklist deste dia
+                      </Link>
+                    ) : null}
+                    {o.ncFotos.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {o.ncFotos.slice(0, 3).map((src, i) => (
+                          <a
+                            key={src}
+                            href={src}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="h-14 w-14 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                          >
+                            <img src={src} alt={`Foto NC ${i + 1}`} className="h-full w-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {canMarkResolved && !historyGroup.representative.resolvido ? (
+              <div className="flex shrink-0 gap-2 border-t border-slate-100 p-4 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    openResolveModal(
+                      historyGroup.representative,
+                      historyGroup.ocorrencias.map((o) => o.id),
+                    )
+                  }}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-emerald-700"
+                >
+                  <Check size={16} strokeWidth={3} aria-hidden />
+                  Resolver mesmo defeito ({historyGroup.count} dias)
+                </button>
+              </div>
+            ) : null}
+          </aside>
         </Portal>
       ) : null}
     </div>

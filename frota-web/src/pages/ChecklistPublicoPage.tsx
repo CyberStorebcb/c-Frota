@@ -76,13 +76,21 @@ function TelaEscolhaChecklist({
   onSelecionar,
   highlightTipo,
   hideSync,
+  embeddedInFrame,
 }: {
   onSelecionar: (tipo: string) => void
   highlightTipo?: string | null
   hideSync?: boolean
+  embeddedInFrame?: boolean
 }) {
   return (
-    <div className={`flex min-h-dvh flex-col items-center justify-center px-4 py-8 ${CHECKLIST_PAGE_BG}`}>
+    <div
+      className={`flex flex-col items-center px-4 pb-8 ${CHECKLIST_PAGE_BG} ${
+        embeddedInFrame
+          ? 'min-h-full justify-start pt-10'
+          : 'min-h-dvh justify-center py-8'
+      }`}
+    >
       <div className="w-full max-w-md">
         <CgbHero
           eyebrow="CGB — inspeção frota"
@@ -142,6 +150,7 @@ function TelaIdentificacao({
   demoNome,
   demoMatricula,
   pulseSubmit,
+  embeddedInFrame,
 }: {
   schema: ChecklistSchemaDef
   onConfirmar: (nome: string, matricula: string) => void
@@ -149,6 +158,7 @@ function TelaIdentificacao({
   demoNome?: string
   demoMatricula?: string
   pulseSubmit?: boolean
+  embeddedInFrame?: boolean
 }) {
   const isDemo = demoNome !== undefined
   const [nome, setNome] = useState('')
@@ -176,7 +186,21 @@ function TelaIdentificacao({
   const totalItens = schema.grupos.reduce((acc, g) => acc + g.itens.length, 0)
 
   return (
-    <div className={`flex min-h-dvh flex-col items-center justify-center px-4 py-8 ${CHECKLIST_PAGE_BG}`}>
+    <div
+      className={`flex flex-col items-center px-4 pb-8 ${CHECKLIST_PAGE_BG} ${
+        embeddedInFrame
+          ? 'min-h-full justify-start pt-10'
+          : 'min-h-dvh justify-start pt-6'
+      }`}
+      style={
+        embeddedInFrame
+          ? {
+              paddingTop: 'max(2.5rem, env(safe-area-inset-top, 0px))',
+              paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
+            }
+          : undefined
+      }
+    >
       <div className="w-full max-w-sm">
 
         {/* Cabeçalho */}
@@ -282,6 +306,12 @@ function TelaIdentificacao({
   )
 }
 
+function scrollChecklistViewportToTop() {
+  const scroller = document.querySelector('.overscroll-contain') as HTMLElement | null
+  if (scroller) scroller.scrollTo({ top: 0, behavior: 'instant' })
+  else window.scrollTo({ top: 0, behavior: 'instant' })
+}
+
 // ---------------------------------------------------------------------------
 // Tela de conclusão com resumo dos NCs
 // ---------------------------------------------------------------------------
@@ -299,6 +329,7 @@ function TelaConclusao({
   descricaoProblema,
   isDemo,
   autoOpenWhatsapp,
+  embeddedInFrame,
 }: {
   ncImperativos: number
   ncCount: number
@@ -313,12 +344,17 @@ function TelaConclusao({
   descricaoProblema: string
   isDemo?: boolean
   autoOpenWhatsapp?: boolean
+  embeddedInFrame?: boolean
 }) {
   const { theme } = useTheme()
   const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
   const bloqueado = ncImperativos > 0
   const comNc = ncCount > 0
   const [demoWhatsappOpen, setDemoWhatsappOpen] = useState(false)
+
+  useEffect(() => {
+    scrollChecklistViewportToTop()
+  }, [])
 
   useEffect(() => {
     if (autoOpenWhatsapp) setDemoWhatsappOpen(true)
@@ -341,24 +377,40 @@ function TelaConclusao({
 
   return (
     <>
-    <div className="flex min-h-dvh flex-col items-center justify-start bg-slate-50 px-4 py-10 dark:bg-slate-950">
-      <div className="flex w-full max-w-sm flex-col items-center gap-5 text-center">
-        <BrandLogo tone={footerTone} variant="horizontal" className="!max-h-9 opacity-90" />
+    <div
+      className={`flex flex-col items-center justify-start bg-slate-50 px-4 dark:bg-slate-950 ${
+        embeddedInFrame ? 'min-h-full py-4 pt-8' : 'min-h-dvh py-10'
+      }`}
+      style={
+        embeddedInFrame
+          ? {
+              paddingTop: 'max(2rem, env(safe-area-inset-top, 0px))',
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+            }
+          : undefined
+      }
+    >
+      <div className={`flex w-full max-w-sm flex-col items-center text-center ${embeddedInFrame ? 'gap-3' : 'gap-5'}`}>
+        {!embeddedInFrame && (
+          <BrandLogo tone={footerTone} variant="horizontal" className="!max-h-9 opacity-90" />
+        )}
 
         {/* Ícone de status */}
-        <div className={`grid h-20 w-20 place-items-center rounded-full ${
+        <div className={`grid place-items-center rounded-full ${
+          embeddedInFrame ? 'h-16 w-16' : 'h-20 w-20'
+        } ${
           bloqueado ? 'bg-rose-100 text-rose-500' :
           comNc     ? 'bg-amber-100 text-amber-500' :
                       'bg-emerald-100 text-emerald-500'
         }`}>
-          {bloqueado ? <AlertTriangle size={40} /> : <CheckCircle2 size={40} />}
+          {bloqueado ? <AlertTriangle size={embeddedInFrame ? 32 : 40} /> : <CheckCircle2 size={embeddedInFrame ? 32 : 40} />}
         </div>
 
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">
+          <h1 className={`font-black text-slate-900 dark:text-slate-100 ${embeddedInFrame ? 'text-xl' : 'text-2xl'}`}>
             {offline ? 'Checklist salvo no dispositivo' : bloqueado ? 'Veículo impedido!' : comNc ? 'Checklist enviado' : 'Tudo Conforme!'}
           </h1>
-          <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+          <p className={`mt-2 font-semibold text-slate-500 dark:text-slate-400 ${embeddedInFrame ? 'text-xs leading-snug' : 'text-sm'}`}>
             {offline
               ? 'Assim que a internet voltar, o aplicativo tentará sincronizar automaticamente.'
               : bloqueado
@@ -371,8 +423,8 @@ function TelaConclusao({
 
         {/* Banner de bloqueio */}
         {bloqueado && (
-          <div className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left dark:border-rose-900/50 dark:bg-rose-900/20">
-            <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
+          <div className={`w-full rounded-2xl border border-rose-200 bg-rose-50 text-left dark:border-rose-900/50 dark:bg-rose-900/20 ${embeddedInFrame ? 'px-3 py-2' : 'px-4 py-3'}`}>
+            <p className={`font-extrabold text-rose-600 dark:text-rose-400 ${embeddedInFrame ? 'text-[10px] leading-snug' : 'text-xs'}`}>
               ⚠ VEÍCULO IMPEDIDO — NÃO CONDUZA ATÉ QUE OS ITENS IMPEDITIVOS SEJAM CORRIGIDOS E VERIFICADOS PELO SUPERVISOR.
             </p>
           </div>
@@ -380,7 +432,9 @@ function TelaConclusao({
 
         {/* Alerta WhatsApp para supervisor */}
         {comNc && whatsappLink && (
-          <div className={`w-full rounded-2xl border px-4 py-4 text-left ${
+          <div className={`w-full rounded-2xl border px-4 text-left ${
+            embeddedInFrame ? 'py-3' : 'py-4'
+          } ${
             bloqueado
               ? 'border-rose-300 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-900/20'
               : 'border-amber-300 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-900/20'
@@ -470,7 +524,7 @@ function TelaConclusao({
                   <img
                     src={url}
                     alt={`Foto ${i + 1}`}
-                    className="h-24 w-full rounded-xl border border-slate-200 object-cover shadow-sm dark:border-slate-700"
+                    className={`w-full rounded-xl border border-slate-200 object-cover shadow-sm dark:border-slate-700 ${embeddedInFrame ? 'h-16' : 'h-24'}`}
                   />
                 </a>
               ))}
@@ -924,6 +978,7 @@ function FormularioChecklist({
   demoMode,
   onCursorTarget,
   hideSync,
+  embeddedInFrame,
 }: {
   schema: ChecklistSchemaDef
   operador: string
@@ -933,6 +988,7 @@ function FormularioChecklist({
   demoMode?: { enabled: boolean; speedFactor: number }
   onCursorTarget?: (t: import('../components/checklist/DemoCursor').DemoCursorTarget | null) => void
   hideSync?: boolean
+  embeddedInFrame?: boolean
 }) {
   // No modo demo limita os itens visíveis para manter o vídeo ágil
   const DEMO_MAX_ITENS = demoMode?.enabled ? 10 : Infinity
@@ -1257,6 +1313,7 @@ function FormularioChecklist({
       for (let idx = 0; idx < demoItens.length; idx++) {
         const item = demoItens[idx]!
         if (!demoActiveRef.current) return
+        onCursorTargetRef.current?.(null)
         itemRefs.current[item.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         setItemDestacado(item.id)
         await wait(DEMO_TIMING.itemScroll)
@@ -1300,6 +1357,7 @@ function FormularioChecklist({
 
       // Helper: scrolla um elemento visível para o centro da tela
       const scrollTo = (selector: string) => {
+        onCursorTargetRef.current?.(null)
         const scroller = document.querySelector('.overscroll-contain') as HTMLElement | null
         const root = scroller ?? document.body
         const el = root.querySelector(selector) as HTMLElement | null
@@ -1357,11 +1415,11 @@ function FormularioChecklist({
       setConcluido(true)
       setEnviando(false)
 
-      // Aguarda a tela final renderizar, depois mostra o modal WhatsApp
+      // Aguarda a tela final renderizar, rola ao topo e abre o modal WhatsApp
       await wait(1400)
       if (!demoActiveRef.current) return
-      scrollTo('[data-demo-whatsapp-btn]')
-      await wait(600)
+      scrollChecklistViewportToTop()
+      await wait(500)
       if (!demoActiveRef.current) return
       onCursorTargetRef.current?.({ selector: '[data-demo-whatsapp-btn]', tap: true, key: 'whatsapp-btn' })
       await wait(CURSOR_TRAVEL)
@@ -1798,6 +1856,7 @@ function FormularioChecklist({
         descricaoProblema={resultadoFinal.descricaoProblema}
         isDemo={demoMode?.enabled}
         autoOpenWhatsapp={demoAutoWhatsapp}
+        embeddedInFrame={embeddedInFrame}
       />
     )
   }
@@ -2516,6 +2575,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   }, [isDemo, demoKey])
 
   let content: React.ReactNode
+  const embeddedInFrame = isDemo && withFrame
 
   if (!tipoSelecionado) {
     content = (
@@ -2523,6 +2583,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
         onSelecionar={handleTipo}
         highlightTipo={isDemo ? demo.highlightTipo : null}
         hideSync={isDemo}
+        embeddedInFrame={embeddedInFrame}
       />
     )
   } else {
@@ -2538,6 +2599,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
           demoNome={isDemo ? demo.demoNome : undefined}
           demoMatricula={isDemo ? demo.demoMatricula : undefined}
           pulseSubmit={isDemo ? demo.pulseSubmit : false}
+          embeddedInFrame={embeddedInFrame}
         />
       )
     } else {
@@ -2555,6 +2617,7 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
           demoMode={isDemo ? { enabled: true, speedFactor } : undefined}
           onCursorTarget={isDemo ? demo.setCursorTarget : undefined}
           hideSync={isDemo}
+          embeddedInFrame={embeddedInFrame}
         />
       )
     }
@@ -2564,9 +2627,9 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
     return (
       <>
         <ChecklistPhoneFrame key={demoKey}>
-          <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
           {content}
         </ChecklistPhoneFrame>
+        <ChecklistDemoBanner phase={demo.phase} onRestart={handleDemoRestart} />
         <DemoCursor target={demo.cursorTarget} visible={isDemo} />
       </>
     )

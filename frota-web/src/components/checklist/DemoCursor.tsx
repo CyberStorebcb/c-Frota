@@ -21,12 +21,14 @@ function getCenter(selector: string): Pos | null {
 export function DemoCursor({ target, visible }: { target: DemoCursorTarget | null; visible: boolean }) {
   const [pos, setPos] = useState<Pos | null>(null)
   const [tapping, setTapping] = useState(false)
-  const prevSelector = useRef<string | null>(null)
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Reposiciona quando o target muda
+  // Reposiciona quando o target muda (sem seguir scroll — evita efeito de "arrastar")
   useLayoutEffect(() => {
-    if (!target || !visible) return
+    if (!target || !visible) {
+      setPos(null)
+      return
+    }
 
     const compute = () => {
       const center = getCenter(target.selector)
@@ -35,39 +37,33 @@ export function DemoCursor({ target, visible }: { target: DemoCursorTarget | nul
       return true
     }
 
-    // Tenta imediatamente, depois com pequeno delay para aguardar render
     if (!compute()) {
       const t = setTimeout(() => compute(), 120)
       return () => clearTimeout(t)
     }
   }, [target, visible])
 
-  // Dispara animação de toque quando target.tap === true
-  useEffect(() => {
-    if (!target?.tap || !visible) return
-    if (tapTimer.current) clearTimeout(tapTimer.current)
-    // Pequeno delay para o cursor chegar antes de "tocar"
-    tapTimer.current = setTimeout(() => {
-      setTapping(true)
-      tapTimer.current = setTimeout(() => setTapping(false), 400)
-    }, 300)
-    return () => {
-      if (tapTimer.current) clearTimeout(tapTimer.current)
-    }
-  }, [target, visible])
-
-  // Rastreia mudanças de rota/scroll para atualizar posição
+  // Reposiciona em resize (layout shift), sem animação de scroll
   useEffect(() => {
     if (!target || !visible) return
     const update = () => {
       const center = getCenter(target.selector)
       if (center) setPos(center)
     }
-    window.addEventListener('scroll', update, true)
     window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [target, visible])
+
+  // Dispara animação de toque quando target.tap === true
+  useEffect(() => {
+    if (!target?.tap || !visible) return
+    if (tapTimer.current) clearTimeout(tapTimer.current)
+    tapTimer.current = setTimeout(() => {
+      setTapping(true)
+      tapTimer.current = setTimeout(() => setTapping(false), 400)
+    }, 300)
     return () => {
-      window.removeEventListener('scroll', update, true)
-      window.removeEventListener('resize', update)
+      if (tapTimer.current) clearTimeout(tapTimer.current)
     }
   }, [target, visible])
 

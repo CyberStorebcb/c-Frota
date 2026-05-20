@@ -18,10 +18,10 @@ export function ChecklistPhoneFrame({ children }: { children: ReactNode }) {
 
           {/* Tela */}
           <div
-            className="relative overflow-hidden rounded-[2.1rem] bg-white shadow-inner ring-1 ring-black/20 dark:bg-slate-950"
+            className="relative flex flex-col overflow-hidden rounded-[2.1rem] bg-white shadow-inner ring-1 ring-black/20 dark:bg-slate-950"
             style={{ height: 'min(calc(100dvh - 4rem), 844px)' }}
           >
-            <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain">
               {children}
             </div>
           </div>

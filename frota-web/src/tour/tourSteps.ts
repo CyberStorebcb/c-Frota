@@ -66,7 +66,7 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="manage-filtros"]',
     title: '🔍 Filtros Avançados',
     content:
-      'Filtre por veículo, base, processo, supervisor, gerência e intervalo de datas. Os filtros ativos são destacados e podem ser limpos individualmente.',
+      'Filtre por veículo, base, supervisor, gerência e intervalo de datas. Os filtros ativos são destacados e podem ser limpos individualmente.',
     placement: 'bottom',
   },
   {

@@ -52,11 +52,34 @@ function toAuthUser(supabaseUser: User, role: 'super_admin' | 'admin' | 'user', 
   }
 }
 
+/** Usuário fictício para captura de screenshots em dev (localStorage frota.screenshot.bypass=1). */
+const SCREENSHOT_MOCK_USER: AuthUser = {
+  id: '00000000-0000-0000-0000-000000000001',
+  email: 'apresentacao@cgbengenharia.com.br',
+  role: 'super_admin',
+  mustChangePassword: false,
+}
+
+function readScreenshotBypassUser(): AuthUser | null {
+  if (!import.meta.env.DEV) return null
+  try {
+    if (localStorage.getItem('frota.screenshot.bypass') === '1') return SCREENSHOT_MOCK_USER
+  } catch { /* storage indisponível */ }
+  return null
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<AuthUser | null>(() => readScreenshotBypassUser())
+  const [loading, setLoading] = useState(() => !readScreenshotBypassUser())
 
   useEffect(() => {
+    const bypass = readScreenshotBypassUser()
+    if (bypass) {
+      setUser(bypass)
+      setLoading(false)
+      return
+    }
+
     const timeout = setTimeout(() => setLoading(false), 8000)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeout)

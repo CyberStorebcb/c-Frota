@@ -18,7 +18,9 @@
     "gen:totalveiculos": "node scripts/generate-total-vehicles-fleet.mjs",
     "gen:ativo-placas": "node scripts/gen-fleet-ativo-placas.mjs",
     "gen:desmobilizado-placas": "node scripts/gen-fleet-desmobilizado-placas.mjs",
-    "gen:catalogos": "npm run gen:totalveiculos"
+    "gen:catalogos": "npm run gen:totalveiculos",
+    "gen:apresentacao": "node scripts/capture-apresentacao-screenshots.mjs && node scripts/generate-apresentacao-pdf.mjs",
+    "gen:apresentacao:pdf": "node scripts/generate-apresentacao-pdf.mjs"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.6",
@@ -45,6 +47,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "playwright": "^1.60.0",
     "postcss": "^8.5.12",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.4",

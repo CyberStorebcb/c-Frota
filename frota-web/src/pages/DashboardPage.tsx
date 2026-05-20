@@ -15,7 +15,6 @@ import {
 
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
-import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select } from '../components/ui/Select'
 import {
@@ -218,7 +217,6 @@ export function DashboardPage() {
   const [periodo, setPeriodo] = useState<string>('7d')
   const [customDesde, setCustomDesde] = useState<string>(defaultCustomDesdeIso)
   const [customAte, setCustomAte] = useState<string>(() => hojeLocalIso())
-  const [filtroProcesso, setFiltroProcesso] = useState<string>('todos')
   const [filtroBase, setFiltroBase] = useState<string>('todos')
   const [filtroCoordenador, setFiltroCoordenador] = useState<string>('todos')
   const [filtroSupervisor, setFiltroSupervisor] = useState<string>('todos')
@@ -236,7 +234,6 @@ export function DashboardPage() {
       params.set('desde', customDesde)
       params.set('ate', customAte)
     }
-    if (filtroProcesso !== 'todos') params.set('processo', filtroProcesso)
     if (filtroBase !== 'todos') params.set('base', filtroBase)
     if (filtroCoordenador !== 'todos') params.set('gerencia', filtroCoordenador)
     if (filtroSupervisor !== 'todos') params.set('supervisor', filtroSupervisor)
@@ -304,13 +301,12 @@ export function DashboardPage() {
   const pendenciasFiltradas = useMemo(() => {
     return rows.filter((r) => {
       if (r.resolvido) return false
-      if (filtroProcesso !== 'todos' && !matchesProcessoFilter(r.processo, filtroProcesso)) return false
       if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
       if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.responsavel, filtroSupervisor)) return false
       return true
     })
-  }, [rows, filtroProcesso, filtroBase, filtroCoordenador, filtroSupervisor])
+  }, [rows, filtroBase, filtroCoordenador, filtroSupervisor])
 
   const checklistsPorDiaNoPeriodo = useMemo(() => {
     return checklistsPorDia
@@ -518,13 +514,7 @@ export function DashboardPage() {
         >
           <div className="overflow-hidden">
             <div className="border-t border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4 lg:gap-4">
-                <Select
-                  label="Processo"
-                  value={filtroProcesso}
-                  onChange={setFiltroProcesso}
-                  options={PROCESSO_FILTER_SELECT_OPTIONS}
-                />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 lg:gap-4">
                 <Select
                   label="Base"
                   value={filtroBase}

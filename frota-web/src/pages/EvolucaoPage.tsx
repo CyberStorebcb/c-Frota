@@ -30,7 +30,6 @@ import {
 } from '../apontamentos/evolucaoAnalytics'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
-import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 
 const TOOLTIP_EXEMPLOS_MAX = 5
@@ -504,7 +503,6 @@ export function EvolucaoPage() {
     try { return localStorage.getItem('frota.filtros.evolucao') === 'true' }
     catch { return false }
   })
-  const [filtroProcesso, setFiltroProcesso] = useState('todos')
   const [filtroBase, setFiltroBase] = useState('todos')
   const [filtroCoord, setFiltroCoord] = useState('todos')
   const [filtroResp, setFiltroResp] = useState('todos')
@@ -531,8 +529,8 @@ export function EvolucaoPage() {
   }, [rows])
 
   const filtrosObj = useMemo<EvolucaoFiltros>(
-    () => ({ processo: filtroProcesso, base: filtroBase, coordenador: filtroCoord, responsavel: filtroResp, prefixo: filtroPrefixo, data: filtroData }),
-    [filtroProcesso, filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData],
+    () => ({ base: filtroBase, coordenador: filtroCoord, responsavel: filtroResp, prefixo: filtroPrefixo, data: filtroData }),
+    [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData],
   )
 
   const resolvidosFiltrados = useMemo(() => filterResolvidosParaEvolucao(rows, filtrosObj), [rows, filtrosObj])
@@ -580,7 +578,6 @@ export function EvolucaoPage() {
   const linha2Data = useMemo(() => {
     const keyFn = (iso: string) => agregacao === 'semana' ? mondayKeyFromDateIso(iso) : iso.slice(0, 7)
     const filtered = rows.filter((r) => {
-      if (filtroProcesso !== 'todos' && !matchesProcessoFilter(r.processo, filtroProcesso)) return false
       if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
       if (filtroResp !== 'todos' && r.responsavel !== filtroResp) return false
@@ -604,19 +601,18 @@ export function EvolucaoPage() {
       const d = map.get(p.chave) ?? { abertos: 0, resolvidos: 0, pendentes: 0 }
       return { chave: p.chave, periodo: p.periodo, ...d }
     })
-  }, [rows, filtroProcesso, filtroBase, filtroCoord, filtroResp, filtroPrefixo, agregacao, chartData, boundaryRange])
+  }, [rows, filtroBase, filtroCoord, filtroResp, filtroPrefixo, agregacao, chartData, boundaryRange])
 
   // KPIs globais: total de defeitos no recorte (resolvidos + pendentes)
   const totalDefeitos = useMemo(() => {
     return rows.filter((r) => {
-      if (filtroProcesso !== 'todos' && !matchesProcessoFilter(r.processo, filtroProcesso)) return false
       if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
       if (filtroResp !== 'todos' && r.responsavel !== filtroResp) return false
       if (filtroPrefixo !== 'todos' && r.prefixo !== filtroPrefixo) return false
       return true
     }).length
-  }, [rows, filtroProcesso, filtroBase, filtroCoord, filtroResp, filtroPrefixo])
+  }, [rows, filtroBase, filtroCoord, filtroResp, filtroPrefixo])
 
   const totalPendentes = totalDefeitos - resolvidosFiltrados.length
 
@@ -653,11 +649,11 @@ export function EvolucaoPage() {
   }, [rows, filtroCoord, filtroResp, filtroPrefixo])
 
   const limparFiltros = () => {
-    setFiltroProcesso('todos'); setFiltroBase('todos'); setFiltroCoord('todos')
+    setFiltroBase('todos'); setFiltroCoord('todos')
     setFiltroResp('todos'); setFiltroPrefixo('todos'); setFiltroData('todos')
   }
 
-  const filtrosAtivos = filtroProcesso !== 'todos' || filtroBase !== 'todos' || filtroCoord !== 'todos' ||
+  const filtrosAtivos = filtroBase !== 'todos' || filtroCoord !== 'todos' ||
     filtroResp !== 'todos' || filtroPrefixo !== 'todos' || filtroData !== 'todos'
 
   const isMobile = wrapW > 0 && wrapW < 640
@@ -739,8 +735,7 @@ export function EvolucaoPage() {
         </div>
         <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
-            <div className="grid grid-cols-1 gap-3 border-t border-slate-100 px-4 pb-4 pt-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 dark:border-slate-800">
-              <Select label="Processo" value={filtroProcesso} options={PROCESSO_FILTER_SELECT_OPTIONS} onChange={setFiltroProcesso} />
+            <div className="grid grid-cols-1 gap-3 border-t border-slate-100 px-4 pb-4 pt-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 dark:border-slate-800">
               <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} />
               <Select label="Coordenador" value={filtroCoord} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setFiltroCoord} />
               <Select label="Responsável" value={filtroResp} options={optResp} onChange={setFiltroResp} />

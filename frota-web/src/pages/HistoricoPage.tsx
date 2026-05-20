@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, CalendarCheck2, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
-import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
+import { buildHistoricoResolvidoEntries, type HistoricoResolvidoEntry } from '../apontamentos/groupApontamentos'
 import { Portal } from '../components/ui/Portal'
 
 function formatDateBR(iso: string) {
@@ -191,17 +192,17 @@ export function HistoricoPage() {
     const min = parseMoney(valorMin)
     const max = parseMoney(valorMax)
 
-    let list = rows.filter((r) => r.resolvido && r.dataResolvido)
+    let list = buildHistoricoResolvidoEntries(rows)
     if (q) {
       list = list.filter(
-        (r) =>
-          r.defeito.toLowerCase().includes(q) ||
-          r.veiculoLabel.toLowerCase().includes(q),
+        (e) =>
+          e.representative.defeito.toLowerCase().includes(q) ||
+          e.representative.veiculoLabel.toLowerCase().includes(q),
       )
     }
     if (min != null || max != null) {
-      list = list.filter((r) => {
-        const v = r.reparoValor
+      list = list.filter((e) => {
+        const v = e.representative.reparoValor
         if (v == null || !Number.isFinite(v)) return false
         if (min != null && v < min) return false
         if (max != null && v > max) return false
@@ -209,29 +210,35 @@ export function HistoricoPage() {
       })
     }
     if (dataInicio) {
-      list = list.filter((r) => !!r.dataResolvido && r.dataResolvido >= dataInicio)
+      list = list.filter((e) => e.dataResolvido >= dataInicio)
     }
     if (dataFim) {
-      list = list.filter((r) => !!r.dataResolvido && r.dataResolvido <= dataFim)
+      list = list.filter((e) => e.dataResolvido <= dataFim)
     }
     return [...list].sort((a, b) => {
-      const tb = resolvedAtMs(b.dataResolvido!, b.horaResolvido)
-      const ta = resolvedAtMs(a.dataResolvido!, a.horaResolvido)
+      const tb = resolvedAtMs(b.dataResolvido, b.representative.horaResolvido)
+      const ta = resolvedAtMs(a.dataResolvido, a.representative.horaResolvido)
       if (tb !== ta) return tb - ta
-      return b.id.localeCompare(a.id)
+      return b.key.localeCompare(a.key)
     })
   }, [rows, query, valorMin, valorMax, dataInicio, dataFim])
 
   const totalGastoHistorico = useMemo(() => {
     let s = 0
-    for (const r of historico) {
-      const v = r.reparoValor
+    for (const e of historico) {
+      const v = e.representative.reparoValor
       if (v != null && Number.isFinite(v)) s += v
     }
     return s
   }, [historico])
 
-  const gerarPdf = async (r: (typeof historico)[number]) => {
+  const apontamentoParaPdf = (e: HistoricoResolvidoEntry): Apontamento => ({
+    ...e.representative,
+    dataApontamento: e.dataPrimeiroApontamento,
+  })
+
+  const gerarPdf = async (e: HistoricoResolvidoEntry) => {
+    const r = apontamentoParaPdf(e)
     const { jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'pt', format: 'a4' })
     const pageW = doc.internal.pageSize.getWidth()
@@ -861,9 +868,11 @@ export function HistoricoPage() {
                   </td>
                 </tr>
               ) : (
-                historico.map((r) => (
+                historico.map((e) => {
+                  const r = e.representative
+                  return (
                   <tr
-                    key={r.id}
+                    key={e.key}
                     className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40"
                   >
                     <td className="px-4 py-3">
@@ -885,11 +894,18 @@ export function HistoricoPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
-                      {formatDateBR(r.dataApontamento)}
+                      <div className="flex flex-col items-center gap-1">
+                        <span>{formatDateBR(e.dataPrimeiroApontamento)}</span>
+                        {e.count > 1 ? (
+                          <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                            1º de {e.count} apontamentos
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs sm:text-sm">
                       <div className="flex flex-col items-center font-black text-emerald-700 dark:text-emerald-400">
-                        <span>{formatDateBR(r.dataResolvido!)}</span>
+                        <span>{formatDateBR(e.dataResolvido)}</span>
                         {r.horaResolvido ? (
                           <span className="mt-0.5 text-[11px] font-extrabold text-slate-500 dark:text-slate-400">
                             {r.horaResolvido}
@@ -918,7 +934,7 @@ export function HistoricoPage() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => void gerarPdf(r)}
+                            onClick={() => void gerarPdf(e)}
                             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
                             title="Gerar relatório em PDF"
                             aria-label="Gerar relatório em PDF"
@@ -931,7 +947,7 @@ export function HistoricoPage() {
                           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">—</span>
                           <button
                             type="button"
-                            onClick={() => void gerarPdf(r)}
+                            onClick={() => void gerarPdf(e)}
                             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
                             title="Gerar relatório em PDF"
                             aria-label="Gerar relatório em PDF"
@@ -942,7 +958,8 @@ export function HistoricoPage() {
                       )}
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

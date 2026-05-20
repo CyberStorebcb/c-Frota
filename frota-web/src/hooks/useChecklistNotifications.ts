@@ -56,7 +56,7 @@ async function fetchTodayStats(activeVehicles: FleetVehicle[]): Promise<{ realiz
   }
 
   const total = activeVehicles.filter(
-    (v) => isOperacionalAtivosDashboardKpi(v.placa, v.prefixo ?? '')
+    (v) => isOperacionalAtivosDashboardKpi(v.placa, v.prefixo ?? '', v.status),
   ).length
   const realizaram = placasFeitas.size
   const naoRealizaram = Math.max(0, total - realizaram)

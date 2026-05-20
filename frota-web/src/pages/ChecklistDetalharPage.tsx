@@ -14,7 +14,6 @@ import {
 
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
-import { PROCESSO_FILTER_SELECT_OPTIONS, matchesProcessoFilter } from '../data/processoFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select } from '../components/ui/Select'
 import { getVehicleOperationalStatusRowsWithLocals, isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
@@ -89,7 +88,6 @@ type ChecklistDetalharFiltersState = {
   periodo: string
   customDesde: string
   customAte: string
-  processo: string
   base: string
   gerencia: string
   supervisor: string
@@ -165,9 +163,6 @@ export function ChecklistDetalharPage() {
   const [customAte, setCustomAte] = useState(() =>
     pickFilter(searchParams.get('ate'), savedFilters, 'customAte', hojeLocalIso()),
   )
-  const [filtroProcesso, setFiltroProcesso] = useState(() =>
-    pickFilter(searchParams.get('processo'), savedFilters, 'processo', 'todos'),
-  )
   const [filtroBase, setFiltroBase] = useState(() => pickFilter(searchParams.get('base'), savedFilters, 'base', 'todos'))
   const [filtroCoordenador, setFiltroCoordenador] = useState(() =>
     pickFilter(searchParams.get('gerencia'), savedFilters, 'gerencia', 'todos'),
@@ -185,7 +180,6 @@ export function ChecklistDetalharPage() {
       periodo,
       customDesde,
       customAte,
-      processo: filtroProcesso,
       base: filtroBase,
       gerencia: filtroCoordenador,
       supervisor: filtroSupervisor,
@@ -196,7 +190,6 @@ export function ChecklistDetalharPage() {
     periodo,
     customDesde,
     customAte,
-    filtroProcesso,
     filtroBase,
     filtroCoordenador,
     filtroSupervisor,
@@ -215,7 +208,7 @@ export function ChecklistDetalharPage() {
     for (const v of allVehicles) {
       const placa = normPlaca(v.placa)
       if (!placa) continue
-      if (!isOperacionalAtivosDashboardKpi(placa, v.prefixo ?? '')) continue
+      if (!isOperacionalAtivosDashboardKpi(placa, v.prefixo ?? '', v.status)) continue
       m.set(placa, {
         placa,
         modelo: v.modelo ?? '—',
@@ -280,18 +273,17 @@ export function ChecklistDetalharPage() {
   }, [limites, frotaMap])
 
   // ── aplicar filtros ───────────────────────────────────────────────────────
-  function passaFiltros(r: { base: string; supervisor: string; coordenador: string; processo: string }) {
+  function passaFiltros(r: { base: string; supervisor: string; coordenador: string }) {
     if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
     if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
     if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
-    if (filtroProcesso !== 'todos' && !matchesProcessoFilter(r.processo, filtroProcesso)) return false
     return true
   }
 
   const placasRealizaram = useMemo(
     () => rawChecklists.filter(passaFiltros),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rawChecklists, filtroBase, filtroSupervisor, filtroCoordenador, filtroProcesso],
+    [rawChecklists, filtroBase, filtroSupervisor, filtroCoordenador],
   )
 
   const placasRealizaramSet = useMemo(
@@ -303,7 +295,7 @@ export function ChecklistDetalharPage() {
     return Array.from(frotaMap.values())
       .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frotaMap, placasRealizaramSet, filtroBase, filtroSupervisor, filtroCoordenador, filtroProcesso])
+  }, [frotaMap, placasRealizaramSet, filtroBase, filtroSupervisor, filtroCoordenador])
 
   // ── busca ─────────────────────────────────────────────────────────────────
   const q = busca.trim().toUpperCase()
@@ -329,7 +321,6 @@ export function ChecklistDetalharPage() {
     ? formatIsoDateBR(limites.ini)
     : `${formatIsoDateBR(limites.ini)} a ${formatIsoDateBR(limites.fim)}`
   const filtrosAtivos =
-    filtroProcesso !== 'todos' ||
     filtroBase !== 'todos' ||
     filtroCoordenador !== 'todos' ||
     filtroSupervisor !== 'todos' ||
@@ -435,7 +426,6 @@ export function ChecklistDetalharPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setFiltroProcesso('todos')
                   setFiltroBase('todos')
                   setFiltroCoordenador('todos')
                   setFiltroSupervisor('todos')
@@ -526,8 +516,7 @@ export function ChecklistDetalharPage() {
                 </div>
               )}
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <Select label="Processo" value={filtroProcesso} onChange={setFiltroProcesso} options={PROCESSO_FILTER_SELECT_OPTIONS} />
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={BASE_FILTER_SELECT_OPTIONS} />
                 <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
                 <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />

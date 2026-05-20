@@ -42,12 +42,26 @@ export function statusOperacionalCatalogo(placa: string, prefixoPlanilha: string
   return prefixoParaStatusOperacional(prefixoPlanilha)
 }
 
+/** Classificação operacional considerando cadastro (INATIVO → DESMOBILIZADO). */
+export function resolveStatusOperacional(
+  placa: string,
+  prefixoPlanilha: string,
+  fleetStatus?: string,
+): string {
+  if (fleetStatus === 'INATIVO') return 'DESMOBILIZADO'
+  return statusOperacionalCatalogo(placa, prefixoPlanilha)
+}
+
 /**
  * Critério do KPI «Total de veículos ativos» no dashboard / registo: soma operacional
  * equivalente às caixas ATIVOS ∪ TRANSPORTE (exclui Reserva e estados não ativos).
  */
-export function isOperacionalAtivosDashboardKpi(placa: string, prefixoPlanilha: string): boolean {
-  const op = statusOperacionalCatalogo(placa, prefixoPlanilha)
+export function isOperacionalAtivosDashboardKpi(
+  placa: string,
+  prefixoPlanilha: string,
+  fleetStatus?: string,
+): boolean {
+  const op = resolveStatusOperacional(placa, prefixoPlanilha, fleetStatus)
   if (NOT_ACTIVE_OPERATIONAL_STATUS_SET.has(op)) return false
   return op !== 'RESERVA'
 }
@@ -71,10 +85,7 @@ export function getVehicleOperationalStatusRowsWithLocals(
     prefixo: v.prefixo ?? '',
     base: v.base ?? '',
     processo: '',
-    statusOperacional:
-      v.status === 'INATIVO'
-        ? 'DESMOBILIZADO'
-        : statusOperacionalCatalogo(v.placa, v.prefixo ?? ''),
+    statusOperacional: resolveStatusOperacional(v.placa, v.prefixo ?? '', v.status),
   }))
 }
 
