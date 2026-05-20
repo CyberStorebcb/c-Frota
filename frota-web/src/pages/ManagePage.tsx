@@ -343,6 +343,18 @@ export function ManagePage() {
     return { total: rowsMatchingFiltros.length, pendentes, resolvidos, entrantes }
   }, [rowsMatchingFiltros, nowMs])
 
+  const severidadeStats = useMemo(() => {
+    let list = rowsMatchingFiltros
+    if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
+    if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
+    if (visao === 'entrantes') list = list.filter((r) => isDefeitoEntrante(r, nowMs))
+    return {
+      total: list.length,
+      imperativos: list.filter((r) => r.imperativo).length,
+      atencao: list.filter((r) => !r.imperativo).length,
+    }
+  }, [rowsMatchingFiltros, visao, nowMs])
+
   const tableRowsAll = useMemo(
     () => buildManageTableRows(sortedFiltered, true, dataOrdem),
     [sortedFiltered, dataOrdem],
@@ -786,63 +798,79 @@ export function ManagePage() {
             </Link>
           </div>
         )}
-        <p className="mt-4 px-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-          Defeitos repetidos (mesma placa e item de checklist) aparecem em uma linha — clique na linha para ver o histórico.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Severidade:
-          </span>
-          <button
-            type="button"
-            onClick={() => { setSeveridade('todos'); setPagina(1) }}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
-              severidade === 'todos'
-                ? 'border-slate-400 bg-slate-800 text-white dark:border-slate-500 dark:bg-slate-700'
-                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            Todos
-          </button>
-          <button
-            type="button"
-            onClick={() => { setSeveridade('imperativo'); setPagina(1) }}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
-              severidade === 'imperativo'
-                ? 'border-rose-500 bg-rose-600 text-white dark:border-rose-500 dark:bg-rose-700'
-                : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50'
-            }`}
-          >
-            <DefeitoSeveridadeIcon imperativo size={12} />
-            Impeditivos
-          </button>
-          <button
-            type="button"
-            onClick={() => { setSeveridade('atencao'); setPagina(1) }}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
-              severidade === 'atencao'
-                ? 'border-amber-500 bg-amber-500 text-white dark:border-amber-500 dark:bg-amber-600'
-                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50'
-            }`}
-          >
-            <DefeitoSeveridadeIcon imperativo={false} size={12} />
-            Precisa de atenção
-          </button>
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/50 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-2 text-slate-500 dark:text-slate-400">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-sky-600 shadow-sm dark:bg-slate-950/60 dark:text-sky-300">
+              <History size={13} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                Agrupamento automático
+              </p>
+              <p className="truncate text-[11px] font-semibold">
+                Mesma placa e item aparecem em uma linha. Clique na linha para ver o histórico.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Severidade
+            </span>
+            <button
+              type="button"
+              onClick={() => { setSeveridade('todos'); setPagina(1) }}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
+                severidade === 'todos'
+                  ? 'border-slate-500 bg-slate-800 text-white shadow-sm dark:border-slate-500 dark:bg-slate-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`}
+            >
+              Todos
+              <span className="rounded-full bg-white/20 px-1.5 text-[10px] tabular-nums">{severidadeStats.total}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSeveridade('imperativo'); setPagina(1) }}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
+                severidade === 'imperativo'
+                  ? 'border-rose-500 bg-rose-600 text-white shadow-sm dark:border-rose-500 dark:bg-rose-700'
+                  : 'border-rose-200 bg-white text-rose-700 hover:bg-rose-50 dark:border-rose-900/60 dark:bg-slate-950/60 dark:text-rose-300 dark:hover:bg-rose-950/40'
+              }`}
+            >
+              <DefeitoSeveridadeIcon imperativo size={12} />
+              Impeditivos
+              <span className="rounded-full bg-white/20 px-1.5 text-[10px] tabular-nums">{severidadeStats.imperativos}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSeveridade('atencao'); setPagina(1) }}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-extrabold transition ${
+                severidade === 'atencao'
+                  ? 'border-amber-500 bg-amber-500 text-white shadow-sm dark:border-amber-500 dark:bg-amber-600'
+                  : 'border-amber-200 bg-white text-amber-700 hover:bg-amber-50 dark:border-amber-900/60 dark:bg-slate-950/60 dark:text-amber-300 dark:hover:bg-amber-950/40'
+              }`}
+            >
+              <DefeitoSeveridadeIcon imperativo={false} size={12} />
+              Atenção
+              <span className="rounded-full bg-white/20 px-1.5 text-[10px] tabular-nums">{severidadeStats.atencao}</span>
+            </button>
+          </div>
         </div>
         <div
           ref={tabelaRef}
           data-tour="manage-table"
           className={`mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 ${carregando ? 'hidden' : ''}`}
         >
-          <table className="min-w-[1040px] w-full border-collapse text-center text-sm">
+          <table className="min-w-[980px] w-full border-collapse text-center text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
-                <th className="px-4 py-3 text-center">Veículo</th>
-                <th className="px-4 py-3 text-center">Processo</th>
-                <th className="px-4 py-3 text-center">Base</th>
-                <th className="px-4 py-3 text-center">Gerência</th>
-                <th className="px-4 py-3 text-center">Defeito</th>
-                <th className="px-4 py-3 text-center">
+                <th className="px-3 py-2 text-center">Veículo</th>
+                <th className="px-3 py-2 text-center">Processo</th>
+                <th className="px-3 py-2 text-center">Base</th>
+                <th className="px-3 py-2 text-center">Gerência</th>
+                <th className="px-3 py-2 text-center">Defeito</th>
+                <th className="px-3 py-2 text-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -861,8 +889,8 @@ export function ManagePage() {
                     )}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">Prazo</th>
-                <th className="px-4 py-3 text-center">Resolvido ou não</th>
+                <th className="px-3 py-2 text-center">Prazo</th>
+                <th className="px-3 py-2 text-center">Status / ações</th>
               </tr>
             </thead>
             <tbody className="font-semibold text-slate-800 dark:text-slate-200">
@@ -896,52 +924,48 @@ export function ManagePage() {
                             : 'border-slate-100 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-900/40',
                       ].join(' ')}
                     >
-                      <td className="align-middle px-4 py-3">
-                        <span className="inline-flex flex-col items-center gap-1.5">
-                          <span className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
-                            <Truck size={14} />
+                      <td className="align-middle px-3 py-2">
+                        <span className="inline-flex min-w-0 items-center justify-center gap-2">
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+                            <Truck size={13} />
                           </span>
-                          <span className="font-mono text-xs tracking-tight">{r.veiculoLabel}</span>
+                          <span className="truncate font-mono text-xs font-black tracking-tight text-slate-800 dark:text-slate-100">{r.veiculoLabel}</span>
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs text-slate-600 dark:text-slate-300">
+                      <td className="whitespace-nowrap px-3 py-2 align-middle text-center text-xs text-slate-600 dark:text-slate-300">
                         <div className="flex justify-center">
                           {r.checklistId
                             ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"><ClipboardList size={10} />Checklist NC</span>
                             : r.processo}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs text-slate-600 dark:text-slate-300">
+                      <td className="whitespace-nowrap px-3 py-2 align-middle text-xs text-slate-600 dark:text-slate-300">
                         {r.base}
                       </td>
-                      <td className="max-w-[140px] px-4 py-3 align-middle text-xs text-slate-600 dark:text-slate-300">
+                      <td className="max-w-[150px] px-3 py-2 align-middle text-xs text-slate-600 dark:text-slate-300">
                         <span className="mx-auto block max-w-full truncate">{r.coordenador}</span>
                       </td>
-                      <td className="max-w-[220px] px-4 py-3 align-middle text-xs leading-snug sm:text-sm">
-                        <div className="flex flex-col items-center gap-1">
+                      <td className="max-w-[320px] px-3 py-2 align-middle text-xs leading-snug sm:text-sm">
+                        <div className="flex min-w-0 flex-col items-center gap-1">
+                          <span className="inline-flex min-w-0 items-start justify-center gap-1.5 text-center">
+                            <DefeitoSeveridadeIcon imperativo={r.imperativo} />
+                            <span className="line-clamp-2">{formatDefeitoParaExibicao(r.defeito)}</span>
+                          </span>
                           {group ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                              <History size={10} aria-hidden />
-                              Recorrente
+                            <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                              <History size={9} aria-hidden />
+                              Recorrente · {group.count}x
                             </span>
                           ) : null}
-                          <span className="inline-flex items-center gap-1.5">
-                            <DefeitoSeveridadeIcon imperativo={r.imperativo} />
-                            <span>{formatDefeitoParaExibicao(r.defeito)}</span>
-                          </span>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
+                      <td className="whitespace-nowrap px-3 py-2 align-middle text-center text-xs sm:text-sm">
                         {group ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-black tabular-nums text-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
-                              {group.count}×
-                            </span>
+                          <div className="flex flex-col items-center gap-0.5">
                             <div>{formatDateBR(r.dataApontamento)}</div>
                             {r.horaApontamento ? (
                               <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">{r.horaApontamento}</div>
                             ) : null}
-                            <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">último apontamento</div>
                           </div>
                         ) : (
                           <>
@@ -952,36 +976,47 @@ export function ManagePage() {
                           </>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 align-middle text-xs sm:text-sm">
+                      <td className="whitespace-nowrap px-3 py-2 align-middle text-center text-xs sm:text-sm">
                         <div className="flex flex-col items-center gap-0.5">
                           <span className={atrasado ? 'font-black text-rose-600 dark:text-rose-400' : ''}>
                             {r.prazo ? formatDateBR(r.prazo) : '—'}
                           </span>
                           {atrasado ? (
-                            <span className="text-[10px] font-extrabold uppercase text-rose-600 dark:text-rose-400">
+                            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                               Atrasado
                             </span>
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-middle" onClick={stopRowClick}>
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-3 py-2 align-middle" onClick={stopRowClick}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {group && (
+                            <button
+                              type="button"
+                              onClick={(e) => { stopRowClick(e); setHistoryGroup(group) }}
+                              className="inline-flex items-center gap-1 rounded-full border border-sky-300 bg-sky-50 px-2 py-1 text-[10px] font-extrabold text-sky-700 transition hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950/70"
+                              title="Ver histórico de ocorrências"
+                            >
+                              <History size={11} aria-hidden />
+                              {group.count}x
+                            </button>
+                          )}
                           {r.resolvido ? (
                             <span
-                              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
                               title="Resolvido"
                             >
-                              <Check size={16} strokeWidth={3} className="text-emerald-600" aria-hidden />
+                              <Check size={14} strokeWidth={3} className="text-emerald-600" aria-hidden />
                               Sim
                             </span>
                           ) : r.justificado ? (
                             <>
-                              <div className="flex flex-col gap-0.5">
+                              <div className="flex flex-col items-center gap-0.5">
                                 <span
-                                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1.5 text-xs font-extrabold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-extrabold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
                                   title={r.justificativa ?? 'Justificado'}
                                 >
-                                  <MessageSquareWarning size={13} className="text-amber-600" aria-hidden />
+                                  <MessageSquareWarning size={12} className="text-amber-600" aria-hidden />
                                   Justificado
                                 </span>
                                 {r.agendamentoData && (
@@ -995,10 +1030,10 @@ export function ManagePage() {
                                   <button
                                     type="button"
                                     onClick={(e) => { stopRowClick(e); openJustModal(r) }}
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
                                     title="Editar justificativa"
                                   >
-                                    <MessageSquareWarning size={16} aria-hidden />
+                                    <MessageSquareWarning size={15} aria-hidden />
                                   </button>
                                   <button
                                     type="button"
@@ -1006,10 +1041,10 @@ export function ManagePage() {
                                       stopRowClick(e)
                                       openResolveModal(r, group?.ocorrencias.map((o) => o.id))
                                     }}
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
                                     title="Marcar como resolvido"
                                   >
-                                    <Check size={18} strokeWidth={3} aria-hidden />
+                                    <Check size={17} strokeWidth={3} aria-hidden />
                                   </button>
                                 </>
                               ) : null}
@@ -1017,10 +1052,10 @@ export function ManagePage() {
                           ) : (
                             <>
                               <span
-                                className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1.5 text-xs font-extrabold text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+                                className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-extrabold text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
                                 title="Não resolvido"
                               >
-                                <X size={14} strokeWidth={2.5} className="text-rose-600" aria-hidden />
+                                <X size={13} strokeWidth={2.5} className="text-rose-600" aria-hidden />
                                 Não
                               </span>
                               {canMarkResolved ? (
@@ -1028,11 +1063,11 @@ export function ManagePage() {
                                   <button
                                     type="button"
                                     onClick={(e) => { stopRowClick(e); openJustModal(r) }}
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
                                     title="Adicionar justificativa"
                                     aria-label="Justificar não resolução"
                                   >
-                                    <MessageSquareWarning size={16} aria-hidden />
+                                    <MessageSquareWarning size={15} aria-hidden />
                                   </button>
                                   <button
                                     type="button"
@@ -1040,11 +1075,11 @@ export function ManagePage() {
                                       stopRowClick(e)
                                       openResolveModal(r, group?.ocorrencias.map((o) => o.id))
                                     }}
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 dark:focus-visible:ring-offset-slate-950"
                                     title="Marcar como resolvido"
                                     aria-label={`Marcar defeito ${formatDefeitoParaExibicao(r.defeito).slice(0, 48)} do veículo ${r.prefixo} como resolvido`}
                                   >
-                                    <Check size={18} strokeWidth={3} aria-hidden />
+                                    <Check size={17} strokeWidth={3} aria-hidden />
                                   </button>
                                 </>
                               ) : null}

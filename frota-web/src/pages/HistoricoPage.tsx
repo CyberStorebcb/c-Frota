@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CalendarCheck2, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CalendarCheck2, ChevronLeft, ChevronRight, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
 import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import { buildHistoricoResolvidoEntries, type HistoricoResolvidoEntry } from '../apontamentos/groupApontamentos'
 import { Portal } from '../components/ui/Portal'
+import { Select } from '../components/ui/Select'
+import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
+import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 
 function DefeitoSeveridadeIcon({ imperativo, size = 14 }: { imperativo: boolean; size?: number }) {
   if (imperativo) {
@@ -200,6 +203,10 @@ export function HistoricoPage() {
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim] = useState('')
   const [imgOpen, setImgOpen] = useState<string | null>(null)
+  const [base, setBase] = useState('todos')
+  const [coordenador, setCoordenador] = useState('todos')
+  const [pagina, setPagina] = useState(1)
+  const PAGE_SIZE = 25
 
   const historico = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -235,13 +242,15 @@ export function HistoricoPage() {
     if (dataFim) {
       list = list.filter((e) => e.dataResolvido <= dataFim)
     }
+    if (base !== 'todos') list = list.filter((e) => matchesBaseFilter(e.representative.base, base))
+    if (coordenador !== 'todos') list = list.filter((e) => matchesCoordenadorFilter(e.representative.coordenador, coordenador))
     return [...list].sort((a, b) => {
       const tb = resolvedAtMs(b.dataResolvido, b.representative.horaResolvido)
       const ta = resolvedAtMs(a.dataResolvido, a.representative.horaResolvido)
       if (tb !== ta) return tb - ta
       return b.key.localeCompare(a.key)
     })
-  }, [rows, query, valorMin, valorMax, dataInicio, dataFim])
+  }, [rows, query, valorMin, valorMax, dataInicio, dataFim, base, coordenador])
 
   const totalGastoHistorico = useMemo(() => {
     let s = 0
@@ -251,6 +260,9 @@ export function HistoricoPage() {
     }
     return s
   }, [historico])
+
+  const totalPaginas = Math.max(1, Math.ceil(historico.length / PAGE_SIZE))
+  const paginaRows = historico.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE)
 
   const apontamentoParaPdf = (e: HistoricoResolvidoEntry): Apontamento => ({
     ...e.representative,
@@ -773,13 +785,18 @@ export function HistoricoPage() {
       </div>
 
       <div data-tour="historico-lista" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
+        <div className="mb-3 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+          <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={(v) => { setBase(v); setPagina(1) }} />
+          <Select label="Gerência" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setCoordenador(v); setPagina(1) }} />
+        </div>
+
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex w-full flex-col gap-2 sm:max-w-3xl sm:flex-row sm:items-center">
             <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
               <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => { setQuery(e.target.value); setPagina(1) }}
                 placeholder="Buscar por defeito ou veículo..."
                 className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
@@ -792,7 +809,7 @@ export function HistoricoPage() {
                 </span>
                 <input
                   value={valorMin}
-                  onChange={(e) => setValorMin(e.target.value)}
+                  onChange={(e) => { setValorMin(e.target.value); setPagina(1) }}
                   inputMode="decimal"
                   placeholder="0"
                   className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
@@ -804,7 +821,7 @@ export function HistoricoPage() {
                 </span>
                 <input
                   value={valorMax}
-                  onChange={(e) => setValorMax(e.target.value)}
+                  onChange={(e) => { setValorMax(e.target.value); setPagina(1) }}
                   inputMode="decimal"
                   placeholder="9999"
                   className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
@@ -836,7 +853,7 @@ export function HistoricoPage() {
             <input
               type="date"
               value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
+              onChange={(e) => { setDataInicio(e.target.value); setPagina(1) }}
               className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
             />
           </div>
@@ -847,7 +864,7 @@ export function HistoricoPage() {
             <input
               type="date"
               value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
+              onChange={(e) => { setDataFim(e.target.value); setPagina(1) }}
               className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
             />
           </div>
@@ -889,7 +906,7 @@ export function HistoricoPage() {
                   </td>
                 </tr>
               ) : (
-                historico.map((e) => {
+                paginaRows.map((e) => {
                   const r = e.representative
                   return (
                   <tr
@@ -988,6 +1005,47 @@ export function HistoricoPage() {
             </tbody>
           </table>
         </div>
+
+        {totalPaginas > 1 && (
+          <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {historico.length === 0 ? 'Nenhum registro' : (
+                <>
+                  Mostrando{' '}
+                  <span className="font-extrabold text-slate-700 dark:text-slate-300">{(pagina - 1) * PAGE_SIZE + 1}</span>
+                  {' — '}
+                  <span className="font-extrabold text-slate-700 dark:text-slate-300">{Math.min(pagina * PAGE_SIZE, historico.length)}</span>
+                  {' de '}
+                  <span className="font-extrabold text-slate-700 dark:text-slate-300">{historico.length}</span>
+                  {' registro(s)'}
+                </>
+              )}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={pagina === 1}
+                onClick={() => setPagina((p) => p - 1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Página anterior"
+              >
+                <ChevronLeft size={20} aria-hidden />
+              </button>
+              <span className="min-w-[7.5rem] px-2 text-center text-xs font-extrabold tabular-nums text-slate-600 dark:text-slate-300">
+                {pagina} / {totalPaginas}
+              </span>
+              <button
+                type="button"
+                disabled={pagina === totalPaginas}
+                onClick={() => setPagina((p) => p + 1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Próxima página"
+              >
+                <ChevronRight size={20} aria-hidden />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {imgOpen ? (

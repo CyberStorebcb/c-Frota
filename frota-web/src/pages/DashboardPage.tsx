@@ -2,6 +2,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import {
   type LucideIcon,
+  AlertTriangle,
   BarChart3,
   Calendar,
   CheckCircle2,
@@ -24,6 +25,7 @@ import {
 import { useFleet } from '../frota/FleetContext'
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
 import { supabase } from '../lib/supabase'
 import type { DashboardAdesaoChartRow } from './DashboardAdesaoCharts'
 
@@ -308,6 +310,16 @@ export function DashboardPage() {
     })
   }, [rows, filtroBase, filtroCoordenador, filtroSupervisor])
 
+  const gruposRecorrentes = useMemo(() => {
+    // Pega todos os rows como ManageTableRows e extrai os grupos
+    const tableRows = buildManageTableRows(pendenciasFiltradas, true, 'desc')
+    return tableRows
+      .filter((r): r is { type: 'group'; group: ApontamentoGroup; sortKey: string } => r.type === 'group')
+      .map((r) => r.group)
+      .filter((g) => g.diasConsecutivos >= 3)
+      .slice(0, 5) // máx 5 alertas
+  }, [pendenciasFiltradas])
+
   const checklistsPorDiaNoPeriodo = useMemo(() => {
     return checklistsPorDia
       .filter((d) => d.data >= periodoInicioIso && d.data <= periodoFimIso)
@@ -565,6 +577,36 @@ export function DashboardPage() {
               </Card>
             )})}
           </div>
+
+          {gruposRecorrentes.length > 0 && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
+              <div className="mb-3 flex items-center gap-2">
+                <AlertTriangle size={16} className="shrink-0 text-rose-600 dark:text-rose-400" />
+                <span className="text-sm font-extrabold text-rose-800 dark:text-rose-200">
+                  {gruposRecorrentes.length} defeito{gruposRecorrentes.length > 1 ? 's' : ''} recorrente{gruposRecorrentes.length > 1 ? 's' : ''} (3+ dias seguidos)
+                </span>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {gruposRecorrentes.map((g) => (
+                  <li key={g.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-rose-900 dark:text-rose-200">
+                    <span className="rounded bg-rose-100 px-1.5 py-0.5 font-mono font-black dark:bg-rose-900/40">
+                      {g.representative.prefixo || g.placa}
+                    </span>
+                    <span className="flex-1 leading-snug">{g.representative.defeito}</span>
+                    <span className="shrink-0 font-extrabold text-rose-700 dark:text-rose-300">
+                      {g.diasConsecutivos}d seguidos · {g.count}x
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/gerenciar?severidade=imperativo"
+                className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-extrabold text-rose-700 underline-offset-2 hover:underline dark:text-rose-300"
+              >
+                Ver no Gerenciar →
+              </Link>
+            </div>
+          )}
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-transparent dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2.5rem]">
             <div className="flex shrink-0 flex-col gap-2 border-b border-slate-100/80 bg-transparent p-4 dark:border-slate-800/60 dark:bg-transparent sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
