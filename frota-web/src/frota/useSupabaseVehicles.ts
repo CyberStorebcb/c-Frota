@@ -62,6 +62,7 @@ export type UseSupabaseVehiclesResult = {
   restoreVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
   hardDeleteVehicle: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>
   setManutencao: (id: string, emManutencao: boolean) => Promise<{ ok: true } | { ok: false; message: string }>
+  setStatus: (id: string, status: VehicleStatus) => Promise<{ ok: true } | { ok: false; message: string }>
 }
 
 export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
@@ -161,10 +162,16 @@ export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
   const setManutencao = useCallback(async (id: string, emManutencao: boolean): Promise<{ ok: true } | { ok: false; message: string }> => {
     const { error } = await supabase.from('vehicles').update({ em_manutencao: emManutencao }).eq('id', id)
     if (error) return { ok: false, message: error.message }
-    // Atualiza estado local imediatamente sem recarregar tudo
     setVehicles((prev) => prev.map((v) => v.id === id ? { ...v, emManutencao } : v))
     return { ok: true }
   }, [])
 
-  return { vehicles, deletedVehicles, loading, reload, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setManutencao }
+  const setStatus = useCallback(async (id: string, status: VehicleStatus): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const { error } = await supabase.from('vehicles').update({ status }).eq('id', id)
+    if (error) return { ok: false, message: error.message }
+    setVehicles((prev) => prev.map((v) => v.id === id ? { ...v, status } : v))
+    return { ok: true }
+  }, [])
+
+  return { vehicles, deletedVehicles, loading, reload, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setManutencao, setStatus }
 }

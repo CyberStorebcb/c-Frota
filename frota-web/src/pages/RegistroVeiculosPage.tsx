@@ -251,6 +251,7 @@ function VehicleOverflowMenu({
   supabaseVehicleIds: Set<string>
   onDeleteRequest: (id: string, placa: string, isSupabase: boolean) => void
   setManutencao: (id: string, emManutencao: boolean) => Promise<{ ok: true } | { ok: false; message: string }>
+  setStatus: (id: string, status: VehicleStatus) => Promise<{ ok: true } | { ok: false; message: string }>
 }) {
   const menuOpen = menuForId === vehicle.id
   const menuPosition =
@@ -292,29 +293,31 @@ function VehicleOverflowMenu({
               Editar
             </button>
           ) : null}
-          {isAdmin && vehicle.status !== 'ATIVO' && (
+          {isAdmin && supabaseVehicleIds.has(vehicle.id) && vehicle.status !== 'ATIVO' && (
             <button
               type="button"
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
               onClick={() => {
-                setFleetVehicleStatus(vehicle.placa, 'ATIVO')
-                refresh(); setMenuForId(null)
-                showNotification('Estado: ativo.', 'success')
+                void setStatus(vehicle.id, 'ATIVO').then(() => {
+                  refresh(); setMenuForId(null)
+                  showNotification('Estado: ativo.', 'success')
+                })
               }}
             >
               Marcar ativo
             </button>
           )}
-          {isAdmin && vehicle.status !== 'INATIVO' && (
+          {isAdmin && supabaseVehicleIds.has(vehicle.id) && vehicle.status !== 'INATIVO' && (
             <button
               type="button"
               role="menuitem"
               className="w-full px-4 py-2 text-left text-xs font-black uppercase tracking-wide text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
               onClick={() => {
-                setFleetVehicleStatus(vehicle.placa, 'INATIVO')
-                refresh(); setMenuForId(null)
-                showNotification('Veículo marcado como inativo.', 'success')
+                void setStatus(vehicle.id, 'INATIVO').then(() => {
+                  refresh(); setMenuForId(null)
+                  showNotification('Veículo marcado como inativo.', 'success')
+                })
               }}
             >
               Marcar inativo
@@ -453,7 +456,7 @@ function defaultForm() {
  * Controlo da frota: cadastro e listagem de veículos (UI alinhada ao painel operacional).
  */
 export function RegistroVeiculosPage() {
-  const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setManutencao, reload: reloadSupabase } = useSupabaseVehicles()
+  const { vehicles: supabaseVehicles, deletedVehicles, saveVehicle, softDeleteVehicle, restoreVehicle, hardDeleteVehicle, setManutencao, setStatus, reload: reloadSupabase } = useSupabaseVehicles()
   const { reload: reloadFleet } = useFleet()
   const supabaseVehicleIds = useMemo(() => new Set(supabaseVehicles.map((v) => v.id)), [supabaseVehicles])
   const [vehicles, setVehicles] = useState<FleetVehicle[]>(() => getDisplayedFleetVehicles())
@@ -737,6 +740,15 @@ export function RegistroVeiculosPage() {
     colFilterCoordSup,
     colFilterStatus,
   ])
+
+  const filteredActive = useMemo(
+    () => filteredVehicles.filter((v) => v.status !== 'INATIVO'),
+    [filteredVehicles],
+  )
+  const filteredInactive = useMemo(
+    () => filteredVehicles.filter((v) => v.status === 'INATIVO'),
+    [filteredVehicles],
+  )
 
   const clearListColumnFilters = () => {
     setColFilterPlaca('')
@@ -1394,8 +1406,9 @@ export function RegistroVeiculosPage() {
         </div>
 
       {filteredVehicles.length > 0 && layoutMode === 'grid' ? (
+        <>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredVehicles.map((vehicle) => {
+          {filteredActive.map((vehicle) => {
             const typeInfo =
               VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
               VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
@@ -1494,12 +1507,86 @@ export function RegistroVeiculosPage() {
                     supabaseVehicleIds={supabaseVehicleIds}
                     onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
                     setManutencao={setManutencao}
+                    setStatus={setStatus}
                   />
                 </div>
               </div>
             )
           })}
         </div>
+        {filteredInactive.length > 0 && (
+          <>
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-4 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+                <Ban size={12} className="text-slate-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                  Inativos — {filteredInactive.length}
+                </span>
+              </div>
+              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+            </div>
+            <div className="mt-4 grid gap-4 opacity-60 md:grid-cols-2 lg:grid-cols-3">
+              {filteredInactive.map((vehicle) => {
+                const typeInfo =
+                  VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
+                  VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
+                const Icon = typeInfo.icon
+                return (
+                  <div
+                    key={vehicle.id}
+                    className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:opacity-100 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className={`inline-flex rounded-2xl bg-slate-100 p-3 dark:bg-slate-800 ${typeInfo.color}`}>
+                        <Icon size={22} />
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          <Ban size={11} />
+                          INATIVO
+                        </div>
+                        <VehicleOverflowMenu
+                          vehicle={vehicle}
+                          menuForId={menuForId}
+                          setMenuForId={setMenuForId}
+                          refresh={refresh}
+                          showNotification={showNotification}
+                          placement="up"
+                          isAdmin={canRegisterVehicle}
+                          onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
+                          supabaseVehicleIds={supabaseVehicleIds}
+                          onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
+                          setManutencao={setManutencao}
+                          setStatus={setStatus}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-5 space-y-1">
+                      <h3 className="text-xl font-black uppercase leading-none tracking-tight text-slate-900 dark:text-white">
+                        {formatPlaca(vehicle.placa)}
+                      </h3>
+                      <p className="text-sm font-bold uppercase text-slate-500 dark:text-slate-400">
+                        {vehicle.modelo} • {vehicle.prefixo}
+                      </p>
+                    </div>
+                    <div className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Responsável</span>
+                        <p className="truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.responsavel}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Base</span>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{vehicle.base}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+        </>
       ) : null}
 
       {layoutMode === 'list' ? (
@@ -1655,7 +1742,8 @@ export function RegistroVeiculosPage() {
                   </td>
                 </tr>
               ) : (
-                filteredVehicles.map((vehicle) => {
+                <>
+                {filteredActive.map((vehicle) => {
                   const typeInfo =
                     VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
                     VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
@@ -1760,11 +1848,112 @@ export function RegistroVeiculosPage() {
                           supabaseVehicleIds={supabaseVehicleIds}
                           onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
                           setManutencao={setManutencao}
+                          setStatus={setStatus}
                         />
                       </td>
                     </tr>
                   )
-                })
+                })}
+                {filteredInactive.length > 0 && (
+                  <>
+                    <tr>
+                      <td colSpan={8} className="border-b border-slate-200 bg-slate-100/80 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/60">
+                        <div className="flex items-center gap-2">
+                          <Ban size={13} className="text-slate-400" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                            Inativos — {filteredInactive.length}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {filteredInactive.map((vehicle) => {
+                      const typeInfo =
+                        VEHICLE_TYPES.find((t) => t.id === vehicle.tipo) ??
+                        VEHICLE_TYPES.find((t) => t.id === 'VEICULOS LEVES')!
+                      const Icon = typeInfo.icon
+                      return (
+                        <tr
+                          key={vehicle.id}
+                          className="border-b border-slate-200 bg-slate-100/60 opacity-70 transition-colors hover:bg-slate-100 hover:opacity-100 dark:border-slate-800/80 dark:bg-slate-900/40 dark:hover:bg-slate-800/40"
+                        >
+                          <td className="px-4 py-3 align-middle">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => goToGerenciarVeiculo(vehicle)}
+                                title={`Gerenciar apontamentos — ${formatPlaca(vehicle.placa)}`}
+                                aria-label={`Gerenciar apontamentos do veículo ${formatPlaca(vehicle.placa)}`}
+                                className={`inline-flex rounded-xl bg-slate-100 p-2 transition-colors hover:bg-blue-100 hover:ring-2 hover:ring-blue-500/30 dark:bg-slate-800 dark:hover:bg-blue-950/50 ${typeInfo.color}`}
+                              >
+                                <Icon size={20} />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 align-middle">
+                            <span className="font-mono text-sm font-black uppercase text-slate-900 dark:text-white">{formatPlaca(vehicle.placa)}</span>
+                          </td>
+                          <td className="max-w-[220px] px-4 py-3 align-middle">
+                            <div className="mx-auto max-w-full truncate text-xs font-bold uppercase text-slate-600 dark:text-slate-300">
+                              {vehicle.modelo} • {vehicle.prefixo}
+                            </div>
+                          </td>
+                          <td className="hidden max-w-[160px] px-4 py-3 align-middle md:table-cell">
+                            <span className="mx-auto block max-w-full truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">
+                              {vehicle.responsavel}
+                            </span>
+                          </td>
+                          <td className="hidden max-w-[160px] px-4 py-3 align-middle lg:table-cell">
+                            <span className="mx-auto block max-w-full truncate text-xs font-bold text-slate-700 dark:text-slate-300">{vehicle.base}</span>
+                          </td>
+                          <td className="hidden px-4 py-3 align-middle xl:table-cell">
+                            <div className="flex flex-col items-center gap-1 text-center">
+                              {vehicle.coordenador && vehicle.coordenador !== 'NÃO ATRIBUÍDO' && (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Coord.</span>
+                                  <span className="max-w-[160px] truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.coordenador}</span>
+                                </div>
+                              )}
+                              {vehicle.supervisor && vehicle.supervisor !== 'NÃO ATRIBUÍDO' && (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Sup.</span>
+                                  <span className="max-w-[160px] truncate text-xs font-bold uppercase text-slate-700 dark:text-slate-300">{vehicle.supervisor}</span>
+                                </div>
+                              )}
+                              {(!vehicle.coordenador || vehicle.coordenador === 'NÃO ATRIBUÍDO') && (!vehicle.supervisor || vehicle.supervisor === 'NÃO ATRIBUÍDO') && (
+                                <span className="text-xs text-slate-400">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 align-middle">
+                            <div className="flex flex-wrap items-center justify-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                <Ban size={10} />
+                                INATIVO
+                              </span>
+                            </div>
+                          </td>
+                          <td className="relative px-2 py-3 pr-4 text-right align-middle">
+                            <VehicleOverflowMenu
+                              vehicle={vehicle}
+                              menuForId={menuForId}
+                              setMenuForId={setMenuForId}
+                              refresh={refresh}
+                              showNotification={showNotification}
+                              placement="down"
+                              isAdmin={canRegisterVehicle}
+                              onEdit={canRegisterVehicle ? handleOpenEditModal : undefined}
+                              supabaseVehicleIds={supabaseVehicleIds}
+                              onDeleteRequest={(id, placa, isSup) => setConfirmDelete({ id, placa, isSupabase: isSup })}
+                              setManutencao={setManutencao}
+                              setStatus={setStatus}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </>
+                )}
+                </>
               )}
             </tbody>
           </table>
