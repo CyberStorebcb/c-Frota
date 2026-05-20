@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { KeyRound, Eye, EyeOff, LogOut } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 
 export function TrocarSenhaPage() {
   const { changePassword, logout, user } = useAuth()
+  const navigate = useNavigate()
   const [nova, setNova]           = useState('')
   const [confirma, setConfirma]   = useState('')
   const [mostrar, setMostrar]     = useState(false)
@@ -19,9 +21,17 @@ export function TrocarSenhaPage() {
     setSalvando(true)
     const res = await changePassword(nova)
     setSalvando(false)
-    if (!res.ok) { setErro(res.message); return }
+    if (!res.ok) {
+      const msg = res.message.toLowerCase()
+      if (msg.includes('different') || msg.includes('same') || msg.includes('diferente')) {
+        setErro('A nova senha deve ser diferente da senha temporária.')
+      } else {
+        setErro('Não foi possível alterar a senha. Tente novamente.')
+      }
+      return
+    }
     setOk(true)
-    setTimeout(() => { window.location.href = '/' }, 1500)
+    setTimeout(() => { navigate('/', { replace: true }) }, 1500)
   }
 
   return (
