@@ -12,6 +12,7 @@ export type AuthUser = {
 type Ctx = {
   user: AuthUser | null
   loading: boolean
+  isPasswordRecovery: boolean
   login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; message: string }>
   logout: () => Promise<void>
   changePassword: (newPassword: string) => Promise<{ ok: true } | { ok: false; message: string }>
@@ -71,6 +72,7 @@ function readScreenshotBypassUser(): AuthUser | null {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => readScreenshotBypassUser())
   const [loading, setLoading] = useState(() => !readScreenshotBypassUser())
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
 
   useEffect(() => {
     const bypass = readScreenshotBypassUser()
@@ -80,8 +82,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // onAuthStateChange dispara ANTES de getSession() retornar quando há um
+    // token de recovery no hash da URL (fluxo de redefinição de senha via link).
+    // Por isso ele é o responsável por setar loading=false, garantindo que o
+    // RequireAuth não redirecione antes da sessão de recovery ser estabelecida.
+    let initialEventFired = false
     const timeout = setTimeout(() => setLoading(false), 8000)
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event: string, session: Session | null) => {
+        // USER_UPDATED é disparado pelo updateUser() durante troca de senha.
+        // Ignorar para não sobrescrever o mustChangePassword que já foi limpo localmente.
+        if (event === 'USER_UPDATED') return
+
+        if (!initialEventFired) {
+          initialEventFired = true
+          clearTimeout(timeout)
+        }
+
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsPasswordRecovery(true)
+        }
+
+        if (session?.user) {
+          const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
+          setUser(toAuthUser(session.user, role, mustChangePassword))
+        } else {
+          setUser(null)
+        }
+        setLoading(false)
+      }
+    )
+
+    // getSession() como fallback: se onAuthStateChange não disparar (sem sessão,
+    // sem hash de recovery), ele encerra o loading após resolver.
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (initialEventFired) return  // onAuthStateChange já tratou
       clearTimeout(timeout)
       if (session?.user) {
         const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
@@ -89,20 +125,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false)
     }).catch(() => { clearTimeout(timeout); setLoading(false) })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: Session | null) => {
-        // USER_UPDATED é disparado pelo updateUser() durante troca de senha.
-        // Ignorar para não sobrescrever o mustChangePassword que já foi limpo localmente.
-        if (event === 'USER_UPDATED') return
-        if (session?.user) {
-          const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
-          setUser(toAuthUser(session.user, role, mustChangePassword))
-        } else {
-          setUser(null)
-        }
-      }
-    )
 
     return () => subscription.unsubscribe()
   }, [])
@@ -143,12 +165,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Atualiza estado local imediatamente — o listener USER_UPDATED é ignorado
     setUser((prev) => prev ? { ...prev, mustChangePassword: false } : prev)
+    setIsPasswordRecovery(false)
     return { ok: true }
   }, [user])
 
   const value = useMemo(
-    () => ({ user, loading, login, logout, changePassword }),
-    [user, loading, login, logout, changePassword],
+    () => ({ user, loading, isPasswordRecovery, login, logout, changePassword }),
+    [user, loading, isPasswordRecovery, login, logout, changePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

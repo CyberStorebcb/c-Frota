@@ -1,11 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, Eye, EyeOff, LogOut } from 'lucide-react'
+import { KeyRound, Eye, EyeOff, Loader2, LogOut } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 
 export function TrocarSenhaPage() {
-  const { changePassword, logout, user } = useAuth()
+  const { changePassword, logout, user, loading, isPasswordRecovery } = useAuth()
   const navigate = useNavigate()
+
+  // Se terminar de carregar e não houver sessão nem recovery, volta ao login
+  useEffect(() => {
+    if (!loading && !user && !isPasswordRecovery) {
+      navigate('/login', { replace: true })
+    }
+  }, [loading, user, isPasswordRecovery, navigate])
   const [nova, setNova]           = useState('')
   const [confirma, setConfirma]   = useState('')
   const [mostrar, setMostrar]     = useState(false)
@@ -34,6 +41,14 @@ export function TrocarSenhaPage() {
     setTimeout(() => { navigate('/', { replace: true }) }, 1500)
   }
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+        <Loader2 size={32} className="animate-spin text-slate-400" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
       <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
@@ -42,9 +57,13 @@ export function TrocarSenhaPage() {
             <KeyRound size={28} className="text-brand-400" />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-black text-slate-100">Crie sua senha</h1>
+            <h1 className="text-xl font-black text-slate-100">
+              {isPasswordRecovery ? 'Redefinir senha' : 'Crie sua senha'}
+            </h1>
             <p className="mt-1 text-sm text-slate-400">
-              Este é seu primeiro acesso. Defina uma senha pessoal para continuar.
+              {isPasswordRecovery
+                ? 'Digite sua nova senha para recuperar o acesso.'
+                : 'Este é seu primeiro acesso. Defina uma senha pessoal para continuar.'}
             </p>
           </div>
         </div>

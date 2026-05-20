@@ -11,11 +11,11 @@ import { TourLauncher } from './tour/TourLauncher'
 
 function AuthedShellWithTour() {
   return (
-    <TourProvider>
+    <>
       <AppShell />
       <TourOverlay />
       <TourLauncher />
-    </TourProvider>
+    </>
   )
 }
 
@@ -75,8 +75,9 @@ function ChecklistTipoRedirect() {
 
 export default function App() {
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
+    <TourProvider>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
         {/* Rotas públicas */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/termos" element={<TermsPage />} />
@@ -88,10 +89,8 @@ export default function App() {
         <Route path="/checklist/:tipo" element={<ChecklistTipoRedirect />} />
         <Route path="/checklist" element={<ChecklistPublicoPage />} />
 
-        {/* Troca de senha obrigatória (autenticado mas bloqueado) */}
-        <Route element={<RequireAuth />}>
-          <Route path="/trocar-senha" element={<TrocarSenhaPage />} />
-        </Route>
+        {/* Troca de senha — pública para suportar o fluxo de recovery via link de e-mail */}
+        <Route path="/trocar-senha" element={<TrocarSenhaPage />} />
 
         {/* Rotas autenticadas */}
         <Route element={<RequireAuth />}>
@@ -117,8 +116,9 @@ export default function App() {
             />
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </TourProvider>
   )
 }
