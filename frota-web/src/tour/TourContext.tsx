@@ -12,7 +12,10 @@ type TourCtx = {
   start: () => void
   /** Inicia sempre do passo 0, ignorando progresso salvo. */
   startFresh: () => void
+  /** Encerra o tour ativo sem marcar como concluído. */
   stop: () => void
+  /** Reinicia do zero (mesmo comportamento que startFresh, exposto para o botão de reset). */
+  resetTour: () => void
   next: () => void
   prev: () => void
   goTo: (i: number) => void
@@ -20,8 +23,7 @@ type TourCtx = {
 
 const Ctx = createContext<TourCtx | null>(null)
 
-const STORAGE_COMPLETED = 'frota.tour.completed'
-const STORAGE_PROGRESS  = 'frota.tour.progress'
+const STORAGE_PROGRESS = 'frota.tour.progress'
 
 function loadProgress(): number {
   try {
@@ -47,17 +49,23 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-  const autoStartedFor = useRef<string | null>(null)
+  // Guarda o email do último login para detectar nova sessão
+  const lastLoginEmailRef = useRef<string | null>(null)
 
-  // ── Auto-start para usuários demo ────────────────────────────────────────
+  // ── Auto-start: reinicia do zero a cada novo login do usuário demo ────────
   useEffect(() => {
-    if (!user?.email) return
+    if (!user?.email) {
+      // Usuário deslogou — reseta para detectar próximo login
+      lastLoginEmailRef.current = null
+      return
+    }
     if (!shouldAutoStartTour(user.email)) return
-    if (autoStartedFor.current === user.email) return
-    autoStartedFor.current = user.email
-    const saved = loadProgress()
+    if (lastLoginEmailRef.current === user.email) return
+    // Novo login detectado: começa sempre do passo 0
+    lastLoginEmailRef.current = user.email
+    clearProgress()
     tourNavigatingRef.current = true
-    setStepIndex(saved)
+    setStepIndex(0)
     setActive(true)
   }, [user?.email])
 
@@ -83,7 +91,6 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       // O usuário navegou manualmente para fora do roteiro: encerra o tour.
       setActive(false)
       clearProgress()
-      try { localStorage.setItem(STORAGE_COMPLETED, 'true') } catch { /* ignore */ }
     } else {
       tourNavigatingRef.current = false
     }
@@ -108,7 +115,13 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const stop = useCallback(() => {
     setActive(false)
     clearProgress()
-    try { localStorage.setItem(STORAGE_COMPLETED, 'true') } catch { /* ignore */ }
+  }, [])
+
+  const resetTour = useCallback(() => {
+    clearProgress()
+    tourNavigatingRef.current = true
+    setStepIndex(0)
+    setActive(true)
   }, [])
 
   const next = useCallback(() => {
@@ -117,7 +130,6 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       if (n >= TOUR_STEPS.length) {
         setActive(false)
         clearProgress()
-        try { localStorage.setItem(STORAGE_COMPLETED, 'true') } catch { /* ignore */ }
         return i
       }
       const nextStep = TOUR_STEPS[n]
@@ -163,11 +175,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       start,
       startFresh,
       stop,
+      resetTour,
       next,
       prev,
       goTo,
     }),
-    [active, stepIndex, start, startFresh, stop, next, prev, goTo],
+    [active, stepIndex, start, startFresh, stop, resetTour, next, prev, goTo],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
