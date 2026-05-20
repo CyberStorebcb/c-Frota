@@ -275,13 +275,10 @@ async function playAudioViaWebAudio(src: string, rate: number): Promise<void> {
       voiceSource = null
       resolve()
     }
-    source.onerror = () => {
-      voiceSource = null
-      reject(new Error('playback failed'))
-    }
     try {
       source.start(0)
     } catch (err) {
+      voiceSource = null
       reject(err)
     }
   })
