@@ -2,10 +2,13 @@ import { DEMO_NARRATION_STEPS, type DemoNarrationStepId } from './demoNarration'
 
 /** Loop ambiente — mixado via Web Audio junto com a narração */
 export const DEMO_AMBIENT_SRC = '/demo-narration/ambient-bg.wav'
-const AMBIENT_VOLUME = 0.32
+const AMBIENT_VOLUME_IDLE = 0.72   // volume quando narrador está em silêncio
+const AMBIENT_VOLUME_VOICE = 0.18  // volume durante a narração (ducking)
+const AMBIENT_VOLUME = AMBIENT_VOLUME_IDLE
 const VOICE_VOLUME = 1
 const AMBIENT_FADE_IN_SEC = 0.5
 const AMBIENT_FADE_OUT_SEC = 0.8
+const AMBIENT_DUCK_SEC = 0.4       // tempo de fade para ducking
 
 export type DemoAudioDiagnostic = {
   ok: boolean
@@ -304,22 +307,43 @@ function speakText(text: string, rate: number): Promise<void> {
   })
 }
 
+function duckAmbient() {
+  if (!ambientGain || !audioCtx) return
+  const now = audioCtx.currentTime
+  ambientGain.gain.cancelScheduledValues(now)
+  ambientGain.gain.setValueAtTime(ambientGain.gain.value, now)
+  ambientGain.gain.linearRampToValueAtTime(AMBIENT_VOLUME_VOICE, now + AMBIENT_DUCK_SEC)
+}
+
+function unduckAmbient() {
+  if (!ambientGain || !audioCtx || !ambientActive) return
+  const now = audioCtx.currentTime
+  ambientGain.gain.cancelScheduledValues(now)
+  ambientGain.gain.setValueAtTime(ambientGain.gain.value, now)
+  ambientGain.gain.linearRampToValueAtTime(AMBIENT_VOLUME_IDLE, now + AMBIENT_DUCK_SEC)
+}
+
 async function playNarrationVoice(stepId: DemoNarrationStepId): Promise<void> {
   const step = DEMO_NARRATION_STEPS[stepId]
   if (!step) return
 
-  if (step.audio && (await audioFileExists(step.audio))) {
-    try {
-      await playAudioViaWebAudio(step.audio, audioPlaybackRate(config.speedFactor))
-      return
-    } catch {
-      /* fallback TTS */
+  duckAmbient()
+  try {
+    if (step.audio && (await audioFileExists(step.audio))) {
+      try {
+        await playAudioViaWebAudio(step.audio, audioPlaybackRate(config.speedFactor))
+        return
+      } catch {
+        /* fallback TTS */
+      }
     }
-  }
 
-  if (step.text) {
-    await ensureVoices()
-    await speakText(step.text, speechRate(config.speedFactor))
+    if (step.text) {
+      await ensureVoices()
+      await speakText(step.text, speechRate(config.speedFactor))
+    }
+  } finally {
+    unduckAmbient()
   }
 }
 

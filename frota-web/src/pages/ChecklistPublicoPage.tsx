@@ -2570,6 +2570,68 @@ function clearDraftSession() {
   catch { /* sem acesso */ }
 }
 
+function DemoOutroScreen({ onRestart }: { onRestart: () => void }) {
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center bg-[#0b1020] px-6 text-center">
+      {/* Logo animada */}
+      <div className="relative mb-8 flex items-center justify-center">
+        {/* Anel pulsante externo */}
+        <div className="absolute h-36 w-36 animate-ping rounded-full bg-[#b51649]/20" style={{ animationDuration: '2.5s' }} />
+        {/* Anel médio */}
+        <div className="absolute h-28 w-28 animate-ping rounded-full bg-[#b51649]/30" style={{ animationDuration: '2.5s', animationDelay: '0.4s' }} />
+        {/* Logo central */}
+        <div
+          className="relative flex h-20 w-20 items-center justify-center rounded-[2rem] bg-gradient-to-br from-[#b51649] via-[#9f1239] to-[#7f1022] shadow-[0_0_60px_rgba(181,22,73,0.6)] ring-2 ring-white/20"
+          style={{ animation: 'cgb-outro-logo 0.6s cubic-bezier(0.34,1.56,0.64,1) both' }}
+        >
+          <img src="/branding/favicon.png" alt="CGB" className="h-[70%] w-[70%] object-contain" />
+        </div>
+      </div>
+
+      {/* Texto */}
+      <div style={{ animation: 'cgb-outro-text 0.5s ease 0.4s both' }}>
+        <p className="text-[11px] font-black uppercase tracking-[0.3em] text-rose-400">CGB Energia</p>
+        <h2 className="mt-2 text-3xl font-black tracking-tight text-white">Até logo! 👋</h2>
+        <p className="mx-auto mt-3 max-w-[260px] text-sm font-semibold leading-relaxed text-slate-400">
+          Obrigado por conhecer o <span className="font-extrabold text-white">CGB Frota</span>. Gestão inteligente para sua frota.
+        </p>
+      </div>
+
+      {/* Divisor */}
+      <div className="my-6 h-px w-16 rounded-full bg-white/10" style={{ animation: 'cgb-outro-text 0.5s ease 0.7s both' }} />
+
+      {/* Slogan */}
+      <p
+        className="text-xs font-extrabold uppercase tracking-widest text-slate-500"
+        style={{ animation: 'cgb-outro-text 0.5s ease 0.9s both' }}
+      >
+        Segurança · Eficiência · Controle
+      </p>
+
+      {/* Botão reiniciar */}
+      <button
+        type="button"
+        onClick={onRestart}
+        className="mt-10 rounded-2xl bg-white/10 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-white/15 active:scale-95"
+        style={{ animation: 'cgb-outro-text 0.5s ease 1.1s both' }}
+      >
+        ↺ Ver novamente
+      </button>
+
+      <style>{`
+        @keyframes cgb-outro-logo {
+          from { opacity: 0; transform: scale(0.3) rotate(-15deg); }
+          to   { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+        @keyframes cgb-outro-text {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolean } = {}) {
   const [searchParams] = useSearchParams()
   const isDemo = forceDemo || searchParams.get('demo') === '1'
@@ -2650,7 +2712,9 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
   let content: React.ReactNode
   const embeddedInFrame = isDemo && withFrame
 
-  if (!tipoSelecionado) {
+  if (isDemo && demoConcluido) {
+    content = <DemoOutroScreen onRestart={handleDemoRestart} />
+  } else if (!tipoSelecionado) {
     content = (
       <TelaEscolhaChecklist
         onSelecionar={handleTipo}
