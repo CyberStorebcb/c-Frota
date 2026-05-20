@@ -578,6 +578,18 @@ export function RegistroVeiculosPage() {
     [apontamentosRows],
   )
 
+  /** NC imperativos pendentes — itens marcados com 🚫 que impedem condução. */
+  const ncImpeditivosPendentes = useMemo(
+    () => apontamentosRows.filter((r) => !r.resolvido && r.imperativo).length,
+    [apontamentosRows],
+  )
+
+  /** Set de placas normalizadas com pelo menos um NC imperativo não resolvido. */
+  const placasComImpedimento = useMemo(
+    () => new Set(apontamentosRows.filter((r) => !r.resolvido && r.imperativo).map((r) => r.placa)),
+    [apontamentosRows],
+  )
+
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -1048,7 +1060,7 @@ export function RegistroVeiculosPage() {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4 md:gap-6">
           {(
             [
               {
@@ -1080,6 +1092,16 @@ export function RegistroVeiculosPage() {
                 orb: 'bg-amber-400/25 dark:bg-amber-500/12',
                 iconWrap:
                   'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-600/25 ring-2 ring-white/30 dark:from-amber-600 dark:to-orange-800 dark:shadow-orange-950/35 dark:ring-amber-400/20',
+              },
+              {
+                label: 'Com impedimento',
+                value: apontamentosCarregando ? '—' : ncImpeditivosPendentes,
+                Icon: Ban,
+                card:
+                  'border-rose-200/90 bg-gradient-to-br from-white via-white to-rose-50/90 shadow-rose-500/[0.06] dark:border-rose-500/25 dark:from-slate-900 dark:via-slate-900 dark:to-rose-950/35 dark:shadow-rose-950/25',
+                orb: 'bg-rose-400/25 dark:bg-rose-500/12',
+                iconWrap:
+                  'bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-lg shadow-rose-600/25 ring-2 ring-white/30 dark:from-rose-600 dark:to-red-800 dark:shadow-rose-950/35 dark:ring-rose-400/20',
               },
             ] satisfies { label: string; value: number | string; Icon: typeof List; card: string; orb: string; iconWrap: string }[]
           ).map(({ label, value, Icon, card, orb, iconWrap }) => (
@@ -1381,7 +1403,9 @@ export function RegistroVeiculosPage() {
               <div
                 key={vehicle.id}
                 className={`group relative overflow-hidden rounded-3xl border p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl ${
-                  vehicle.emManutencao
+                  placasComImpedimento.has(normalizePlaca(vehicle.placa))
+                    ? 'border-rose-300 bg-rose-50 hover:border-rose-400 hover:shadow-rose-200/40 dark:border-rose-800/60 dark:bg-rose-950/25 dark:hover:border-rose-700'
+                    : vehicle.emManutencao
                     ? 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-amber-200/40 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:border-amber-800'
                     : vehicle.status === 'INATIVO'
                     ? 'border-slate-300 bg-slate-100 hover:border-slate-400 hover:shadow-slate-200/40 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-slate-600'
@@ -1638,7 +1662,9 @@ export function RegistroVeiculosPage() {
                     <tr
                       key={vehicle.id}
                       className={`border-b transition-colors ${
-                        vehicle.emManutencao
+                        placasComImpedimento.has(normalizePlaca(vehicle.placa))
+                          ? 'border-rose-200 bg-rose-50/70 hover:bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/25 dark:hover:bg-rose-950/35'
+                          : vehicle.emManutencao
                           ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
                           : vehicle.status === 'INATIVO'
                           ? 'border-slate-200 bg-slate-100/60 hover:bg-slate-100 dark:border-slate-800/80 dark:bg-slate-900/40 dark:hover:bg-slate-800/40'
