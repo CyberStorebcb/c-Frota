@@ -68,7 +68,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => { clearTimeout(timeout); setLoading(false) })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event: string, session: Session | null) => {
+      async (event: string, session: Session | null) => {
+        // USER_UPDATED é disparado pelo updateUser() durante troca de senha.
+        // Ignorar para não sobrescrever o mustChangePassword que já foi limpo localmente.
+        if (event === 'USER_UPDATED') return
         if (session?.user) {
           const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
           setUser(toAuthUser(session.user, role, mustChangePassword))
@@ -98,14 +101,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const changePassword = useCallback(async (
     newPassword: string,
   ): Promise<{ ok: true } | { ok: false; message: string }> => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) return { ok: false, message: error.message }
-
-    // Limpa o flag no perfil
+    // Atualiza o perfil ANTES do updateUser para que, se o listener
+    // onAuthStateChange disparar, já leia must_change_password = false.
     if (user) {
       await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id)
-      setUser((prev) => prev ? { ...prev, mustChangePassword: false } : prev)
     }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) {
+      // Reverte o flag se a troca de senha falhou
+      if (user) {
+        await supabase.from('profiles').update({ must_change_password: true }).eq('id', user.id)
+      }
+      return { ok: false, message: error.message }
+    }
+
+    // Atualiza estado local imediatamente — o listener USER_UPDATED é ignorado
+    setUser((prev) => prev ? { ...prev, mustChangePassword: false } : prev)
     return { ok: true }
   }, [user])
 
