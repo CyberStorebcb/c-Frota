@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -8,6 +8,10 @@ import {
   ChevronUp,
   ClipboardCheck,
   ClipboardX,
+  LayoutGrid,
+  List,
+  Maximize2,
+  Minimize2,
   Search,
   X,
 } from 'lucide-react'
@@ -15,12 +19,17 @@ import {
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
+import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
 import { Select } from '../components/ui/Select'
 import { getVehicleOperationalStatusRowsWithLocals, isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
 import { useFleet } from '../frota/FleetContext'
 import { supabase } from '../lib/supabase'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
+
+function normNome(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
+}
 
 function hojeLocalIso(): string {
   const d = new Date()
@@ -84,6 +93,8 @@ function computeLimites(periodo: string, desde: string, ate: string): { ini: str
 const FILTROS_STORAGE_KEY = 'frota.filtros.checklist-detalhar.v1'
 const FILTROS_VISIBLE_LEGACY_KEY = 'frota.filtros.checklist-detalhar'
 
+type ViewMode = 'cards' | 'list'
+
 type ChecklistDetalharFiltersState = {
   periodo: string
   customDesde: string
@@ -91,8 +102,10 @@ type ChecklistDetalharFiltersState = {
   base: string
   gerencia: string
   supervisor: string
+  responsavel: string
   busca: string
   filtrosVisiveis: boolean
+  viewMode: ViewMode
 }
 
 function loadChecklistDetalharFilters(): Partial<ChecklistDetalharFiltersState> | null {
@@ -134,6 +147,7 @@ type VeiculoRow = {
   base: string
   supervisor: string
   coordenador: string
+  responsavel: string
   processo: string
 }
 
@@ -143,10 +157,85 @@ type ChecklistRow = {
   base: string
   supervisor: string
   coordenador: string
+  responsavel: string
   processo: string
   data: string
   hora: string
   temNc: boolean
+}
+
+function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
+  return (
+    <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
+      <table className="w-full min-w-[520px] border-collapse text-left">
+        <thead className="sticky top-0 z-[1] bg-rose-50/95 text-[9px] font-black uppercase tracking-wider text-rose-700 backdrop-blur dark:bg-rose-950/90 dark:text-rose-300">
+          <tr className="border-b border-rose-100 dark:border-rose-950/50">
+            <th className="px-3 py-2.5">Placa</th>
+            <th className="px-3 py-2.5">Base</th>
+            <th className="px-3 py-2.5">Modelo</th>
+            <th className="px-3 py-2.5">Supervisor</th>
+            <th className="px-3 py-2.5">Gerência</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((v) => (
+            <tr
+              key={v.placa}
+              className="border-b border-slate-100 transition hover:bg-rose-50/50 dark:border-slate-800 dark:hover:bg-rose-950/15"
+            >
+              <td className="px-3 py-2 text-xs font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</td>
+              <td className="px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{v.base || '—'}</td>
+              <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
+              <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor || '—'}</td>
+              <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ListaRealizaram({ items }: { items: ChecklistRow[] }) {
+  return (
+    <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
+      <table className="w-full min-w-[560px] border-collapse text-left">
+        <thead className="sticky top-0 z-[1] bg-emerald-50/95 text-[9px] font-black uppercase tracking-wider text-emerald-700 backdrop-blur dark:bg-emerald-950/90 dark:text-emerald-300">
+          <tr className="border-b border-emerald-100 dark:border-emerald-950/50">
+            <th className="px-3 py-2.5">Placa</th>
+            <th className="px-3 py-2.5">Base</th>
+            <th className="px-3 py-2.5">Modelo</th>
+            <th className="px-3 py-2.5">Hora</th>
+            <th className="px-3 py-2.5">NC</th>
+            <th className="px-3 py-2.5">Supervisor</th>
+            <th className="px-3 py-2.5">Gerência</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((v) => (
+            <tr
+              key={v.placa}
+              className="border-b border-slate-100 transition hover:bg-emerald-50/50 dark:border-slate-800 dark:hover:bg-emerald-950/15"
+            >
+              <td className="px-3 py-2 text-xs font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</td>
+              <td className="px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{v.base || '—'}</td>
+              <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
+              <td className="px-3 py-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">{v.hora}</td>
+              <td className="px-3 py-2">
+                {v.temNc ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">NC</span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-slate-400">—</span>
+                )}
+              </td>
+              <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor || '—'}</td>
+              <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 // ─── componente ────────────────────────────────────────────────────────────
@@ -170,10 +259,35 @@ export function ChecklistDetalharPage() {
   const [filtroSupervisor, setFiltroSupervisor] = useState(() =>
     pickFilter(searchParams.get('supervisor'), savedFilters, 'supervisor', 'todos'),
   )
+  const [filtroResponsavel, setFiltroResponsavel] = useState(() =>
+    pickFilter(searchParams.get('responsavel'), savedFilters, 'responsavel', 'todos'),
+  )
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    savedFilters?.viewMode === 'list' ? 'list' : 'cards',
+  )
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const columnsRef = useRef<HTMLDivElement>(null)
 
   const { vehicles: allVehicles } = useFleet()
+
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = columnsRef.current
+    if (!el) return
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await el.requestFullscreen()
+    } catch {
+      /* navegador bloqueou */
+    }
+  }, [])
 
   useEffect(() => {
     saveChecklistDetalharFilters({
@@ -183,8 +297,10 @@ export function ChecklistDetalharPage() {
       base: filtroBase,
       gerencia: filtroCoordenador,
       supervisor: filtroSupervisor,
+      responsavel: filtroResponsavel,
       busca,
       filtrosVisiveis,
+      viewMode,
     })
   }, [
     periodo,
@@ -193,8 +309,10 @@ export function ChecklistDetalharPage() {
     filtroBase,
     filtroCoordenador,
     filtroSupervisor,
+    filtroResponsavel,
     busca,
     filtrosVisiveis,
+    viewMode,
   ])
 
   const limites = useMemo(
@@ -215,6 +333,7 @@ export function ChecklistDetalharPage() {
         base: v.base ?? '',
         supervisor: v.supervisor ?? '',
         coordenador: v.coordenador ?? '',
+        responsavel: v.responsavel ?? '',
         processo: v.prefixo ?? '',
       })
     }
@@ -259,6 +378,7 @@ export function ChecklistDetalharPage() {
             base: frotaInfo?.base ?? String(dv.base ?? ''),
             supervisor: frotaInfo?.supervisor ?? '',
             coordenador: frotaInfo?.coordenador ?? '',
+            responsavel: frotaInfo?.responsavel ?? '',
             processo: frotaInfo?.processo ?? '',
             data: (row.data_inspecao as string).slice(0, 10),
             hora: row.created_at
@@ -273,17 +393,18 @@ export function ChecklistDetalharPage() {
   }, [limites, frotaMap])
 
   // ── aplicar filtros ───────────────────────────────────────────────────────
-  function passaFiltros(r: { base: string; supervisor: string; coordenador: string }) {
+  function passaFiltros(r: { base: string; supervisor: string; coordenador: string; responsavel: string }) {
     if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
     if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
     if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
+    if (filtroResponsavel !== 'todos' && normNome(r.responsavel) !== normNome(filtroResponsavel)) return false
     return true
   }
 
   const placasRealizaram = useMemo(
     () => rawChecklists.filter(passaFiltros),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rawChecklists, filtroBase, filtroSupervisor, filtroCoordenador],
+    [rawChecklists, filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel],
   )
 
   const placasRealizaramSet = useMemo(
@@ -295,7 +416,7 @@ export function ChecklistDetalharPage() {
     return Array.from(frotaMap.values())
       .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frotaMap, placasRealizaramSet, filtroBase, filtroSupervisor, filtroCoordenador])
+  }, [frotaMap, placasRealizaramSet, filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel])
 
   // ── busca ─────────────────────────────────────────────────────────────────
   const q = busca.trim().toUpperCase()
@@ -320,10 +441,55 @@ export function ChecklistDetalharPage() {
   const periodoResumo = limites.ini === limites.fim
     ? formatIsoDateBR(limites.ini)
     : `${formatIsoDateBR(limites.ini)} a ${formatIsoDateBR(limites.fim)}`
+  // ── opções em cascata ────────────────────────────────────────────────────
+  const responsaveisDaGerencia = useMemo(
+    () => getResponsaveisByGerencia(filtroCoordenador),
+    [filtroCoordenador],
+  )
+
+  const basesDaCascata = useMemo(
+    () => getBasesByGerenciaAndResponsavel(filtroCoordenador, filtroResponsavel),
+    [filtroCoordenador, filtroResponsavel],
+  )
+
+  const responsavelOptions = useMemo(() => {
+    const nomes = new Set<string>()
+    for (const v of allVehicles) {
+      const nome = v.responsavel?.trim()
+      if (!nome || nome === 'NÃO ATRIBUÍDO') continue
+      // se a gerência tem mapeamento, exibe só os responsáveis dela (comparação sem acento)
+      if (responsaveisDaGerencia && !responsaveisDaGerencia.some((r) => normNome(r) === normNome(nome))) continue
+      nomes.add(nome)
+    }
+    const sorted = Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    return [{ value: 'todos', label: 'Todos' }, ...sorted.map((n) => ({ value: n, label: n }))]
+  }, [allVehicles, responsaveisDaGerencia])
+
+  const baseOptions = useMemo(() => {
+    if (!basesDaCascata) return BASE_FILTER_SELECT_OPTIONS
+    const allowed = new Set(basesDaCascata.map((b) => b.toLowerCase()))
+    return BASE_FILTER_SELECT_OPTIONS.filter((o) => o.value === 'todos' || allowed.has(o.value.toLowerCase()))
+  }, [basesDaCascata])
+
+  // reset de filtros dependentes quando a gerência muda
+  useEffect(() => {
+    if (responsaveisDaGerencia && filtroResponsavel !== 'todos') {
+      if (!responsaveisDaGerencia.some((r) => normNome(r) === normNome(filtroResponsavel))) setFiltroResponsavel('todos')
+    }
+  }, [filtroCoordenador, responsaveisDaGerencia, filtroResponsavel])
+
+  useEffect(() => {
+    if (basesDaCascata && filtroBase !== 'todos') {
+      const allowed = basesDaCascata.map((b) => b.toLowerCase())
+      if (!allowed.includes(filtroBase.toLowerCase())) setFiltroBase('todos')
+    }
+  }, [filtroCoordenador, filtroResponsavel, basesDaCascata, filtroBase])
+
   const filtrosAtivos =
     filtroBase !== 'todos' ||
     filtroCoordenador !== 'todos' ||
     filtroSupervisor !== 'todos' ||
+    filtroResponsavel !== 'todos' ||
     busca.trim().length > 0
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -429,6 +595,7 @@ export function ChecklistDetalharPage() {
                   setFiltroBase('todos')
                   setFiltroCoordenador('todos')
                   setFiltroSupervisor('todos')
+                  setFiltroResponsavel('todos')
                   setBusca('')
                 }}
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
@@ -516,9 +683,10 @@ export function ChecklistDetalharPage() {
                 </div>
               )}
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={BASE_FILTER_SELECT_OPTIONS} />
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
+                <Select label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} options={responsavelOptions} />
+                <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} />
                 <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
               </div>
             </div>
@@ -532,10 +700,59 @@ export function ChecklistDetalharPage() {
           <span className="size-7 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400" />
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-2 xl:items-start">
+        <div
+          ref={columnsRef}
+          className={`flex min-h-0 flex-1 flex-col gap-3 ${isFullscreen ? 'bg-slate-50 p-4 dark:bg-slate-950' : ''}`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Resultados por veículo
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('cards')}
+                  title="Visão em cards"
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
+                    viewMode === 'cards'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <LayoutGrid size={13} />
+                  Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  title="Visão em lista"
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
+                    viewMode === 'list'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <List size={13} />
+                  Lista
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                {isFullscreen ? 'Sair' : 'Tela cheia'}
+              </button>
+            </div>
+          </div>
+
+        <div className={`grid min-h-0 flex-1 gap-4 xl:grid-cols-2 xl:items-stretch ${isFullscreen ? 'min-h-0' : ''}`}>
 
           {/* Coluna: Não realizaram */}
-          <div className="flex min-h-[420px] flex-col overflow-hidden rounded-[1.5rem] border border-rose-200/80 bg-white shadow-soft dark:border-rose-950/60 dark:bg-slate-900">
+          <div className={`flex flex-col overflow-hidden rounded-[1.5rem] border border-rose-200/80 bg-white shadow-soft dark:border-rose-950/60 dark:bg-slate-900 ${isFullscreen ? 'min-h-0 flex-1' : 'min-h-[420px]'}`}>
             <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-rose-100 bg-rose-50/85 px-4 py-3 backdrop-blur dark:border-rose-950/50 dark:bg-rose-950/25">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-rose-500 shadow-sm dark:bg-slate-950">
                 <ClipboardX size={15} />
@@ -556,8 +773,10 @@ export function ChecklistDetalharPage() {
                   {q ? 'Sem resultados.' : 'Todos realizaram o checklist!'}
                 </p>
               </div>
+            ) : viewMode === 'list' ? (
+              <ListaNaoRealizaram items={naoRealizaramFiltrados} />
             ) : (
-              <div className="custom-scrollbar max-h-[62vh] space-y-3 overflow-y-auto p-3">
+              <div className={`custom-scrollbar space-y-3 overflow-y-auto p-3 ${isFullscreen ? 'flex-1' : 'max-h-[62vh]'}`}>
                 {naoRealizaramFiltrados.map((v) => (
                   <div
                     key={v.placa}
@@ -603,7 +822,7 @@ export function ChecklistDetalharPage() {
           </div>
 
           {/* Coluna: Realizaram */}
-          <div className="flex min-h-[420px] flex-col overflow-hidden rounded-[1.5rem] border border-emerald-200/80 bg-white shadow-soft dark:border-emerald-950/60 dark:bg-slate-900">
+          <div className={`flex flex-col overflow-hidden rounded-[1.5rem] border border-emerald-200/80 bg-white shadow-soft dark:border-emerald-950/60 dark:bg-slate-900 ${isFullscreen ? 'min-h-0 flex-1' : 'min-h-[420px]'}`}>
             <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-emerald-100 bg-emerald-50/85 px-4 py-3 backdrop-blur dark:border-emerald-950/50 dark:bg-emerald-950/25">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-emerald-500 shadow-sm dark:bg-slate-950">
                 <ClipboardCheck size={15} />
@@ -621,8 +840,10 @@ export function ChecklistDetalharPage() {
               <div className="py-14 text-center text-xs font-semibold text-slate-400">
                 {q ? 'Sem resultados.' : 'Nenhum checklist realizado no período.'}
               </div>
+            ) : viewMode === 'list' ? (
+              <ListaRealizaram items={realizaramFiltrados} />
             ) : (
-              <div className="custom-scrollbar max-h-[62vh] space-y-3 overflow-y-auto p-3">
+              <div className={`custom-scrollbar space-y-3 overflow-y-auto p-3 ${isFullscreen ? 'flex-1' : 'max-h-[62vh]'}`}>
                 {realizaramFiltrados.map((v) => (
                   <div
                     key={v.placa}
@@ -677,6 +898,7 @@ export function ChecklistDetalharPage() {
             )}
           </div>
 
+        </div>
         </div>
       )}
 
