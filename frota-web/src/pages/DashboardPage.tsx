@@ -474,26 +474,18 @@ export function DashboardPage() {
     if (!contentRef.current || exportando) return
     setExportando(true)
     try {
-      const { default: html2canvas } = await import('html2canvas')
-      const canvas = await html2canvas(contentRef.current, {
+      const { toPng } = await import('html-to-image')
+      const dataUrl = await toPng(contentRef.current, {
         backgroundColor: isDark ? '#020617' : '#f8fafc',
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
+        pixelRatio: 2,
       })
-      canvas.toBlob((blob) => {
-        if (!blob) return
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
-        link.download = `dashboard-frota-${hoje}.png`
-        link.href = url
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-      }, 'image/png')
+      const link = document.createElement('a')
+      const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+      link.download = `dashboard-frota-${hoje}.png`
+      link.href = dataUrl
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
     } finally {
       setExportando(false)
     }
