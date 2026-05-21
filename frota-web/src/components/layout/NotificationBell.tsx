@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCircle2, ClipboardCheck, ClipboardX, X } from 'lucide-react'
+import { Bell, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardX, X } from 'lucide-react'
 import { useChecklistNotifications } from '../../hooks/useChecklistNotifications'
+import { useAgendaNotifications } from '../../hooks/useAgendaNotifications'
 import { useFleet } from '../../frota/FleetContext'
+import { useAuth } from '../../auth/AuthContext'
 
 const HOUR_LABELS: Record<number, string> = { 10: '10h', 16: '16h', 18: '18h' }
 
@@ -18,10 +20,21 @@ function hourFromId(id: string): string {
 
 export function NotificationBell() {
   const { vehicles } = useFleet()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+
   const { notifications, unreadCount, markAllRead } = useChecklistNotifications(vehicles)
+  const { count: agendaCount } = useAgendaNotifications(isAdmin)
+
   const [open, setOpen] = useState(false)
+  const [agendaLida, setAgendaLida] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+
+  // Reseta leitura da agenda quando a contagem muda (novo agendamento do dia)
+  useEffect(() => {
+    if (agendaCount > 0) setAgendaLida(false)
+  }, [agendaCount])
 
   // fecha ao clicar fora
   useEffect(() => {
@@ -35,9 +48,15 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
+  const agendaUnread = isAdmin && agendaCount > 0 && !agendaLida
+  const totalUnread = unreadCount + (agendaUnread ? 1 : 0)
+
   const toggle = () => {
     setOpen((v) => {
-      if (!v) markAllRead()
+      if (!v) {
+        markAllRead()
+        if (agendaCount > 0) setAgendaLida(true)
+      }
       return !v
     })
   }
@@ -46,6 +65,12 @@ export function NotificationBell() {
     markAllRead()
     setOpen(false)
     navigate(`/checklists/detalhar?periodo=hoje`)
+  }
+
+  const irParaAgenda = () => {
+    setAgendaLida(true)
+    setOpen(false)
+    navigate(`/gerenciar`)
   }
 
   return (
@@ -58,9 +83,9 @@ export function NotificationBell() {
         aria-label="Notificações"
       >
         <Bell size={18} />
-        {unreadCount > 0 && (
+        {totalUnread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {totalUnread > 9 ? '9+' : totalUnread}
           </span>
         )}
       </button>
@@ -81,7 +106,47 @@ export function NotificationBell() {
 
           {/* Lista */}
           <div className="custom-nb-scroll max-h-[420px] overflow-y-auto">
-            {notifications.length === 0 ? (
+
+            {/* Card de agendamentos — visível apenas para admin quando há itens para hoje/vencidos */}
+            {isAdmin && agendaCount > 0 && (
+              <div className={`relative border-b border-slate-50 px-4 py-3.5 dark:border-slate-800/60 ${
+                agendaUnread ? 'bg-amber-50/60 dark:bg-amber-950/20' : ''
+              }`}>
+                {agendaUnread && (
+                  <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-amber-500" />
+                )}
+
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <CalendarClock size={13} className="text-amber-500" />
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                      Agenda de correções
+                    </span>
+                  </div>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+                    {agendaCount} {agendaCount === 1 ? 'item' : 'itens'}
+                  </span>
+                </div>
+
+                <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {agendaCount === 1
+                    ? '1 correção agendada para hoje ou vencida aguarda ação.'
+                    : `${agendaCount} correções agendadas para hoje ou vencidas aguardam ação.`}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={irParaAgenda}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-[11px] font-extrabold text-white transition-colors hover:bg-amber-600"
+                >
+                  <CalendarClock size={12} />
+                  Ver agendamentos
+                </button>
+              </div>
+            )}
+
+            {/* Notificações de checklist */}
+            {notifications.length === 0 && !(isAdmin && agendaCount > 0) ? (
               <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
                 <Bell size={24} className="opacity-30" />
                 <p className="text-xs font-semibold">Sem notificações</p>
@@ -150,7 +215,7 @@ export function NotificationBell() {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
+          {(notifications.length > 0 || (isAdmin && agendaCount > 0)) && (
             <div className="border-t border-slate-100 px-4 py-2.5 dark:border-slate-800">
               <p className="text-center text-[10px] font-medium text-slate-400">
                 Atualizado automaticamente às 10h, 16h e 18h
