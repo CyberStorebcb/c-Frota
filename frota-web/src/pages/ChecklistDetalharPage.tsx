@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -8,20 +9,31 @@ import {
   ChevronUp,
   ClipboardCheck,
   ClipboardX,
+  FileDown,
+  Camera,
   LayoutGrid,
   List,
   Maximize2,
   Minimize2,
   Search,
+  Trophy,
   X,
 } from 'lucide-react'
+
+import {
+  generateChecklistDetalharPdf,
+  type ChecklistDetalharPdfScope,
+} from '../checklists/generateChecklistDetalharPdf'
 
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
 import { Select } from '../components/ui/Select'
-import { getVehicleOperationalStatusRowsWithLocals, isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
+import { ChecklistTop10Section } from '../components/checklist/ChecklistTop10Section'
+import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
+import { captureElementScreenshot, downloadDataUrl } from '../checklists/captureElementScreenshot'
+import { getVehicleOperationalStatusRowsWithLocals } from '../frota/vehicleOperationalStatus'
 import { useFleet } from '../frota/FleetContext'
 import { supabase } from '../lib/supabase'
 
@@ -93,7 +105,7 @@ function computeLimites(periodo: string, desde: string, ate: string): { ini: str
 const FILTROS_STORAGE_KEY = 'frota.filtros.checklist-detalhar.v1'
 const FILTROS_VISIBLE_LEGACY_KEY = 'frota.filtros.checklist-detalhar'
 
-type ViewMode = 'cards' | 'list'
+type ViewMode = 'cards' | 'list' | 'ranking'
 
 type ChecklistDetalharFiltersState = {
   periodo: string
@@ -264,11 +276,17 @@ export function ChecklistDetalharPage() {
   )
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    savedFilters?.viewMode === 'cards' ? 'cards' : 'list',
-  )
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = savedFilters?.viewMode
+    if (saved === 'cards' || saved === 'list' || saved === 'ranking') return saved
+    return 'list'
+  })
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [pdfModalOpen, setPdfModalOpen] = useState(false)
+  const [pdfGerando, setPdfGerando] = useState(false)
+  const [capturandoFoto, setCapturandoFoto] = useState(false)
   const columnsRef = useRef<HTMLDivElement>(null)
+  const rankingCaptureRef = useRef<HTMLDivElement>(null)
 
   const { vehicles: allVehicles } = useFleet()
 
@@ -320,13 +338,24 @@ export function ChecklistDetalharPage() {
     [periodo, customDesde, customAte],
   )
 
-  // ── frota ATIVA via contexto (Supabase + catálogo, sem desmobilizado/inativo) ──
+  // ── frota ATIVA — mesmo critério do Dashboard (ATIVOS + TRANSPORTE, prefixo obrigatório) ──
   const frotaMap = useMemo(() => {
+    const opRows = getVehicleOperationalStatusRowsWithLocals(allVehicles)
+    const ativasSet = new Set(
+      opRows
+        .filter((r) => {
+          const s = r.statusOperacional
+          if (!s) return false            // prefixo vazio/N/A → sem classificação, não conta
+          if (s === 'DESMOBILIZADO' || s === 'EM MOBILIZAÇÃO' || s === 'AGUARDANDO' || s === 'AVARIADO') return false
+          if (s === 'RESERVA') return false
+          return true                     // ATIVOS + TRANSPORTE
+        })
+        .map((r) => normPlaca(r.placa)),
+    )
     const m = new Map<string, VeiculoRow>()
     for (const v of allVehicles) {
       const placa = normPlaca(v.placa)
-      if (!placa) continue
-      if (!isOperacionalAtivosDashboardKpi(placa, v.prefixo ?? '', v.status)) continue
+      if (!placa || !ativasSet.has(placa)) continue
       m.set(placa, {
         placa,
         modelo: v.modelo ?? '—',
@@ -337,18 +366,16 @@ export function ChecklistDetalharPage() {
         processo: v.prefixo ?? '',
       })
     }
-    // merge com operational rows para pegar base do catálogo
-    for (const r of getVehicleOperationalStatusRowsWithLocals(allVehicles)) {
-      const placa = normPlaca(r.placa)
-      const existing = m.get(placa)
-      if (existing && r.base && existing.base === 'N/A') existing.base = r.base
-    }
     return m
   }, [allVehicles])
 
   // ── checklists do período ─────────────────────────────────────────────────
   const [rawChecklists, setRawChecklists] = useState<ChecklistRow[]>([])
+  const [checklistCompletionsByDay, setChecklistCompletionsByDay] = useState<Set<string>>(() => new Set())
   const [loading, setLoading] = useState(true)
+
+  const periodDays = useMemo(() => listDaysInPeriod(limites.ini, limites.fim), [limites])
+  const diasNoPeriodo = periodDays.length
 
   useEffect(() => {
     let cancelled = false
@@ -362,8 +389,9 @@ export function ChecklistDetalharPage() {
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (cancelled) return
-        if (!data) { setRawChecklists([]); setLoading(false); return }
+        if (!data) { setRawChecklists([]); setChecklistCompletionsByDay(new Set()); setLoading(false); return }
 
+        const completions = new Set<string>()
         // deduplicar por placa — mantém o mais recente por período
         const seen = new Map<string, ChecklistRow>()
         for (const row of data) {
@@ -372,6 +400,8 @@ export function ChecklistDetalharPage() {
             : {}
           const placa = normPlaca(String(dv.placa ?? ''))
           if (!placa) continue
+          const dataInspecao = (row.data_inspecao as string).slice(0, 10)
+          if (dataInspecao) completions.add(`${placa}|${dataInspecao}`)
           if (seen.has(placa)) continue
           const frotaInfo = frotaMap.get(placa)
           seen.set(placa, {
@@ -389,6 +419,7 @@ export function ChecklistDetalharPage() {
             temNc: (row.nc_count as number) > 0,
           })
         }
+        setChecklistCompletionsByDay(completions)
         setRawChecklists(Array.from(seen.values()))
         setLoading(false)
       })
@@ -420,6 +451,11 @@ export function ChecklistDetalharPage() {
   const placasNaoRealizaram = useMemo(
     () => Array.from(frotaMap.values()).filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v)),
     [frotaMap, placasRealizaramSet, passaFiltros],
+  )
+
+  const frotaFiltrada = useMemo(
+    () => Array.from(frotaMap.values()).filter(passaFiltros),
+    [frotaMap, passaFiltros],
   )
 
   // ── busca ─────────────────────────────────────────────────────────────────
@@ -496,6 +532,45 @@ export function ChecklistDetalharPage() {
     filtroResponsavel !== 'todos' ||
     busca.trim().length > 0
 
+  const exportarPdf = useCallback(
+    async (scope: ChecklistDetalharPdfScope) => {
+      setPdfGerando(true)
+      try {
+        await generateChecklistDetalharPdf(
+          scope,
+          {
+            periodoLabel,
+            periodoResumo,
+            busca: q || undefined,
+          },
+          naoRealizaramFiltrados,
+          realizaramFiltrados,
+        )
+        setPdfModalOpen(false)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Não foi possível gerar o PDF.'
+        window.alert(msg)
+      } finally {
+        setPdfGerando(false)
+      }
+    },
+    [periodoLabel, periodoResumo, q, naoRealizaramFiltrados, realizaramFiltrados],
+  )
+
+  const capturarRanking = useCallback(async () => {
+    const el = rankingCaptureRef.current
+    if (!el) return
+    setCapturandoFoto(true)
+    try {
+      const dataUrl = await captureElementScreenshot(el)
+      downloadDataUrl(dataUrl, `ranking-checklist-${limites.ini}-${limites.fim}.png`)
+    } catch {
+      window.alert('Não foi possível capturar a imagem do ranking.')
+    } finally {
+      setCapturandoFoto(false)
+    }
+  }, [limites.ini, limites.fim])
+
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto bg-slate-50/70 px-4 py-5 dark:bg-slate-950 sm:px-6 lg:px-8">
@@ -558,9 +633,9 @@ export function ChecklistDetalharPage() {
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
               <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/55">
                 <div className="absolute inset-y-0 left-0 w-1 bg-slate-400/70" />
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Frota filtrada</p>
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Veículos ativos</p>
                 <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{total}</p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-400">veículos no recorte atual</p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">ativos no recorte atual</p>
               </div>
               <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm backdrop-blur dark:border-emerald-900/60 dark:bg-emerald-950/25">
                 <div className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
@@ -710,7 +785,7 @@ export function ChecklistDetalharPage() {
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Resultados por veículo
+              {viewMode === 'ranking' ? 'Rankings do período' : 'Resultados por veículo'}
             </p>
             <div className="flex items-center gap-2">
               <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -740,7 +815,42 @@ export function ChecklistDetalharPage() {
                   <List size={13} />
                   Lista
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('ranking')}
+                  title="Visão em ranking"
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
+                    viewMode === 'ranking'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Trophy size={13} />
+                  Ranking
+                </button>
               </div>
+              {viewMode === 'ranking' ? (
+                <button
+                  type="button"
+                  onClick={() => void capturarRanking()}
+                  disabled={capturandoFoto}
+                  title="Capturar imagem do ranking"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <Camera size={14} className={capturandoFoto ? 'animate-pulse' : ''} />
+                  {capturandoFoto ? 'Gerando…' : 'Foto'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPdfModalOpen(true)}
+                  title="Exportar PDF"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <FileDown size={14} />
+                  PDF
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
@@ -753,6 +863,18 @@ export function ChecklistDetalharPage() {
             </div>
           </div>
 
+        {viewMode === 'ranking' ? (
+          <ChecklistTop10Section
+            frota={frotaFiltrada}
+            completions={checklistCompletionsByDay}
+            diasNoPeriodo={diasNoPeriodo}
+            periodDays={periodDays}
+            periodoLabel={periodoLabel}
+            periodoResumo={periodoResumo}
+            captureRef={rankingCaptureRef}
+            fullscreen={isFullscreen}
+          />
+        ) : (
         <div className={`grid min-h-0 flex-1 gap-4 xl:grid-cols-2 xl:items-stretch ${isFullscreen ? 'min-h-0' : ''}`}>
 
           {/* Coluna: Não realizaram */}
@@ -903,6 +1025,88 @@ export function ChecklistDetalharPage() {
           </div>
 
         </div>
+        )}
+
+        {pdfModalOpen &&
+          createPortal(
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-base font-black text-slate-900 dark:text-slate-100">Exportar PDF</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Escolha quais checklists incluir no relatório.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !pdfGerando && setPdfModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={pdfGerando || naoRealizaramFiltrados.length === 0}
+                onClick={() => void exportarPdf('nao')}
+                className="flex w-full items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-950/60 dark:bg-rose-950/20 dark:hover:bg-rose-950/30"
+              >
+                <ClipboardX size={18} className="shrink-0 text-rose-600 dark:text-rose-400" />
+                <div>
+                  <p className="text-sm font-extrabold text-rose-800 dark:text-rose-200">Somente não realizados</p>
+                  <p className="text-[11px] font-semibold text-rose-600/80 dark:text-rose-300/70">
+                    {naoRealizaramFiltrados.length} veículo(s)
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={pdfGerando || realizaramFiltrados.length === 0}
+                onClick={() => void exportarPdf('sim')}
+                className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-950/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30"
+              >
+                <ClipboardCheck size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <div>
+                  <p className="text-sm font-extrabold text-emerald-800 dark:text-emerald-200">Somente realizados</p>
+                  <p className="text-[11px] font-semibold text-emerald-600/80 dark:text-emerald-300/70">
+                    {realizaramFiltrados.length} veículo(s)
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={pdfGerando || (naoRealizaramFiltrados.length === 0 && realizaramFiltrados.length === 0)}
+                onClick={() => void exportarPdf('ambos')}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800"
+              >
+                <FileDown size={18} className="shrink-0 text-slate-600 dark:text-slate-300" />
+                <div>
+                  <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">Ambos</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {naoRealizaramFiltrados.length} não realizados · {realizaramFiltrados.length} realizados
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              disabled={pdfGerando}
+              onClick={() => setPdfModalOpen(false)}
+              className="mt-5 w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-extrabold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              {pdfGerando ? 'Gerando PDF…' : 'Cancelar'}
+            </button>
+          </div>
+            </div>,
+            (document.fullscreenElement as HTMLElement | null) ?? document.body,
+          )}
         </div>
       )}
 
