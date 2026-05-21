@@ -29,6 +29,7 @@
     "@radix-ui/react-select": "^2.2.6",
     "@supabase/supabase-js": "^2.105.4",
     "dom-to-image-more": "^3.7.2",
+    "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.14.0",
     "pdf-lib": "^1.17.1",

@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react'
+﻿import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   type LucideIcon,
@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   ClipboardX,
   Gauge,
+  ImageDown,
   Truck,
 } from 'lucide-react'
 
@@ -466,6 +467,30 @@ export function DashboardPage() {
     [isDark],
   )
 
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [exportando, setExportando] = useState(false)
+
+  async function exportarImagem() {
+    if (!contentRef.current || exportando) return
+    setExportando(true)
+    try {
+      const { default: html2canvas } = await import('html2canvas')
+      const canvas = await html2canvas(contentRef.current, {
+        backgroundColor: isDark ? '#020617' : '#f8fafc',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      })
+      const link = document.createElement('a')
+      const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+      link.download = `dashboard-frota-${hoje}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } catch { /* ignore */ } finally {
+      setExportando(false)
+    }
+  }
+
   return (
     <div className="-mx-3 -my-3 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent text-slate-900 dark:text-slate-100 sm:-mx-4 sm:-my-4 lg:-mx-8 lg:-my-6">
       <div className="shrink-0 overflow-hidden border-b border-slate-200/80 bg-transparent dark:border-slate-800/60 dark:bg-transparent sm:rounded-t-xl lg:rounded-t-2xl">
@@ -557,6 +582,16 @@ export function DashboardPage() {
             </button>
             <button
               type="button"
+              onClick={exportarImagem}
+              disabled={exportando}
+              title="Exportar imagem do dashboard"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 dark:border-slate-600/60 dark:bg-transparent dark:text-slate-200 dark:hover:bg-white/5 sm:gap-2 sm:px-3.5 sm:text-[11px]"
+            >
+              <ImageDown size={15} className="shrink-0" aria-hidden />
+              <span className="hidden sm:inline">{exportando ? 'Exportando…' : 'Exportar'}</span>
+            </button>
+            <button
+              type="button"
               onClick={irParaDetalhar}
               className="flex items-center justify-center rounded-xl bg-[#1E3A8A] px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-900/15 transition-all duration-300 ease-out will-change-transform hover:-translate-y-0.5 hover:scale-[1.03] hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-0 active:scale-[0.98] active:shadow-lg dark:shadow-blue-950/30 dark:focus-visible:ring-offset-slate-950 sm:rounded-2xl sm:px-5 sm:text-xs sm:py-3"
             >
@@ -565,12 +600,15 @@ export function DashboardPage() {
           </div>
         </header>
 
+      </div>
+
+      <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
         <div
           id="dashboard-filtros-avancados"
-          className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosAvancadosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+          className={`shrink-0 grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosAvancadosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
         >
           <div className="overflow-hidden">
-            <div className="border-t border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
+            <div className="border-b border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 lg:gap-4">
                 <Select
                   label="Base"
@@ -594,8 +632,6 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
-
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:flex-row lg:gap-5 lg:p-5">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
@@ -718,6 +754,7 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <style>{`
