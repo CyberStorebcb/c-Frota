@@ -1,9 +1,11 @@
 import { HelpCircle, RotateCcw, X } from 'lucide-react'
 import { useTour } from './TourContext'
 
-/** Botão flutuante para iniciar/controlar o tour. */
+/** Botão flutuante para iniciar/controlar o tour. Visível apenas na conta demo. */
 export function TourLauncher() {
-  const { active, start, stop, resetTour } = useTour()
+  const { active, isDemo, start, stop, resetTour } = useTour()
+
+  if (!isDemo) return null
 
   if (active) {
     return (

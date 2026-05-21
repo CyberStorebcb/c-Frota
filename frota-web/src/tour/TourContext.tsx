@@ -9,6 +9,7 @@ type TourCtx = {
   stepIndex: number
   step: TourStep | null
   total: number
+  isDemo: boolean
   /** Inicia do passo salvo (retoma onde parou). */
   start: () => void
   /** Inicia sempre do passo 0, ignorando progresso salvo. */
@@ -217,6 +218,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       stepIndex,
       step: active ? TOUR_STEPS[stepIndex] ?? null : null,
       total: TOUR_STEPS.length,
+      isDemo,
       start,
       startFresh,
       stop,
@@ -225,7 +227,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       prev,
       goTo,
     }),
-    [active, finished, stepIndex, start, startFresh, stop, resetTour, next, prev, goTo],
+    [active, finished, stepIndex, isDemo, start, startFresh, stop, resetTour, next, prev, goTo],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
