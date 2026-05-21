@@ -234,16 +234,39 @@ export function DashboardPage() {
   const isDark = theme === 'dark'
   const areaGradId = useId().replace(/:/g, '')
   const [viewMode, setViewMode] = useState<'bar' | 'area'>('bar')
-  const [periodo, setPeriodo] = useState<string>('7d')
-  const [customDesde, setCustomDesde] = useState<string>(defaultCustomDesdeIso)
-  const [customAte, setCustomAte] = useState<string>(() => hojeLocalIso())
-  const [filtroBase, setFiltroBase] = useState<string>('todos')
-  const [filtroCoordenador, setFiltroCoordenador] = useState<string>('todos')
-  const [filtroSupervisor, setFiltroSupervisor] = useState<string>('todos')
+  const [periodo, setPeriodo] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.periodo') ?? '7d' } catch { return '7d' }
+  })
+  const [customDesde, setCustomDesde] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.customDesde') ?? defaultCustomDesdeIso } catch { return defaultCustomDesdeIso }
+  })
+  const [customAte, setCustomAte] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.customAte') ?? hojeLocalIso() } catch { return hojeLocalIso() }
+  })
+  const [filtroBase, setFiltroBase] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.filtroBase') ?? 'todos' } catch { return 'todos' }
+  })
+  const [filtroCoordenador, setFiltroCoordenador] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.filtroCoordenador') ?? 'todos' } catch { return 'todos' }
+  })
+  const [filtroSupervisor, setFiltroSupervisor] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.filtroSupervisor') ?? 'todos' } catch { return 'todos' }
+  })
   const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(() => {
     try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
     catch { return false }
   })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('frota.dashboard.periodo', periodo)
+      localStorage.setItem('frota.dashboard.customDesde', customDesde)
+      localStorage.setItem('frota.dashboard.customAte', customAte)
+      localStorage.setItem('frota.dashboard.filtroBase', filtroBase)
+      localStorage.setItem('frota.dashboard.filtroCoordenador', filtroCoordenador)
+      localStorage.setItem('frota.dashboard.filtroSupervisor', filtroSupervisor)
+    } catch { /* ignore */ }
+  }, [periodo, customDesde, customAte, filtroBase, filtroCoordenador, filtroSupervisor])
 
   const navigate = useNavigate()
 
