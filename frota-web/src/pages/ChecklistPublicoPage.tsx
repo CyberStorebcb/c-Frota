@@ -829,6 +829,7 @@ const ItemChecklist = memo(function ItemChecklist({
   obs,
   fotos,
   destacado,
+  fotoFaltando,
   onResposta,
   onObs,
   onAddFoto,
@@ -842,6 +843,7 @@ const ItemChecklist = memo(function ItemChecklist({
   obs: string
   fotos: File[]
   destacado: boolean
+  fotoFaltando: boolean
   onResposta: (id: string, valor: RespostaVal) => void
   onObs: (id: string, valor: string) => void
   onAddFoto: (id: string, files: File[]) => void
@@ -912,6 +914,11 @@ const ItemChecklist = memo(function ItemChecklist({
               className="w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 dark:border-rose-800/60 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:ring-rose-900/30"
             />
           </div>
+          {fotoFaltando && (
+            <p className="flex items-center gap-1 text-[11px] font-extrabold text-rose-500 dark:text-rose-400">
+              📷 Foto obrigatória — anexe ao menos 1 foto
+            </p>
+          )}
           <FotosItem
             fotos={fotos}
             onAdd={(novos) => onAddFoto(item.id, novos)}
@@ -1569,7 +1576,15 @@ function FormularioChecklist({
     [schema.camposExtras, dadosVeiculo],
   )
   const evidenciaNr12Ok = !schema.temEvidencia || arquivos.length > 0
-  const podEnviar = tudo100 && camposPreenchidos && evidenciaNr12Ok
+
+  // itens com NC que ainda não têm nenhuma foto anexada
+  const itensNcSemFoto = useMemo(
+    () => todosItens.filter((it) => respostas[it.id] === 'nc' && (fotosItem[it.id] ?? []).length === 0),
+    [todosItens, respostas, fotosItem],
+  )
+  const fotosNcOk = itensNcSemFoto.length === 0
+
+  const podEnviar = tudo100 && camposPreenchidos && evidenciaNr12Ok && fotosNcOk
   const mostrarBarraEnvio = tudo100 || enviando
 
   // Mapa: itemId → número sequencial global (calculado uma vez)
@@ -2373,6 +2388,7 @@ function FormularioChecklist({
                   obs={observacoes[item.id] ?? ''}
                   fotos={fotosItem[item.id] ?? []}
                   destacado={itemDestacado === item.id}
+                  fotoFaltando={respostas[item.id] === 'nc' && (fotosItem[item.id] ?? []).length === 0 && !fotosNcOk}
                   onResposta={setResposta}
                   onObs={setObservacaoCb}
                   onAddFoto={addFotoItem}
@@ -2514,6 +2530,10 @@ function FormularioChecklist({
             ) : tudo100 && camposPreenchidos && evidenciaNr12Ok ? (
               <p className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 size={16} /> Pronto para enviar
+              </p>
+            ) : tudo100 && camposPreenchidos && evidenciaNr12Ok && !fotosNcOk ? (
+              <p className="text-sm font-semibold text-rose-500 dark:text-rose-400">
+                📷 {itensNcSemFoto.length} item(s) NC sem foto — obrigatória
               </p>
             ) : tudo100 && camposPreenchidos && schema.temEvidencia && !evidenciaNr12Ok ? (
               <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
