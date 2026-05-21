@@ -479,14 +479,22 @@ export function DashboardPage() {
         backgroundColor: isDark ? '#020617' : '#f8fafc',
         scale: 2,
         useCORS: true,
+        allowTaint: true,
         logging: false,
       })
-      const link = document.createElement('a')
-      const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
-      link.download = `dashboard-frota-${hoje}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
-    } catch { /* ignore */ } finally {
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+        link.download = `dashboard-frota-${hoje}.png`
+        link.href = url
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }, 'image/png')
+    } finally {
       setExportando(false)
     }
   }
