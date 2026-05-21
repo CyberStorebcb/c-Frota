@@ -21,6 +21,7 @@ const L = {
   innerPad: 24,
   rowH: 82,
   rowGap: 12,
+  podiumListGap: 30,
   podiumH: 240,
   spotlightH: 132,
   radius: 30,
@@ -409,7 +410,7 @@ function measureColumnHeight(variant: 'nao' | 'sim', entries: ChecklistAdherence
 
   if (variant === 'sim') {
     const listCount = Math.max(0, rows.length - 3)
-    return L.colHeaderH + L.innerPad + L.podiumH + L.innerPad + listCount * (L.rowH + L.rowGap) + L.innerPad
+    return L.colHeaderH + L.innerPad + L.podiumH + L.podiumListGap + listCount * (L.rowH + L.rowGap) + L.innerPad
   }
 
   const listCount = Math.max(0, rows.length - 1)
@@ -505,7 +506,7 @@ function drawCompetitionBoard(
     })
   } else {
     drawPodium(ctx, contentX, cursorY, contentW, L.podiumH, rows)
-    cursorY += L.podiumH + L.rowGap
+    cursorY += L.podiumH + L.podiumListGap
     rows.slice(3).forEach((entry, i) => {
       drawLeaderRow(ctx, contentX, cursorY, contentW, L.rowH, entry, i + 4, variant)
       cursorY += L.rowH + L.rowGap
