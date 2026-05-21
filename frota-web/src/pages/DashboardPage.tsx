@@ -473,11 +473,34 @@ export function DashboardPage() {
   async function exportarImagem() {
     if (!contentRef.current || exportando) return
     setExportando(true)
+
+    const el = contentRef.current
+
+    // Coleta todos os ancestrais com overflow-hidden até o body e remove temporariamente
+    const overflowEls: { el: HTMLElement; prev: string }[] = []
+    let cursor: HTMLElement | null = el
+    while (cursor && cursor !== document.body) {
+      const cs = window.getComputedStyle(cursor)
+      if (cs.overflow === 'hidden' || cs.overflowY === 'hidden') {
+        overflowEls.push({ el: cursor, prev: cursor.style.overflow })
+        cursor.style.overflow = 'visible'
+      }
+      cursor = cursor.parentElement
+    }
+
+    // Expande o próprio elemento para mostrar conteúdo completo
+    const prevStyle = { height: el.style.height, minHeight: el.style.minHeight, maxHeight: el.style.maxHeight }
+    el.style.height = 'auto'
+    el.style.minHeight = 'unset'
+    el.style.maxHeight = 'unset'
+
     try {
       const { toPng } = await import('html-to-image')
-      const dataUrl = await toPng(contentRef.current, {
+      const dataUrl = await toPng(el, {
         backgroundColor: isDark ? '#020617' : '#f8fafc',
-        pixelRatio: 2,
+        pixelRatio: 3,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
       })
       const link = document.createElement('a')
       const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
@@ -487,6 +510,11 @@ export function DashboardPage() {
       link.click()
       document.body.removeChild(link)
     } finally {
+      // Restaura tudo
+      el.style.height = prevStyle.height
+      el.style.minHeight = prevStyle.minHeight
+      el.style.maxHeight = prevStyle.maxHeight
+      for (const { el: e, prev } of overflowEls) e.style.overflow = prev
       setExportando(false)
     }
   }
