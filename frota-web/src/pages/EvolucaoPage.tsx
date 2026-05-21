@@ -503,11 +503,24 @@ export function EvolucaoPage() {
     try { return localStorage.getItem('frota.filtros.evolucao') === 'true' }
     catch { return false }
   })
-  const [filtroBase, setFiltroBase] = useState('todos')
-  const [filtroCoord, setFiltroCoord] = useState('todos')
-  const [filtroResp, setFiltroResp] = useState('todos')
-  const [filtroPrefixo, setFiltroPrefixo] = useState('todos')
-  const [filtroData, setFiltroData] = useState<EvolucaoFiltros['data']>('todos')
+  const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
+  const [filtroBase, setFiltroBase] = useState(() => lsGet('frota.evolucao.base', 'todos'))
+  const [filtroCoord, setFiltroCoord] = useState(() => lsGet('frota.evolucao.coord', 'todos'))
+  const [filtroResp, setFiltroResp] = useState(() => lsGet('frota.evolucao.resp', 'todos'))
+  const [filtroPrefixo, setFiltroPrefixo] = useState(() => lsGet('frota.evolucao.prefixo', 'todos'))
+  const [filtroData, setFiltroData] = useState<EvolucaoFiltros['data']>(
+    () => (lsGet('frota.evolucao.data', 'todos') as EvolucaoFiltros['data'])
+  )
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('frota.evolucao.base', filtroBase)
+      localStorage.setItem('frota.evolucao.coord', filtroCoord)
+      localStorage.setItem('frota.evolucao.resp', filtroResp)
+      localStorage.setItem('frota.evolucao.prefixo', filtroPrefixo)
+      localStorage.setItem('frota.evolucao.data', filtroData)
+    } catch { /* ignore */ }
+  }, [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData])
 
   useEffect(() => {
     const el = wrapRef.current

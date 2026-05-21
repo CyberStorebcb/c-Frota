@@ -909,16 +909,28 @@ export function ChecklistResultadosPage() {
   const [paginaAtual, setPaginaAtual] = useState(1)
   const [query, setQuery]             = useState('')
   const [queryInput, setQueryInput]   = useState('')
-  const [tipoFiltro, setTipoFiltro]   = useState('')
-  const [somenteNc, setSomenteNc]     = useState(false)
-  const [dataInicio, setDataInicio]   = useState('')
-  const [dataFim, setDataFim]         = useState('')
-  const [ordemCol, setOrdemCol]       = useState<OrdemCol>('created_at')
-  const [ordemDir, setOrdemDir]       = useState<OrdemDir>('desc')
+  const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
+  const [tipoFiltro, setTipoFiltro]   = useState(() => lsGet('frota.checklists.tipoFiltro', ''))
+  const [somenteNc, setSomenteNc]     = useState(() => lsGet('frota.checklists.somenteNc', 'false') === 'true')
+  const [dataInicio, setDataInicio]   = useState(() => lsGet('frota.checklists.dataInicio', ''))
+  const [dataFim, setDataFim]         = useState(() => lsGet('frota.checklists.dataFim', ''))
+  const [ordemCol, setOrdemCol]       = useState<OrdemCol>(() => (lsGet('frota.checklists.ordemCol', 'created_at') as OrdemCol))
+  const [ordemDir, setOrdemDir]       = useState<OrdemDir>(() => (lsGet('frota.checklists.ordemDir', 'desc') as OrdemDir))
   const [detalhe, setDetalhe]         = useState<ChecklistRow | null>(null)
   const [editando, setEditando]       = useState<ChecklistRow | null>(null)
   const [sparkRows, setSparkRows]     = useState<ChecklistRow[]>([])
   const [reloadNonce, setReloadNonce] = useState(0)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('frota.checklists.tipoFiltro', tipoFiltro)
+      localStorage.setItem('frota.checklists.somenteNc', String(somenteNc))
+      localStorage.setItem('frota.checklists.dataInicio', dataInicio)
+      localStorage.setItem('frota.checklists.dataFim', dataFim)
+      localStorage.setItem('frota.checklists.ordemCol', ordemCol)
+      localStorage.setItem('frota.checklists.ordemDir', ordemDir)
+    } catch { /* ignore */ }
+  }, [tipoFiltro, somenteNc, dataInicio, dataFim, ordemCol, ordemDir])
 
   const totalPaginas = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE))
 

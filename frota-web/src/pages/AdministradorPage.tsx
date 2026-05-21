@@ -69,7 +69,9 @@ export function UsuariosPage() {
   const [users, setUsers] = useState<ProfileRow[]>([])
   const [carregando, setCarregando] = useState(true)
   const [search, setSearch] = useState('')
-  const [filtroRole, setFiltroRole] = useState<RoleFilter>('todos')
+  const [filtroRole, setFiltroRole] = useState<RoleFilter>(
+    () => { try { return (localStorage.getItem('frota.admin.filtroRole') ?? 'todos') as RoleFilter } catch { return 'todos' } }
+  )
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const [resetModal, setResetModal] = useState<{ id: string; email: string } | null>(null)
@@ -83,6 +85,10 @@ export function UsuariosPage() {
   const [createConfirm, setCreateConfirm] = useState('')
   const [createRole, setCreateRole] = useState<'admin' | 'user'>('user')
   const [criando, setCriando] = useState(false)
+
+  useEffect(() => {
+    try { localStorage.setItem('frota.admin.filtroRole', filtroRole) } catch { /* ignore */ }
+  }, [filtroRole])
 
   const showMsg = useCallback((text: string, ok = true) => {
     setMsg({ text, ok })

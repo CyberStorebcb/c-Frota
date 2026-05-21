@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertCircle, ArrowLeft, CalendarCheck2, ChevronLeft, ChevronRight, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
 import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
@@ -197,15 +197,27 @@ async function mergeOsIntoReport(reportBytes: ArrayBuffer, osDataUrl: string): P
 
 export function HistoricoPage() {
   const { rows } = useApontamentos()
+  const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
   const [query, setQuery] = useState('')
-  const [valorMin, setValorMin] = useState('')
-  const [valorMax, setValorMax] = useState('')
-  const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim] = useState('')
+  const [valorMin, setValorMin] = useState(() => lsGet('frota.historico.valorMin', ''))
+  const [valorMax, setValorMax] = useState(() => lsGet('frota.historico.valorMax', ''))
+  const [dataInicio, setDataInicio] = useState(() => lsGet('frota.historico.dataInicio', ''))
+  const [dataFim, setDataFim] = useState(() => lsGet('frota.historico.dataFim', ''))
   const [imgOpen, setImgOpen] = useState<string | null>(null)
-  const [base, setBase] = useState('todos')
-  const [coordenador, setCoordenador] = useState('todos')
+  const [base, setBase] = useState(() => lsGet('frota.historico.base', 'todos'))
+  const [coordenador, setCoordenador] = useState(() => lsGet('frota.historico.coordenador', 'todos'))
   const [pagina, setPagina] = useState(1)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('frota.historico.base', base)
+      localStorage.setItem('frota.historico.coordenador', coordenador)
+      localStorage.setItem('frota.historico.dataInicio', dataInicio)
+      localStorage.setItem('frota.historico.dataFim', dataFim)
+      localStorage.setItem('frota.historico.valorMin', valorMin)
+      localStorage.setItem('frota.historico.valorMax', valorMax)
+    } catch { /* ignore */ }
+  }, [base, coordenador, dataInicio, dataFim, valorMin, valorMax])
   const PAGE_SIZE = 25
 
   const historico = useMemo(() => {

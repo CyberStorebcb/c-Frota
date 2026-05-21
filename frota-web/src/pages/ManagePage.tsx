@@ -165,8 +165,13 @@ export function ManagePage() {
   const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes'>('apontamentos')
-  const [severidade, setSeveridade] = useState<'todos' | 'imperativo' | 'atencao'>('todos')
+  const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
+  const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes'>(
+    () => (lsGet('frota.manage.visao', 'apontamentos') as 'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes')
+  )
+  const [severidade, setSeveridade] = useState<'todos' | 'imperativo' | 'atencao'>(
+    () => (lsGet('frota.manage.severidade', 'todos') as 'todos' | 'imperativo' | 'atencao')
+  )
   const [vehicleId, setVehicleId] = useState(() => searchParams.get('veiculo') ?? 'todos')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
     if (searchParams.get('veiculo')) return true
@@ -174,15 +179,17 @@ export function ManagePage() {
     catch { return false }
   })
   const [query, setQuery] = useState('')
-  const [base, setBase] = useState('todos')
-  const [coordenador, setCoordenador] = useState('todos')
-  const [responsavel, setResponsavel] = useState('todos')
-  const [supervisor, setSupervisor] = useState('todos')
-  const [prefixo, setPrefixo] = useState('todos')
-  const [data, setData] = useState('todos')
+  const [base, setBase] = useState(() => lsGet('frota.manage.base', 'todos'))
+  const [coordenador, setCoordenador] = useState(() => lsGet('frota.manage.coordenador', 'todos'))
+  const [responsavel, setResponsavel] = useState(() => lsGet('frota.manage.responsavel', 'todos'))
+  const [supervisor, setSupervisor] = useState(() => lsGet('frota.manage.supervisor', 'todos'))
+  const [prefixo, setPrefixo] = useState(() => lsGet('frota.manage.prefixo', 'todos'))
+  const [data, setData] = useState(() => lsGet('frota.manage.data', 'todos'))
   const [pagina, setPagina] = useState(1)
-  const [dataOrdem, setDataOrdem] = useState<'asc' | 'desc'>('asc')
-  const [pageSizeStr, setPageSizeStr] = useState('25')
+  const [dataOrdem, setDataOrdem] = useState<'asc' | 'desc'>(
+    () => (lsGet('frota.manage.dataOrdem', 'asc') as 'asc' | 'desc')
+  )
+  const [pageSizeStr, setPageSizeStr] = useState(() => lsGet('frota.manage.pageSize', '25'))
   const pageSize = Number(pageSizeStr) || 25
   const [historyGroup, setHistoryGroup] = useState<ApontamentoGroup | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -191,6 +198,21 @@ export function ManagePage() {
   const urlPlaca = searchParams.get('placa')
   const urlPrefixo = searchParams.get('prefixo')
   const urlChecklist = searchParams.get('checklist')
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('frota.manage.visao', visao)
+      localStorage.setItem('frota.manage.severidade', severidade)
+      localStorage.setItem('frota.manage.base', base)
+      localStorage.setItem('frota.manage.coordenador', coordenador)
+      localStorage.setItem('frota.manage.responsavel', responsavel)
+      localStorage.setItem('frota.manage.supervisor', supervisor)
+      localStorage.setItem('frota.manage.prefixo', prefixo)
+      localStorage.setItem('frota.manage.data', data)
+      localStorage.setItem('frota.manage.dataOrdem', dataOrdem)
+      localStorage.setItem('frota.manage.pageSize', pageSizeStr)
+    } catch { /* ignore */ }
+  }, [visao, severidade, base, coordenador, responsavel, supervisor, prefixo, data, dataOrdem, pageSizeStr])
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 60_000)
