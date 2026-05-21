@@ -384,6 +384,11 @@ export function DashboardPage() {
     }))
   }, [checklistsPorDiaNoPeriodo, periodoChartMode])
 
+  const chartTotals = useMemo(() => ({
+    realizados: checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.realizados, 0),
+    comNc: checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.comNc, 0),
+  }), [checklistsPorDiaNoPeriodo])
+
   // KPIs
   const stats = useMemo<Stat[]>(() => {
     const { fimMsEnd } = periodoLimites
@@ -473,8 +478,11 @@ export function DashboardPage() {
   async function exportarImagem() {
     if (!contentRef.current || exportando) return
     setExportando(true)
+    // Aguarda o overlay ser renderizado no DOM antes de capturar
+    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
 
     const el = contentRef.current
+    if (!el) { setExportando(false); return }
 
     // Coleta todos os ancestrais com overflow-hidden até o body e remove temporariamente
     const overflowEls: { el: HTMLElement; prev: string }[] = []
@@ -759,7 +767,30 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex h-[min(52vh,480px)] min-h-[260px] min-w-0 flex-1 flex-col p-3 sm:min-h-[300px] sm:p-4 lg:h-[min(56vh,560px)] lg:p-5">
+            <div className="relative flex h-[min(52vh,480px)] min-h-[260px] min-w-0 flex-1 flex-col p-3 sm:min-h-[300px] sm:p-4 lg:h-[min(56vh,560px)] lg:p-5">
+              {exportando && (
+                <div className="pointer-events-none absolute right-6 top-4 z-10 min-w-[188px] rounded-2xl border border-slate-600/70 bg-slate-950/95 px-3 py-2.5 text-slate-100 shadow-2xl shadow-black/40">
+                  <p className="mb-2 border-b border-slate-500/30 pb-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                    Total do período
+                  </p>
+                  <ul className="space-y-2">
+                    <li className="flex items-center justify-between gap-8 text-[13px] font-bold tabular-nums">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: '#1E40AF' }} />
+                        <span className="text-slate-300">Realizados</span>
+                      </span>
+                      <span className="text-white">{chartTotals.realizados}</span>
+                    </li>
+                    <li className="flex items-center justify-between gap-8 text-[13px] font-bold tabular-nums">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: '#FF8A65' }} />
+                        <span className="text-slate-300">Com NC</span>
+                      </span>
+                      <span className="text-white">{chartTotals.comNc}</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
               <Suspense
                 fallback={
                   <div className="flex min-h-[240px] flex-1 items-center justify-center gap-2 text-sm font-semibold text-slate-400 dark:text-slate-500">
