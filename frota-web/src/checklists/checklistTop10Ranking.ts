@@ -59,12 +59,54 @@ export function countDaysInPeriod(ini: string, fim: string): number {
   return listDaysInPeriod(ini, fim).length
 }
 
+export type FleetAdherenceStats = {
+  realizados: number
+  esperados: number
+  pct: number
+}
+
 function countPlacaCompletions(placa: string, days: string[], completions: Set<string>): number {
   let total = 0
   for (const day of days) {
     if (completions.has(`${placa}|${day}`)) total += 1
   }
   return total
+}
+
+export function filterCompletionsToDays(completions: Set<string>, days: string[]): Set<string> {
+  const daysSet = new Set(days)
+  const filtered = new Set<string>()
+  for (const key of completions) {
+    const pipeIdx = key.lastIndexOf('|')
+    if (pipeIdx === -1) continue
+    const day = key.slice(pipeIdx + 1)
+    if (daysSet.has(day)) filtered.add(key)
+  }
+  return filtered
+}
+
+/** Aderência diária da frota: checklists concluídos (placa × dia) ÷ (veículos × dias do período). */
+export function computeFleetAdherence(
+  fleetPlacas: Iterable<string>,
+  completions: Set<string>,
+  days: string[],
+): FleetAdherenceStats {
+  const placas = [...fleetPlacas]
+  const esperados = placas.length * days.length
+  if (esperados === 0) {
+    return { realizados: 0, esperados: 0, pct: 0 }
+  }
+
+  let realizados = 0
+  for (const placa of placas) {
+    realizados += countPlacaCompletions(placa, days, completions)
+  }
+
+  return {
+    realizados,
+    esperados,
+    pct: Math.round((realizados / esperados) * 100),
+  }
 }
 
 type GroupStats = {

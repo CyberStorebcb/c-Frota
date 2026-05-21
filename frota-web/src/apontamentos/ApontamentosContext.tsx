@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { supabase, type HistoricoRow } from '../lib/supabase'
+import { fetchAllSupabasePages } from '../lib/supabasePaginate'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 import {
   apontamentoVeiculoIdFromPlaca,
@@ -244,22 +245,15 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
     // 2. Checklists concluídos — filtra itens NC nas respostas (nc_count pode estar desatualizado).
     const fetchAllNc = async () => {
-      const all: unknown[] = []
-      let from = 0
-      const pageSize = 1000
-      while (true) {
-        const { data, error } = await supabase
+      return fetchAllSupabasePages((from, to) =>
+        supabase
           .from('checklists')
           .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
           .eq('progresso', 100)
           .order('data_inspecao', { ascending: true })
-          .range(from, from + pageSize - 1)
-        if (error) return { data: null, error }
-        if (data) all.push(...data)
-        if (!data || data.length < pageSize) break
-        from += pageSize
-      }
-      return { data: all, error: null }
+          .order('id', { ascending: true })
+          .range(from, to),
+      )
     }
 
     const { data: clData, error: clError } = await fetchAllNc()
@@ -271,9 +265,13 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     }
 
     // 3. Busca resoluções da tabela apontamentos
-    const { data: resData } = await supabase
-      .from('apontamentos')
-      .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
+    const { data: resData } = await fetchAllSupabasePages((from, to) =>
+      supabase
+        .from('apontamentos')
+        .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
+        .order('id', { ascending: true })
+        .range(from, to),
+    )
 
     const resolucoes = new Map<string, Resolucao>(
       ((resData ?? []) as unknown[]).map((r) => {

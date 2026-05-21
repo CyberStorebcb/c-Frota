@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllSupabasePages } from '../lib/supabasePaginate'
 import {
   getDisplayedFleetVehicles,
   normalizePlaca,
@@ -72,13 +73,22 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setLoading(true)
-    void supabase
-      .from('vehicles')
-      .select('*')
-      .is('deleted_at', null)
-      .order('placa', { ascending: true })
-      .then(({ data }) => {
-        setSupabaseVehicles((data ?? []).map((r) => rowToVehicle(r as SupabaseRow)))
+    void fetchAllSupabasePages((from, to) =>
+      supabase
+        .from('vehicles')
+        .select('*')
+        .is('deleted_at', null)
+        .order('placa', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    )
+      .then(({ data, error }) => {
+        if (error) {
+          setSupabaseVehicles([])
+          setLoading(false)
+          return
+        }
+        setSupabaseVehicles(data.map((r) => rowToVehicle(r as SupabaseRow)))
         setLoading(false)
       })
   }, [tick])

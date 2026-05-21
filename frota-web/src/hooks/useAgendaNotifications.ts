@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllSupabasePages } from '../lib/supabasePaginate'
 
 export type AgendaNotificationState = {
   count: number
@@ -29,15 +30,19 @@ export function useAgendaNotifications(isAdmin: boolean) {
     const fetch = async () => {
       setState((s) => ({ ...s, loading: true }))
       const hoje = hojeLocalIso()
-      const { data } = await supabase
-        .from('apontamentos')
-        .select('id')
-        .eq('resolvido', false)
-        .not('agendamento_data', 'is', null)
-        .lte('agendamento_data', hoje)  // hoje ou vencido
+      const { data } = await fetchAllSupabasePages((from, to) =>
+        supabase
+          .from('apontamentos')
+          .select('id')
+          .eq('resolvido', false)
+          .not('agendamento_data', 'is', null)
+          .lte('agendamento_data', hoje)
+          .order('id', { ascending: true })
+          .range(from, to),
+      )
 
       if (!cancelled) {
-        setState({ count: (data ?? []).length, loading: false })
+        setState({ count: data.length, loading: false })
       }
     }
 

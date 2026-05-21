@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchCompletedChecklistsInPeriod } from '../checklists/fetchChecklistCompletions'
+import { normalizePlacaChecklist } from '../checklists/checklistFleetScope'
 import { isOperacionalAtivosDashboardKpi } from '../frota/vehicleOperationalStatus'
 import type { FleetVehicle } from '../frota/vehicleRegistry'
 
@@ -40,18 +41,14 @@ function saveStored(notifs: ChecklistNotification[]) {
 
 async function fetchTodayStats(activeVehicles: FleetVehicle[]): Promise<{ realizaram: number; naoRealizaram: number; total: number }> {
   const hojeIso = hojeLocalIso()
-  const { data } = await supabase
-    .from('checklists')
-    .select('dados_veiculo')
-    .eq('progresso', 100)
-    .eq('data_inspecao', hojeIso)
+  const data = await fetchCompletedChecklistsInPeriod(hojeIso, hojeIso)
 
   const placasFeitas = new Set<string>()
-  for (const row of data ?? []) {
+  for (const row of data) {
     const dv = row.dados_veiculo && typeof row.dados_veiculo === 'object'
       ? (row.dados_veiculo as Record<string, unknown>)
       : {}
-    const placa = String(dv.placa ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const placa = normalizePlacaChecklist(String(dv.placa ?? ''))
     if (placa) placasFeitas.add(placa)
   }
 

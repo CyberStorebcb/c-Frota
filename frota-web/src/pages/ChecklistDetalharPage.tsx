@@ -25,17 +25,17 @@ import {
   type ChecklistDetalharPdfScope,
 } from '../checklists/generateChecklistDetalharPdf'
 
-import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
-import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
-import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
 import { Select } from '../components/ui/Select'
+import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
+import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
+import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
-import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
+import { computeFleetAdherence, listDaysInPeriod } from '../checklists/checklistTop10Ranking'
+import { buildActiveFleetMap, passesChecklistFleetFilters } from '../checklists/checklistFleetScope'
+import { fetchCompletedChecklistsInPeriod } from '../checklists/fetchChecklistCompletions'
 import { downloadDataUrl, generateRankingScreenshot } from '../checklists/generateRankingScreenshot'
-import { getVehicleOperationalStatusRowsWithLocals, getVehicleOperationalStatusSummary } from '../frota/vehicleOperationalStatus'
 import { useFleet } from '../frota/FleetContext'
-import { supabase } from '../lib/supabase'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -340,24 +340,19 @@ export function ChecklistDetalharPage() {
 
   // ── frota ATIVA — mesmo critério do Dashboard (ATIVOS + TRANSPORTE) ──
   const frotaMap = useMemo(() => {
-    const opRows = getVehicleOperationalStatusRowsWithLocals(allVehicles)
-    const resumo = getVehicleOperationalStatusSummary(opRows)
-    const ativasVehicles = [
-      ...(resumo.find((s) => s.label === 'ATIVOS')?.vehicles ?? []),
-      ...(resumo.find((s) => s.label === 'TRANSPORTE')?.vehicles ?? []),
-    ]
-    const ativasSet = new Set(ativasVehicles.map((r) => normPlaca(r.placa)))
+    const activeMap = buildActiveFleetMap(allVehicles)
     const m = new Map<string, VeiculoRow>()
     for (const v of allVehicles) {
       const placa = normPlaca(v.placa)
-      if (!placa || !ativasSet.has(placa)) continue
+      const active = activeMap.get(placa)
+      if (!active) continue
       m.set(placa, {
         placa,
         modelo: v.modelo ?? '—',
-        base: v.base ?? '',
-        supervisor: v.supervisor ?? '',
-        coordenador: v.coordenador ?? '',
-        responsavel: v.responsavel ?? '',
+        base: active.base,
+        supervisor: active.supervisor,
+        coordenador: active.coordenador,
+        responsavel: active.responsavel,
         processo: v.prefixo ?? '',
       })
     }
@@ -375,28 +370,32 @@ export function ChecklistDetalharPage() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    void supabase
-      .from('checklists')
-      .select('dados_veiculo, data_inspecao, nc_count, created_at')
-      .eq('progresso', 100)
-      .gte('data_inspecao', limites.ini)
-      .lte('data_inspecao', limites.fim)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
+
+    void fetchCompletedChecklistsInPeriod(limites.ini, limites.fim)
+      .then((data) => {
         if (cancelled) return
-        if (!data) { setRawChecklists([]); setChecklistCompletionsByDay(new Set()); setLoading(false); return }
+        if (!data.length) {
+          setRawChecklists([])
+          setChecklistCompletionsByDay(new Set())
+          setLoading(false)
+          return
+        }
 
         const completions = new Set<string>()
-        // deduplicar por placa — mantém o mais recente por período
         const seen = new Map<string, ChecklistRow>()
-        for (const row of data) {
+        const sortedRows = [...data].sort((a, b) => {
+          const ta = a.created_at ? new Date(String(a.created_at)).getTime() : 0
+          const tb = b.created_at ? new Date(String(b.created_at)).getTime() : 0
+          return tb - ta
+        })
+        for (const row of sortedRows) {
           const dv = row.dados_veiculo && typeof row.dados_veiculo === 'object'
             ? (row.dados_veiculo as Record<string, unknown>)
             : {}
           const placa = normPlaca(String(dv.placa ?? ''))
           if (!placa) continue
           const frotaInfo = frotaMap.get(placa)
-          if (!frotaInfo) continue          // ignora checklists de veículos fora da frota ativa
+          if (!frotaInfo) continue
           const dataInspecao = (row.data_inspecao as string).slice(0, 10)
           if (dataInspecao) completions.add(`${placa}|${dataInspecao}`)
           if (seen.has(placa)) continue
@@ -408,7 +407,7 @@ export function ChecklistDetalharPage() {
             coordenador: frotaInfo?.coordenador ?? '',
             responsavel: frotaInfo?.responsavel ?? '',
             processo: frotaInfo?.processo ?? '',
-            data: (row.data_inspecao as string).slice(0, 10),
+            data: dataInspecao,
             hora: row.created_at
               ? new Date(row.created_at as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
               : '—',
@@ -419,18 +418,25 @@ export function ChecklistDetalharPage() {
         setRawChecklists(Array.from(seen.values()))
         setLoading(false)
       })
+      .catch(() => {
+        if (cancelled) return
+        setRawChecklists([])
+        setChecklistCompletionsByDay(new Set())
+        setLoading(false)
+      })
+
     return () => { cancelled = true }
   }, [limites, frotaMap])
 
   // ── aplicar filtros ───────────────────────────────────────────────────────
   const passaFiltros = useCallback(
-    (r: { base: string; supervisor: string; coordenador: string; responsavel: string }) => {
-      if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
-      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
-      if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
-      if (filtroResponsavel !== 'todos' && normNome(r.responsavel) !== normNome(filtroResponsavel)) return false
-      return true
-    },
+    (r: { base: string; supervisor: string; coordenador: string; responsavel: string }) =>
+      passesChecklistFleetFilters(r, {
+        base: filtroBase,
+        supervisor: filtroSupervisor,
+        coordenador: filtroCoordenador,
+        responsavel: filtroResponsavel,
+      }),
     [filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel],
   )
 
@@ -472,7 +478,15 @@ export function ChecklistDetalharPage() {
   }, [placasNaoRealizaram, q])
 
   const total = placasRealizaram.length + placasNaoRealizaram.length
-  const pct = total > 0 ? Math.round((placasRealizaram.length / total) * 100) : 0
+  const aderenciaStats = useMemo(
+    () => computeFleetAdherence(
+      frotaFiltrada.map((v) => v.placa),
+      checklistCompletionsByDay,
+      periodDays,
+    ),
+    [frotaFiltrada, checklistCompletionsByDay, periodDays],
+  )
+  const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
   const periodoResumo = limites.ini === limites.fim
     ? formatIsoDateBR(limites.ini)
@@ -638,7 +652,8 @@ export function ChecklistDetalharPage() {
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aderência no período</p>
                       <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        {placasRealizaram.length} de {total} veículos realizaram checklist.
+                        {aderenciaStats.realizados} de {aderenciaStats.esperados} checklists diários concluídos
+                        {diasNoPeriodo > 1 ? ` (${diasNoPeriodo} dias × ${total} veículos).` : '.'}
                       </p>
                     </div>
                     <span className={`rounded-2xl px-3 py-1.5 text-xl font-black ${pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}`}>

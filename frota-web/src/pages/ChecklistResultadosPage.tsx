@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react'
 import { supabase, type ChecklistRow } from '../lib/supabase'
+import { fetchAllSupabasePages } from '../lib/supabasePaginate'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 import { useAuth } from '../auth/AuthContext'
 import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
@@ -1011,24 +1012,25 @@ export function ChecklistResultadosPage() {
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      let q = supabase
-        .from('checklists')
-        .select('data_inspecao,nc_count')
-        .order('data_inspecao', { ascending: true })
+      const oitoSemanas = new Date()
+      oitoSemanas.setDate(oitoSemanas.getDate() - 56)
+      const defaultDesde = oitoSemanas.toISOString().slice(0, 10)
+      const inicio = dataInicio || defaultDesde
+      const fim = dataFim || undefined
 
-      if (dataInicio || dataFim) {
-        if (dataInicio) q = q.gte('data_inspecao', dataInicio) as typeof q
-        if (dataFim) q = q.lte('data_inspecao', dataFim) as typeof q
-      } else {
-        const oitoSemanas = new Date()
-        oitoSemanas.setDate(oitoSemanas.getDate() - 56)
-        q = q.gte('data_inspecao', oitoSemanas.toISOString().slice(0, 10)) as typeof q
-      }
+      const { data } = await fetchAllSupabasePages<Pick<ChecklistRow, 'data_inspecao' | 'nc_count'>>((from, to) => {
+        let q = supabase
+          .from('checklists')
+          .select('data_inspecao,nc_count')
+          .gte('data_inspecao', inicio)
+          .order('data_inspecao', { ascending: true })
+          .order('id', { ascending: true })
+        if (fim) q = q.lte('data_inspecao', fim)
+        return q.range(from, to)
+      })
 
-      const { data } = await q
       if (cancelled) return
-      await Promise.resolve()
-      if (data) setSparkRows(data as ChecklistRow[])
+      setSparkRows(data as ChecklistRow[])
     })()
     return () => {
       cancelled = true

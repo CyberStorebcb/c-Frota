@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllSupabasePages } from '../lib/supabasePaginate'
 import {
   type FleetVehicle,
   type AddFleetVehicleInput,
@@ -73,19 +74,35 @@ export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
   const load = useCallback(async () => {
     setLoading(true)
     const [activeRes, deletedRes] = await Promise.all([
-      supabase.from('vehicles').select('*').is('deleted_at', null).order('placa', { ascending: true }),
-      supabase.from('vehicles').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from('vehicles')
+          .select('*')
+          .is('deleted_at', null)
+          .order('placa', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from('vehicles')
+          .select('*')
+          .not('deleted_at', 'is', null)
+          .order('deleted_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to),
+      ),
     ])
 
-    if (!activeRes.error && activeRes.data) {
+    if (!activeRes.error) {
       setVehicles((activeRes.data as SupabaseVehicleRow[]).map(rowToFleetVehicle))
     }
-    if (!deletedRes.error && deletedRes.data) {
+    if (!deletedRes.error) {
       setDeletedVehicles(
         (deletedRes.data as SupabaseVehicleRow[]).map((r) => ({
           ...rowToFleetVehicle(r),
           deletedAt: r.deleted_at ?? '',
-        }))
+        })),
       )
     }
     setLoading(false)

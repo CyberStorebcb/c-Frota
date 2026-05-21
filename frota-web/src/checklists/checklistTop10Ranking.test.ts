@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildChecklistAdherenceRanking,
+  computeFleetAdherence,
   countDaysInPeriod,
   listDaysInPeriod,
   type ChecklistTop10Row,
@@ -16,6 +17,34 @@ const frotaBase: ChecklistTop10Row[] = [
     responsavel: 'João',
   },
 ]
+
+describe('computeFleetAdherence', () => {
+  it('calcula 50% quando 1 veículo preenche 1 de 2 dias', () => {
+    const days = listDaysInPeriod('2026-05-19', '2026-05-20')
+    const completions = new Set(['ABC1D23|2026-05-19'])
+
+    expect(computeFleetAdherence(['ABC1D23'], completions, days)).toEqual({
+      realizados: 1,
+      esperados: 2,
+      pct: 50,
+    })
+  })
+
+  it('calcula aderência agregada com múltiplos veículos', () => {
+    const days = listDaysInPeriod('2026-05-19', '2026-05-20')
+    const completions = new Set([
+      'AAA1111|2026-05-19',
+      'AAA1111|2026-05-20',
+      'BBB2222|2026-05-19',
+    ])
+
+    expect(computeFleetAdherence(['AAA1111', 'BBB2222'], completions, days)).toEqual({
+      realizados: 3,
+      esperados: 4,
+      pct: 75,
+    })
+  })
+})
 
 describe('countDaysInPeriod', () => {
   it('conta dias inclusive no intervalo', () => {
