@@ -33,7 +33,7 @@ import { Select } from '../components/ui/Select'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
 import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
 import { downloadDataUrl, generateRankingScreenshot } from '../checklists/generateRankingScreenshot'
-import { getVehicleOperationalStatusRowsWithLocals } from '../frota/vehicleOperationalStatus'
+import { getVehicleOperationalStatusRowsWithLocals, getVehicleOperationalStatusSummary } from '../frota/vehicleOperationalStatus'
 import { useFleet } from '../frota/FleetContext'
 import { supabase } from '../lib/supabase'
 
@@ -338,21 +338,15 @@ export function ChecklistDetalharPage() {
     [periodo, customDesde, customAte],
   )
 
-  // ── frota ATIVA — mesmo critério do Dashboard (ATIVOS + TRANSPORTE, prefixo obrigatório) ──
+  // ── frota ATIVA — mesmo critério do Dashboard (ATIVOS + TRANSPORTE) ──
   const frotaMap = useMemo(() => {
     const opRows = getVehicleOperationalStatusRowsWithLocals(allVehicles)
-
-    const ativasSet = new Set(
-      opRows
-        .filter((r) => {
-          const s = r.statusOperacional
-          if (!s) return false
-          if (s === 'DESMOBILIZADO' || s === 'EM MOBILIZAÇÃO' || s === 'AGUARDANDO' || s === 'AVARIADO') return false
-          if (s === 'RESERVA') return false
-          return true
-        })
-        .map((r) => normPlaca(r.placa)),
-    )
+    const resumo = getVehicleOperationalStatusSummary(opRows)
+    const ativasVehicles = [
+      ...(resumo.find((s) => s.label === 'ATIVOS')?.vehicles ?? []),
+      ...(resumo.find((s) => s.label === 'TRANSPORTE')?.vehicles ?? []),
+    ]
+    const ativasSet = new Set(ativasVehicles.map((r) => normPlaca(r.placa)))
     const m = new Map<string, VeiculoRow>()
     for (const v of allVehicles) {
       const placa = normPlaca(v.placa)
