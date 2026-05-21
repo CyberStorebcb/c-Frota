@@ -430,8 +430,8 @@ export function ChecklistDetalharPage() {
 
   // ── aplicar filtros ───────────────────────────────────────────────────────
   const passaFiltros = useCallback(
-    (r: { base: string; supervisor: string; coordenador: string; responsavel: string }) =>
-      passesChecklistFleetFilters(r, {
+    (r: { placa?: string; base: string; supervisor: string; coordenador: string; responsavel: string }) =>
+      passesChecklistFleetFilters({ placa: r.placa ?? '', ...r }, {
         base: filtroBase,
         supervisor: filtroSupervisor,
         coordenador: filtroCoordenador,

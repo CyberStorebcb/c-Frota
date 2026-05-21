@@ -4,7 +4,7 @@ export const SUPABASE_PAGE_SIZE = 1000
 
 /** Busca todas as páginas além do limite padrão de 1000 linhas do PostgREST/Supabase. */
 export async function fetchAllSupabasePages<T>(
-  runPage: (from: number, to: number) => Promise<{ data: T[] | null; error: PostgrestError | null }>,
+  runPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
   pageSize = SUPABASE_PAGE_SIZE,
 ): Promise<{ data: T[]; error: PostgrestError | null }> {
   const allRows: T[] = []
