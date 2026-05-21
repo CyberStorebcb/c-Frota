@@ -30,9 +30,9 @@ import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
 import { Select } from '../components/ui/Select'
-import { ChecklistTop10Section } from '../components/checklist/ChecklistTop10Section'
+import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
 import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
-import { captureElementScreenshot, downloadDataUrl } from '../checklists/captureElementScreenshot'
+import { downloadDataUrl, generateRankingScreenshot } from '../checklists/generateRankingScreenshot'
 import { getVehicleOperationalStatusRowsWithLocals } from '../frota/vehicleOperationalStatus'
 import { useFleet } from '../frota/FleetContext'
 import { supabase } from '../lib/supabase'
@@ -285,8 +285,8 @@ export function ChecklistDetalharPage() {
   const [pdfModalOpen, setPdfModalOpen] = useState(false)
   const [pdfGerando, setPdfGerando] = useState(false)
   const [capturandoFoto, setCapturandoFoto] = useState(false)
+  const [rankingGroupBy, setRankingGroupBy] = useState<ChecklistTop10GroupBy>('responsavel')
   const columnsRef = useRef<HTMLDivElement>(null)
-  const rankingCaptureRef = useRef<HTMLDivElement>(null)
 
   const { vehicles: allVehicles } = useFleet()
 
@@ -341,14 +341,15 @@ export function ChecklistDetalharPage() {
   // ── frota ATIVA — mesmo critério do Dashboard (ATIVOS + TRANSPORTE, prefixo obrigatório) ──
   const frotaMap = useMemo(() => {
     const opRows = getVehicleOperationalStatusRowsWithLocals(allVehicles)
+
     const ativasSet = new Set(
       opRows
         .filter((r) => {
           const s = r.statusOperacional
-          if (!s) return false            // prefixo vazio/N/A → sem classificação, não conta
+          if (!s) return false
           if (s === 'DESMOBILIZADO' || s === 'EM MOBILIZAÇÃO' || s === 'AGUARDANDO' || s === 'AVARIADO') return false
           if (s === 'RESERVA') return false
-          return true                     // ATIVOS + TRANSPORTE
+          return true
         })
         .map((r) => normPlaca(r.placa)),
     )
@@ -400,10 +401,11 @@ export function ChecklistDetalharPage() {
             : {}
           const placa = normPlaca(String(dv.placa ?? ''))
           if (!placa) continue
+          const frotaInfo = frotaMap.get(placa)
+          if (!frotaInfo) continue          // ignora checklists de veículos fora da frota ativa
           const dataInspecao = (row.data_inspecao as string).slice(0, 10)
           if (dataInspecao) completions.add(`${placa}|${dataInspecao}`)
           if (seen.has(placa)) continue
-          const frotaInfo = frotaMap.get(placa)
           seen.set(placa, {
             placa,
             modelo: String(dv.modelo ?? dv.veiculo ?? frotaInfo?.modelo ?? '—'),
@@ -558,18 +560,47 @@ export function ChecklistDetalharPage() {
   )
 
   const capturarRanking = useCallback(async () => {
-    const el = rankingCaptureRef.current
-    if (!el) return
     setCapturandoFoto(true)
     try {
-      const dataUrl = await captureElementScreenshot(el)
+      const groupLabel =
+        CHECKLIST_TOP10_GROUP_OPTIONS.find((o) => o.value === rankingGroupBy)?.label ?? 'Responsável'
+      const dataUrl = generateRankingScreenshot({
+        periodoLabel,
+        periodoResumo,
+        diasNoPeriodo,
+        groupLabel,
+        pior: buildChecklistAdherenceRanking(
+          frotaFiltrada,
+          checklistCompletionsByDay,
+          periodDays,
+          rankingGroupBy,
+          'worst',
+        ),
+        melhor: buildChecklistAdherenceRanking(
+          frotaFiltrada,
+          checklistCompletionsByDay,
+          periodDays,
+          rankingGroupBy,
+          'best',
+        ),
+      })
       downloadDataUrl(dataUrl, `ranking-checklist-${limites.ini}-${limites.fim}.png`)
     } catch {
       window.alert('Não foi possível capturar a imagem do ranking.')
     } finally {
       setCapturandoFoto(false)
     }
-  }, [limites.ini, limites.fim])
+  }, [
+    periodoLabel,
+    periodoResumo,
+    diasNoPeriodo,
+    rankingGroupBy,
+    frotaFiltrada,
+    checklistCompletionsByDay,
+    periodDays,
+    limites.ini,
+    limites.fim,
+  ])
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -871,7 +902,8 @@ export function ChecklistDetalharPage() {
             periodDays={periodDays}
             periodoLabel={periodoLabel}
             periodoResumo={periodoResumo}
-            captureRef={rankingCaptureRef}
+            groupBy={rankingGroupBy}
+            onGroupByChange={setRankingGroupBy}
             fullscreen={isFullscreen}
           />
         ) : (
