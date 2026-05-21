@@ -238,7 +238,7 @@ export function DashboardPage() {
     try { return localStorage.getItem('frota.dashboard.periodo') ?? '7d' } catch { return '7d' }
   })
   const [customDesde, setCustomDesde] = useState<string>(() => {
-    try { return localStorage.getItem('frota.dashboard.customDesde') ?? defaultCustomDesdeIso } catch { return defaultCustomDesdeIso }
+    try { return localStorage.getItem('frota.dashboard.customDesde') ?? defaultCustomDesdeIso() } catch { return defaultCustomDesdeIso() }
   })
   const [customAte, setCustomAte] = useState<string>(() => {
     try { return localStorage.getItem('frota.dashboard.customAte') ?? hojeLocalIso() } catch { return hojeLocalIso() }
