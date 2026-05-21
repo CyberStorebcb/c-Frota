@@ -351,6 +351,7 @@ export function ChecklistDetalharPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     void supabase
       .from('checklists')
@@ -360,6 +361,7 @@ export function ChecklistDetalharPage() {
       .lte('data_inspecao', limites.fim)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
+        if (cancelled) return
         if (!data) { setRawChecklists([]); setLoading(false); return }
 
         // deduplicar por placa — mantém o mais recente por período
@@ -390,21 +392,24 @@ export function ChecklistDetalharPage() {
         setRawChecklists(Array.from(seen.values()))
         setLoading(false)
       })
+    return () => { cancelled = true }
   }, [limites, frotaMap])
 
   // ── aplicar filtros ───────────────────────────────────────────────────────
-  function passaFiltros(r: { base: string; supervisor: string; coordenador: string; responsavel: string }) {
-    if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
-    if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
-    if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
-    if (filtroResponsavel !== 'todos' && normNome(r.responsavel) !== normNome(filtroResponsavel)) return false
-    return true
-  }
+  const passaFiltros = useCallback(
+    (r: { base: string; supervisor: string; coordenador: string; responsavel: string }) => {
+      if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
+      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
+      if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
+      if (filtroResponsavel !== 'todos' && normNome(r.responsavel) !== normNome(filtroResponsavel)) return false
+      return true
+    },
+    [filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel],
+  )
 
   const placasRealizaram = useMemo(
     () => rawChecklists.filter(passaFiltros),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rawChecklists, filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel],
+    [rawChecklists, passaFiltros],
   )
 
   const placasRealizaramSet = useMemo(
@@ -412,11 +417,10 @@ export function ChecklistDetalharPage() {
     [placasRealizaram],
   )
 
-  const placasNaoRealizaram = useMemo(() => {
-    return Array.from(frotaMap.values())
-      .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frotaMap, placasRealizaramSet, filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel])
+  const placasNaoRealizaram = useMemo(
+    () => Array.from(frotaMap.values()).filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v)),
+    [frotaMap, placasRealizaramSet, passaFiltros],
+  )
 
   // ── busca ─────────────────────────────────────────────────────────────────
   const q = busca.trim().toUpperCase()

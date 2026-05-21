@@ -197,6 +197,10 @@ export const GERENCIA_MAP: GerenciaEntry[] = [
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+function norm(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
 /**
  * Dado um valor de gerência (ex: 'julio'), retorna os nomes de responsáveis válidos.
  * Retorna null se a gerência não tiver mapeamento (exibe todos).
@@ -211,6 +215,7 @@ export function getResponsaveisByGerencia(gerencia: string): string[] | null {
 /**
  * Dado um valor de gerência e um responsável, retorna as bases válidas.
  * Retorna null se não houver mapeamento (exibe todas).
+ * Comparação sem acento e case-insensitive para robustez.
  */
 export function getBasesByGerenciaAndResponsavel(gerencia: string, responsavel: string): string[] | null {
   if (gerencia === 'todos') return null
@@ -225,7 +230,7 @@ export function getBasesByGerenciaAndResponsavel(gerencia: string, responsavel: 
     return bases.size > 0 ? Array.from(bases) : null
   }
 
-  const resp = entry.responsaveis.find((r) => r.nome === responsavel)
+  const resp = entry.responsaveis.find((r) => norm(r.nome) === norm(responsavel))
   if (!resp || resp.bases.length === 0) return null
   return resp.bases
 }
