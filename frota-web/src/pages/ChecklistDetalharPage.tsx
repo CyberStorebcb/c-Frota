@@ -265,7 +265,7 @@ export function ChecklistDetalharPage() {
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    savedFilters?.viewMode === 'list' ? 'list' : 'cards',
+    savedFilters?.viewMode === 'cards' ? 'cards' : 'list',
   )
   const [isFullscreen, setIsFullscreen] = useState(false)
   const columnsRef = useRef<HTMLDivElement>(null)
