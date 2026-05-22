@@ -36,6 +36,7 @@ import { buildActiveFleetMap, passesChecklistFleetFilters } from '../checklists/
 import { fetchCompletedChecklistsInPeriod } from '../checklists/fetchChecklistCompletions'
 import { downloadDataUrl, generateRankingScreenshot } from '../checklists/generateRankingScreenshot'
 import { useFleet } from '../frota/FleetContext'
+import { useAuth } from '../auth/AuthContext'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -255,6 +256,8 @@ function ListaRealizaram({ items }: { items: ChecklistRow[] }) {
 export function ChecklistDetalharPage() {
   const [searchParams] = useSearchParams()
   const savedFilters = useMemo(() => loadChecklistDetalharFilters(), [])
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
 
   // URL do dashboard tem prioridade; senão restaura o último estado salvo pelo usuário
   const [periodo, setPeriodo] = useState(() => pickFilter(searchParams.get('periodo'), savedFilters, 'periodo', 'hoje'))
@@ -278,7 +281,8 @@ export function ChecklistDetalharPage() {
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = savedFilters?.viewMode
-    if (saved === 'cards' || saved === 'list' || saved === 'ranking') return saved
+    if (saved === 'ranking' && isAdmin) return 'ranking'
+    if (saved === 'cards' || saved === 'list') return saved
     return 'list'
   })
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -855,19 +859,21 @@ export function ChecklistDetalharPage() {
                   <List size={13} />
                   Lista
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('ranking')}
-                  title="Visão em ranking"
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
-                    viewMode === 'ranking'
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                      : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <Trophy size={13} />
-                  Ranking
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ranking')}
+                    title="Visão em ranking"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
+                      viewMode === 'ranking'
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Trophy size={13} />
+                    Ranking
+                  </button>
+                )}
               </div>
               {viewMode === 'ranking' ? (
                 <button
@@ -903,7 +909,7 @@ export function ChecklistDetalharPage() {
             </div>
           </div>
 
-        {viewMode === 'ranking' ? (
+        {viewMode === 'ranking' && isAdmin ? (
           <ChecklistTop10Section
             frota={frotaFiltrada}
             completions={checklistCompletionsByDay}
