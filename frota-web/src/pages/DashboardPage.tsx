@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react'
+﻿import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   type LucideIcon,
@@ -12,10 +12,13 @@ import {
   ClipboardX,
   Gauge,
   ImageDown,
+  RefreshCw,
   Truck,
 } from 'lucide-react'
 
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
+import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
+import { normalizePlaca } from '../frota/vehicleRegistry'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select } from '../components/ui/Select'
@@ -303,6 +306,29 @@ export function DashboardPage() {
   )
 
   const scopedFleetPlacasSet = useMemo(() => new Set(scopedFleetPlacas), [scopedFleetPlacas])
+
+  const adminPlacasSet = useMemo(() => {
+    const s = new Set<string>()
+    for (const row of TOTAL_VEHICLE_ROWS) {
+      if (row.servico?.trim().toLowerCase() === 'administrativo') {
+        const p = normalizePlaca(row.placa)
+        if (p) s.add(p)
+      }
+    }
+    return s
+  }, [])
+
+  const ativosAdministrativos = useMemo(
+    () => [...scopedFleetPlacasSet].filter((p) => adminPlacasSet.has(p)).length,
+    [scopedFleetPlacasSet, adminPlacasSet],
+  )
+
+  const [veiculosCardVirado, setVeiculosCardVirado] = useState(false)
+  const toggleVeiculosCard = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setVeiculosCardVirado((v) => !v)
+  }, [])
 
   const periodoLimites = useMemo(
     () => computePeriodoLimites(periodo, customDesde, customAte),
@@ -671,7 +697,75 @@ export function DashboardPage() {
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:flex-row lg:gap-5 lg:p-5">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
-            {stats.map((s) => {
+            {/* Card de veículos com flip frente/verso */}
+            <div className="relative" style={{ perspective: '800px' }}>
+              <div
+                style={{
+                  transformStyle: 'preserve-3d',
+                  transition: 'transform 0.5s ease',
+                  transform: veiculosCardVirado ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                  position: 'relative',
+                  minHeight: '140px',
+                }}
+              >
+                {/* Frente — operacionais */}
+                <Link
+                  to="/veiculos/status"
+                  style={{ backfaceVisibility: 'hidden' }}
+                  className="group absolute inset-0 flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5 hover:border-purple-400 dark:hover:border-purple-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40"
+                >
+                  <button
+                    type="button"
+                    onClick={toggleVeiculosCard}
+                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                    title="Ver ativos administrativos"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                  <div className="mb-3 shrink-0 rounded-xl p-3 transition-transform group-hover:scale-110 sm:rounded-2xl sm:p-3.5 bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
+                    <Truck size={26} aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 sm:text-[10px]">
+                      Ativos operacionais
+                    </p>
+                    <h3 className="text-2xl font-black tabular-nums tracking-tighter text-slate-800 dark:text-white sm:text-3xl min-[1100px]:text-4xl">
+                      {String(ativosOperacionais)}
+                    </h3>
+                  </div>
+                </Link>
+
+                {/* Verso — administrativos */}
+                <Link
+                  to="/veiculos/status"
+                  style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                  className="group absolute inset-0 flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5 hover:border-indigo-400 dark:hover:border-indigo-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+                >
+                  <button
+                    type="button"
+                    onClick={toggleVeiculosCard}
+                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                    title="Ver ativos operacionais"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                  <div className="mb-3 shrink-0 rounded-xl p-3 transition-transform group-hover:scale-110 sm:rounded-2xl sm:p-3.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                    <Truck size={26} aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 sm:text-[10px]">
+                      Ativos administrativos
+                    </p>
+                    <h3 className="text-2xl font-black tabular-nums tracking-tighter text-slate-800 dark:text-white sm:text-3xl min-[1100px]:text-4xl">
+                      {String(ativosAdministrativos)}
+                    </h3>
+                  </div>
+                </Link>
+              </div>
+            </div>
+
+            {/* Demais cards */}
+            {stats.filter((s) => s.label !== 'Total de veículos ativos').map((s) => {
               const Card = s.href ? Link : 'div'
               const isLast = stats[stats.length - 1]?.label === s.label
               return (
