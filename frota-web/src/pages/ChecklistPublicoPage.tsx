@@ -2550,9 +2550,26 @@ function FormularioChecklist({
           <button
             type="button"
             data-demo-form-field="enviar"
-            onClick={handleEnviar}
-            disabled={!podEnviar || enviando}
-            className={`h-12 shrink-0 rounded-xl px-6 text-sm font-extrabold text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+            onClick={() => {
+              if (podEnviar && !enviando) {
+                void handleEnviar()
+                return
+              }
+              if (enviando) return
+              // Scroll para o primeiro item pendente
+              const primeiroSemResposta = todosItens.find((it) => respostas[it.id] == null)
+              const primeiroNcSemFoto = itensNcSemFoto[0]
+              const alvo = primeiroSemResposta ?? primeiroNcSemFoto
+              if (alvo && itemRefs.current[alvo.id]) {
+                itemRefs.current[alvo.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                setItemDestacado(alvo.id)
+                setTimeout(() => setItemDestacado(null), 1800)
+              }
+            }}
+            disabled={enviando}
+            className={`h-12 shrink-0 rounded-xl px-6 text-sm font-extrabold text-white transition active:scale-95 disabled:cursor-not-allowed ${
+              podEnviar && !enviando ? 'opacity-100' : 'opacity-40'
+            } ${
               ncImperativos > 0
                 ? 'bg-rose-600 dark:bg-rose-700'
                 : CGB_PRIMARY_BUTTON
