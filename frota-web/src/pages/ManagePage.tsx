@@ -4,6 +4,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CalendarClock,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -34,6 +35,10 @@ import {
   findRecorrenteSiblingIds,
   type ApontamentoGroup,
 } from '../apontamentos/groupApontamentos'
+import {
+  downloadAgendaScreenshot,
+  generateAgendaScreenshot,
+} from '../apontamentos/generateAgendaScreenshot'
 import { useAuth } from '../auth/AuthContext'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
@@ -42,9 +47,21 @@ import { Select, type SelectOption } from '../components/ui/Select'
 import { Portal } from '../components/ui/Portal'
 import {
   apontamentoMatchesVehicleFilter,
+  formatPlaca,
   normalizePlaca,
   placaFromApontamentoVeiculoId,
 } from '../frota/vehicleRegistry'
+
+function AgendaDetalheCampo({ label, value }: { label: string; value: string | null | undefined }) {
+  const text = value?.trim()
+  if (!text || text === '—' || text === 'N/A' || text === 'NÃO ATRIBUÍDO') return null
+  return (
+    <div>
+      <dt className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">{label}</dt>
+      <dd className="mt-0.5 text-xs font-semibold leading-snug text-slate-700 dark:text-slate-200">{text}</dd>
+    </div>
+  )
+}
 
 function formatDateBR(iso: string) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -445,6 +462,8 @@ export function ManagePage() {
 
   // ── Modal de Agenda ───────────────────────────────────────────────────────
   const [agendaOpen, setAgendaOpen] = useState(false)
+  const [agendaExpandedId, setAgendaExpandedId] = useState<string | null>(null)
+  const [capturandoAgendaFoto, setCapturandoAgendaFoto] = useState(false)
 
   const agendados = useMemo(() =>
     rows
@@ -452,6 +471,34 @@ export function ManagePage() {
       .sort((a, b) => (a.agendamentoData! > b.agendamentoData! ? 1 : -1)),
     [rows],
   )
+
+  const exportarAgendaFoto = async () => {
+    setCapturandoAgendaFoto(true)
+    try {
+      const dataUrl = generateAgendaScreenshot({
+        items: agendados.map((r) => ({
+          id: r.id,
+          placa: r.placa,
+          prefixo: r.prefixo,
+          modelo: r.modelo,
+          processo: r.processo,
+          base: r.base,
+          responsavel: r.responsavel,
+          supervisor: r.responsavel,
+          coordenador: r.coordenador,
+          veiculoLabel: r.veiculoLabel,
+          defeito: r.defeito,
+          agendamentoData: r.agendamentoData!,
+          justificativa: r.justificativa,
+          imperativo: r.imperativo,
+        })),
+      })
+      const iso = new Date().toISOString().slice(0, 10)
+      downloadAgendaScreenshot(dataUrl, `agenda-correcoes-${iso}.png`)
+    } finally {
+      setCapturandoAgendaFoto(false)
+    }
+  }
 
   // ── Modal de Justificativa ────────────────────────────────────────────────
   const [justOpen, setJustOpen] = useState(false)
@@ -1452,13 +1499,13 @@ export function ManagePage() {
           <button
             type="button"
             className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setAgendaOpen(false) }}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setAgendaExpandedId(null); setAgendaOpen(false) }}
             aria-label="Fechar agenda"
           />
           <div className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain">
             <div className="flex min-h-[100dvh] justify-center p-4 py-6 sm:items-center sm:py-8">
               <div
-                className="my-auto flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+                className="my-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
                 onPointerDown={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
@@ -1479,14 +1526,26 @@ export function ManagePage() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setAgendaOpen(false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-white text-slate-600 hover:bg-amber-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                    aria-label="Fechar"
-                  >
-                    <X size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void exportarAgendaFoto()}
+                      disabled={capturandoAgendaFoto || agendados.length === 0}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-amber-200 bg-white px-3 text-[11px] font-extrabold uppercase tracking-wide text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-slate-800"
+                      title="Exportar agenda como imagem"
+                    >
+                      {capturandoAgendaFoto ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                      Relatório
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAgendaExpandedId(null); setAgendaOpen(false) }}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-white text-slate-600 hover:bg-amber-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      aria-label="Fechar"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Body */}
@@ -1505,50 +1564,151 @@ export function ManagePage() {
                           year: 'numeric',
                         })
                         const isVencida = r.agendamentoData! < new Date().toISOString().slice(0, 10)
+                        const expanded = agendaExpandedId === r.id
+                        const placaFmt = formatPlaca(r.placa) || r.placa || r.veiculoLabel
+                        const prefixoLabel = r.prefixo?.trim() || r.processo?.trim() || '—'
                         return (
-                          <li key={r.id} className="flex items-start gap-3 px-5 py-4">
-                            <div className={[
-                              'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm',
-                              isVencida ? 'bg-rose-500' : 'bg-amber-500',
-                            ].join(' ')}>
-                              <CalendarClock size={16} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono text-xs font-extrabold text-slate-700 dark:text-slate-200">
-                                  {r.prefixo || r.veiculoLabel}
-                                </span>
-                                <span className={[
-                                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold',
-                                  isVencida
-                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
-                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-                                ].join(' ')}>
-                                  📅 {dataBR}
-                                  {isVencida ? ' · vencida' : ''}
-                                </span>
+                          <li key={r.id} className="px-5 py-4">
+                            <div className="flex items-start gap-3">
+                              <div className={[
+                                'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm',
+                                isVencida ? 'bg-rose-500' : 'bg-amber-500',
+                              ].join(' ')}>
+                                <CalendarClock size={16} />
                               </div>
-                              <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-semibold leading-snug text-slate-600 dark:text-slate-300">
-                                <DefeitoSeveridadeIcon imperativo={r.imperativo} size={13} />
-                                {formatDefeitoParaExibicao(r.defeito)}
-                              </p>
-                              {r.justificativa && (
-                                <p className="mt-1 text-[11px] font-semibold italic text-slate-400 dark:text-slate-500 line-clamp-2">
-                                  "{r.justificativa}"
-                                </p>
-                              )}
-                            </div>
-                            {canMarkResolved && (
                               <button
                                 type="button"
-                                onClick={() => { setAgendaOpen(false); openResolveModal(r) }}
-                                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-extrabold text-white shadow-sm hover:bg-emerald-700"
-                                title="Marcar como resolvido"
+                                onClick={() => setAgendaExpandedId((prev) => (prev === r.id ? null : r.id))}
+                                aria-expanded={expanded}
+                                className="min-w-0 flex-1 rounded-xl text-left outline-none transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-amber-400/50 dark:hover:bg-slate-900/60 -mx-2 px-2 py-1"
                               >
-                                <Check size={13} strokeWidth={3} />
-                                Resolver
+                                <div className="flex items-start gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-mono text-xs font-extrabold text-slate-700 dark:text-slate-200">
+                                        {prefixoLabel}
+                                      </span>
+                                      <span className="text-[10px] font-bold text-slate-400">·</span>
+                                      <span className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                        {placaFmt}
+                                      </span>
+                                      <span className={[
+                                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold',
+                                        isVencida
+                                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
+                                          : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+                                      ].join(' ')}>
+                                        📅 {dataBR}
+                                        {isVencida ? ' · vencida' : ''}
+                                      </span>
+                                    </div>
+                                    <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-semibold leading-snug text-slate-600 dark:text-slate-300">
+                                      <DefeitoSeveridadeIcon imperativo={r.imperativo} size={13} />
+                                      <span className={expanded ? '' : 'line-clamp-2'}>
+                                        {formatDefeitoParaExibicao(r.defeito)}
+                                      </span>
+                                    </p>
+                                    {!expanded && r.justificativa ? (
+                                      <p className="mt-1 text-[11px] font-semibold italic text-slate-400 dark:text-slate-500 line-clamp-1">
+                                        "{r.justificativa}"
+                                      </p>
+                                    ) : null}
+                                    {!expanded ? (
+                                      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-600/80 dark:text-amber-400/80">
+                                        Toque para ver detalhes
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                  <span className="mt-0.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden>
+                                    {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                  </span>
+                                </div>
                               </button>
-                            )}
+                              {canMarkResolved && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setAgendaOpen(false); openResolveModal(r) }}
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-extrabold text-white shadow-sm hover:bg-emerald-700"
+                                  title="Marcar como resolvido"
+                                >
+                                  <Check size={13} strokeWidth={3} />
+                                  Resolver
+                                </button>
+                              )}
+                            </div>
+
+                            {expanded ? (
+                              <div className="mt-3 ml-12 rounded-xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                                <dl className="grid gap-3 sm:grid-cols-2">
+                                  <AgendaDetalheCampo label="Placa" value={placaFmt} />
+                                  <AgendaDetalheCampo label="Modelo" value={r.modelo} />
+                                  <AgendaDetalheCampo label="Prefixo / processo" value={prefixoLabel} />
+                                  <AgendaDetalheCampo label="Base" value={r.base} />
+                                  <AgendaDetalheCampo label="Gerência" value={r.coordenador} />
+                                  <AgendaDetalheCampo label="Responsável" value={r.responsavel} />
+                                  <AgendaDetalheCampo
+                                    label="Apontado em"
+                                    value={`${formatDateBR(r.dataApontamento)}${r.horaApontamento ? ` · ${r.horaApontamento}` : ''}`}
+                                  />
+                                  <AgendaDetalheCampo
+                                    label="Prazo"
+                                    value={r.prazo ? formatDateBR(r.prazo) : null}
+                                  />
+                                  <AgendaDetalheCampo
+                                    label="Agendado para"
+                                    value={`${dataBR}${isVencida ? ' (vencida)' : ''}`}
+                                  />
+                                  <AgendaDetalheCampo
+                                    label="Severidade"
+                                    value={r.imperativo ? 'Imperativo — impede condução' : 'Não imperativo'}
+                                  />
+                                </dl>
+
+                                {r.justificativa ? (
+                                  <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                                    <dt className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                      Justificativa
+                                    </dt>
+                                    <dd className="mt-1 text-xs font-semibold italic leading-relaxed text-slate-600 dark:text-slate-300">
+                                      "{r.justificativa}"
+                                    </dd>
+                                    {r.justificativaData ? (
+                                      <dd className="mt-1 text-[10px] font-semibold text-slate-400">
+                                        Registrada em {formatDateBR(r.justificativaData)}
+                                      </dd>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+
+                                {r.descricaoProblema?.trim() ? (
+                                  <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                                    <dt className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                      Descrição adicional
+                                    </dt>
+                                    <dd className="mt-1 text-xs font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
+                                      {r.descricaoProblema}
+                                    </dd>
+                                  </div>
+                                ) : null}
+
+                                {r.problemasAdicionais?.trim() ? (
+                                  <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                                    <dt className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                      Outros problemas reportados
+                                    </dt>
+                                    <dd className="mt-1 text-xs font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
+                                      {r.problemasAdicionais}
+                                    </dd>
+                                  </div>
+                                ) : null}
+
+                                {r.ncFotos.length > 0 ? (
+                                  <p className="mt-3 text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                                    {r.ncFotos.length} foto{r.ncFotos.length > 1 ? 's' : ''} de evidência no checklist
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </li>
                         )
                       })}
@@ -1557,10 +1717,10 @@ export function ManagePage() {
                 </div>
 
                 {/* Footer */}
-                <div className="flex shrink-0 justify-end border-t border-slate-200 bg-slate-50/90 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+                <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-slate-50/90 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/60">
                   <button
                     type="button"
-                    onClick={() => setAgendaOpen(false)}
+                    onClick={() => { setAgendaExpandedId(null); setAgendaOpen(false) }}
                     className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
                   >
                     Fechar
