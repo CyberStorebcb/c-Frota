@@ -698,21 +698,20 @@ export function DashboardPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
             {/* Card de veículos com flip frente/verso */}
-            <div className="relative" style={{ perspective: '800px' }}>
+            <div style={{ perspective: '800px' }} className="h-full">
               <div
                 style={{
                   transformStyle: 'preserve-3d',
                   transition: 'transform 0.5s ease',
                   transform: veiculosCardVirado ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                  position: 'relative',
-                  minHeight: '140px',
                 }}
+                className="relative h-full"
               >
                 {/* Frente — operacionais */}
                 <Link
                   to="/veiculos/status"
                   style={{ backfaceVisibility: 'hidden' }}
-                  className="group absolute inset-0 flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5 hover:border-purple-400 dark:hover:border-purple-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40"
+                  className="group flex h-full w-full flex-col items-center justify-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5 hover:border-purple-400 dark:hover:border-purple-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40"
                 >
                   <button
                     type="button"
@@ -739,7 +738,7 @@ export function DashboardPage() {
                 <Link
                   to="/veiculos/status"
                   style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-                  className="group absolute inset-0 flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5 hover:border-indigo-400 dark:hover:border-indigo-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+                  className="group absolute inset-0 flex flex-col items-center justify-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5 hover:border-indigo-400 dark:hover:border-indigo-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
                 >
                   <button
                     type="button"
