@@ -307,20 +307,27 @@ export function DashboardPage() {
 
   const scopedFleetPlacasSet = useMemo(() => new Set(scopedFleetPlacas), [scopedFleetPlacas])
 
-  const adminPlacasSet = useMemo(() => {
-    const s = new Set<string>()
+  const { adminPlacasSet, operacionalPlacasSet } = useMemo(() => {
+    const adm = new Set<string>()
+    const op = new Set<string>()
     for (const row of TOTAL_VEHICLE_ROWS) {
-      if (row.setor?.trim().toUpperCase() === 'ADM') {
-        const p = normalizePlaca(row.placa)
-        if (p) s.add(p)
-      }
+      const setor = row.setor?.trim().toUpperCase()
+      const p = normalizePlaca(row.placa)
+      if (!p) continue
+      if (setor === 'ADM') adm.add(p)
+      else if (setor === 'OPERACIONAL') op.add(p)
     }
-    return s
+    return { adminPlacasSet: adm, operacionalPlacasSet: op }
   }, [])
 
   const ativosAdministrativos = useMemo(
     () => [...scopedFleetPlacasSet].filter((p) => adminPlacasSet.has(p)).length,
     [scopedFleetPlacasSet, adminPlacasSet],
+  )
+
+  const ativosOperacionaisFiltrado = useMemo(
+    () => [...scopedFleetPlacasSet].filter((p) => operacionalPlacasSet.has(p)).length,
+    [scopedFleetPlacasSet, operacionalPlacasSet],
   )
 
   const [veiculosCardVirado, setVeiculosCardVirado] = useState(false)
@@ -730,7 +737,7 @@ export function DashboardPage() {
                       Ativos operacionais
                     </p>
                     <h3 className="text-2xl font-black tabular-nums tracking-tighter text-slate-800 dark:text-white sm:text-3xl min-[1100px]:text-4xl">
-                      {String(scopedFleetPlacasSet.size)}
+                      {String(ativosOperacionaisFiltrado)}
                     </h3>
                   </div>
                 </Link>
