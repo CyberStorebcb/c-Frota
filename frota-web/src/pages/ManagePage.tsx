@@ -33,6 +33,7 @@ import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import {
   buildManageTableRows,
   findRecorrenteSiblingIds,
+  apontamentoGroupKey,
   type ApontamentoGroup,
 } from '../apontamentos/groupApontamentos'
 import {
@@ -376,7 +377,12 @@ export function ManagePage() {
   }, [rowsMatchingFiltros, visao, severidade])
 
   const stats = useMemo(() => {
-    const pendentes = rowsMatchingFiltros.filter((r) => !r.resolvido).length
+    const pendentesUnicas = new Set(
+      rowsMatchingFiltros
+        .filter((r) => !r.resolvido)
+        .map((r) => apontamentoGroupKey(r) ?? r.id),
+    ).size
+    const pendentes = pendentesUnicas
     const resolvidos = rowsMatchingFiltros.filter((r) => r.resolvido).length
     const entrantes = rowsMatchingFiltros.filter((r) => isDefeitoEntrante(r, nowMs)).length
     return { total: rowsMatchingFiltros.length, pendentes, resolvidos, entrantes }

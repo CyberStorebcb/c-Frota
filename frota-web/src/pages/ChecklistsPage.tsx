@@ -8,9 +8,11 @@ import {
   CheckCircle2,
   ChevronLeft,
   ClipboardList,
+  RefreshCw,
   Search,
   Truck,
 } from 'lucide-react'
+import { usePwaUpdate } from '../pwa/usePwaUpdate'
 
 function IconSkyLift({ size = 24 }: { size?: number }) {
   return (
@@ -360,6 +362,7 @@ function ChecklistForm({ schema, onVoltar }: { schema: ChecklistSchemaDef; onVol
 export function ChecklistsPage() {
   const [query, setQuery] = useState('')
   const [selecionado, setSelecionado] = useState<ChecklistSchemaDef | null>(null)
+  const { updatePending, applyUpdate } = usePwaUpdate()
 
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -368,6 +371,33 @@ export function ChecklistsPage() {
       (s) => s.nome.toLowerCase().includes(q) || s.descricao.toLowerCase().includes(q),
     )
   }, [query])
+
+  if (updatePending) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 px-6 text-center">
+        <div className="grid h-20 w-20 place-items-center rounded-3xl bg-rose-500/10 text-rose-500">
+          <RefreshCw size={36} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+            Atualização obrigatória
+          </h2>
+          <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+            Uma nova versão dos checklists está disponível.<br />
+            Atualize antes de continuar para garantir que está usando a versão correta.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={applyUpdate}
+          className="flex items-center gap-2 rounded-2xl bg-rose-600 px-8 py-4 text-base font-black text-white shadow-lg shadow-rose-500/30 transition hover:bg-rose-700 active:scale-95"
+        >
+          <RefreshCw size={18} />
+          Atualizar agora
+        </button>
+      </div>
+    )
+  }
 
   if (selecionado) {
     return <ChecklistForm schema={selecionado} onVoltar={() => setSelecionado(null)} />
