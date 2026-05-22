@@ -716,7 +716,7 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={toggleVeiculosCard}
-                    className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold text-indigo-600 shadow-sm transition-all hover:scale-105 hover:bg-indigo-100 active:scale-95 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
+                    className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold text-indigo-600 shadow-sm transition-all hover:scale-105 hover:bg-indigo-100 active:scale-95 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
                     title="Ver ativos administrativos"
                   >
                     <RefreshCw size={10} className="transition-transform duration-500 hover:rotate-180" />
@@ -744,7 +744,7 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={toggleVeiculosCard}
-                    className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-extrabold text-purple-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-100 active:scale-95 dark:bg-purple-950/50 dark:text-purple-300 dark:hover:bg-purple-900/60"
+                    className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-extrabold text-purple-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-100 active:scale-95 dark:bg-purple-950/50 dark:text-purple-300 dark:hover:bg-purple-900/60"
                     title="Ver ativos operacionais"
                   >
                     <RefreshCw size={10} className="transition-transform duration-500 hover:rotate-180" />
