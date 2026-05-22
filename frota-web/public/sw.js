@@ -1,4 +1,4 @@
-const CACHE_NAME = 'frota-checklists-v12'
+const CACHE_NAME = 'frota-checklists-v13'
 const BACKGROUND_SYNC_TAG = 'frota-sync-checklists'
 
 // Apenas o shell estático que raramente muda
