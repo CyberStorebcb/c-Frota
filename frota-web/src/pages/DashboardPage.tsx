@@ -310,7 +310,7 @@ export function DashboardPage() {
   const adminPlacasSet = useMemo(() => {
     const s = new Set<string>()
     for (const row of TOTAL_VEHICLE_ROWS) {
-      if (row.servico?.trim().toLowerCase() === 'administrativo') {
+      if (row.setor?.trim().toUpperCase() === 'ADM') {
         const p = normalizePlaca(row.placa)
         if (p) s.add(p)
       }
