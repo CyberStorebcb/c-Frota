@@ -624,7 +624,7 @@ function FotosItem({
         <ImagePlus size={13} className="text-rose-400" />
         <span className="text-[11px] font-extrabold uppercase tracking-wide text-rose-500">
           Foto do problema
-          {fotos.length > 0 ? ` (${fotos.length}/${slots})` : ` — opcional, até ${slots} · máx. 155 KB (ajuste automático)`}
+          {fotos.length > 0 ? ` (${fotos.length}/${slots})` : ` — obrigatória, até ${slots} · máx. 155 KB (ajuste automático)`}
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -2388,7 +2388,7 @@ function FormularioChecklist({
                   obs={observacoes[item.id] ?? ''}
                   fotos={fotosItem[item.id] ?? []}
                   destacado={itemDestacado === item.id}
-                  fotoFaltando={respostas[item.id] === 'nc' && (fotosItem[item.id] ?? []).length === 0 && !fotosNcOk}
+                  fotoFaltando={respostas[item.id] === 'nc' && (fotosItem[item.id] ?? []).length === 0}
                   onResposta={setResposta}
                   onObs={setObservacaoCb}
                   onAddFoto={addFotoItem}
@@ -2527,13 +2527,13 @@ function FormularioChecklist({
               <p className="text-sm font-extrabold text-rose-500">🚫 {ncImperativos} item(s) impeditivo(s)</p>
             ) : ncCount > 0 ? (
               <p className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{ncCount} NC registrado(s)</p>
-            ) : tudo100 && camposPreenchidos && evidenciaNr12Ok ? (
-              <p className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 size={16} /> Pronto para enviar
-              </p>
             ) : tudo100 && camposPreenchidos && evidenciaNr12Ok && !fotosNcOk ? (
               <p className="text-sm font-semibold text-rose-500 dark:text-rose-400">
                 📷 {itensNcSemFoto.length} item(s) NC sem foto — obrigatória
+              </p>
+            ) : tudo100 && camposPreenchidos && evidenciaNr12Ok && fotosNcOk ? (
+              <p className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 size={16} /> Pronto para enviar
               </p>
             ) : tudo100 && camposPreenchidos && schema.temEvidencia && !evidenciaNr12Ok ? (
               <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
