@@ -716,10 +716,11 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={toggleVeiculosCard}
-                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                    className="absolute right-2 top-2 flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold text-indigo-600 shadow-sm transition-all hover:scale-105 hover:bg-indigo-100 hover:shadow-indigo-200 active:scale-95 dark:border-indigo-800/60 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
                     title="Ver ativos administrativos"
                   >
-                    <RefreshCw size={13} />
+                    <RefreshCw size={10} className="transition-transform duration-500 hover:rotate-180" />
+                    ADM
                   </button>
                   <div className="mb-3 shrink-0 rounded-xl p-3 transition-transform group-hover:scale-110 sm:rounded-2xl sm:p-3.5 bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
                     <Truck size={26} aria-hidden />
@@ -743,10 +744,11 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={toggleVeiculosCard}
-                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                    className="absolute right-2 top-2 flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-extrabold text-purple-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-100 hover:shadow-purple-200 active:scale-95 dark:border-purple-800/60 dark:bg-purple-950/50 dark:text-purple-300 dark:hover:bg-purple-900/60"
                     title="Ver ativos operacionais"
                   >
-                    <RefreshCw size={13} />
+                    <RefreshCw size={10} className="transition-transform duration-500 hover:rotate-180" />
+                    OP
                   </button>
                   <div className="mb-3 shrink-0 rounded-xl p-3 transition-transform group-hover:scale-110 sm:rounded-2xl sm:p-3.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
                     <Truck size={26} aria-hidden />
