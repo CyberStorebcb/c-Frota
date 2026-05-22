@@ -730,7 +730,7 @@ export function DashboardPage() {
                       Ativos operacionais
                     </p>
                     <h3 className="text-2xl font-black tabular-nums tracking-tighter text-slate-800 dark:text-white sm:text-3xl min-[1100px]:text-4xl">
-                      {String(ativosOperacionais)}
+                      {String(scopedFleetPlacasSet.size)}
                     </h3>
                   </div>
                 </Link>
