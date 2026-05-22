@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardX, X } from 'lucide-react'
+import { Bell, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardX, ImageDown, X } from 'lucide-react'
 import { useChecklistNotifications } from '../../hooks/useChecklistNotifications'
 import { useAgendaNotifications } from '../../hooks/useAgendaNotifications'
 import { useFleet } from '../../frota/FleetContext'
 import { useAuth } from '../../auth/AuthContext'
+import { useApontamentos } from '../../apontamentos/ApontamentosContext'
+import { generateAgendaScreenshot, downloadAgendaScreenshot } from '../../apontamentos/generateAgendaScreenshot'
 
 const HOUR_LABELS: Record<number, string> = { 10: '10h', 16: '16h', 18: '18h' }
 
@@ -25,9 +27,11 @@ export function NotificationBell() {
 
   const { notifications, unreadCount, markAllRead } = useChecklistNotifications(vehicles)
   const { count: agendaCount } = useAgendaNotifications(isAdmin)
+  const { rows } = useApontamentos()
 
   const [open, setOpen] = useState(false)
   const [agendaLida, setAgendaLida] = useState(false)
+  const [exportandoAgenda, setExportandoAgenda] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
@@ -71,6 +75,36 @@ export function NotificationBell() {
     setAgendaLida(true)
     setOpen(false)
     navigate(`/gerenciar`)
+  }
+
+  const exportarAgendaFoto = async () => {
+    if (exportandoAgenda) return
+    setExportandoAgenda(true)
+    try {
+      const agendados = rows.filter((r) => !r.resolvido && r.agendamentoData)
+      const dataUrl = generateAgendaScreenshot({
+        items: agendados.map((r) => ({
+          id: r.id,
+          placa: r.placa,
+          prefixo: r.prefixo,
+          modelo: r.modelo,
+          processo: r.processo,
+          base: r.base,
+          responsavel: r.responsavel,
+          supervisor: r.responsavel,
+          coordenador: r.coordenador,
+          veiculoLabel: r.veiculoLabel,
+          defeito: r.defeito,
+          agendamentoData: r.agendamentoData!,
+          justificativa: r.justificativa,
+          imperativo: r.imperativo,
+        })),
+      })
+      const iso = new Date().toISOString().slice(0, 10)
+      downloadAgendaScreenshot(dataUrl, `agenda-correcoes-${iso}.png`)
+    } finally {
+      setExportandoAgenda(false)
+    }
   }
 
   return (
@@ -134,14 +168,26 @@ export function NotificationBell() {
                     : `${agendaCount} correções agendadas para hoje ou vencidas aguardam ação.`}
                 </p>
 
-                <button
-                  type="button"
-                  onClick={irParaAgenda}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-[11px] font-extrabold text-white transition-colors hover:bg-amber-600"
-                >
-                  <CalendarClock size={12} />
-                  Ver agendamentos
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={irParaAgenda}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-[11px] font-extrabold text-white transition-colors hover:bg-amber-600"
+                  >
+                    <CalendarClock size={12} />
+                    Ver agendamentos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportarAgendaFoto}
+                    disabled={exportandoAgenda}
+                    title="Exportar foto da agenda"
+                    className="flex items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-extrabold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/60"
+                  >
+                    <ImageDown size={13} />
+                    {exportandoAgenda ? '…' : 'Foto'}
+                  </button>
+                </div>
               </div>
             )}
 
