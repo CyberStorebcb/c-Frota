@@ -248,6 +248,7 @@ export function ManagePage() {
   const [pageSizeStr, setPageSizeStr] = useState(() => lsGet('frota.manage.pageSize', '25'))
   const pageSize = Number(pageSizeStr) || 25
   const [historyGroup, setHistoryGroup] = useState<ApontamentoGroup | null>(null)
+  const [detailApontamento, setDetailApontamento] = useState<Apontamento | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const tabelaRef = useRef<HTMLDivElement | null>(null)
   const syncedVehicleFromUrlRef = useRef<string | null>(null)
@@ -1043,10 +1044,9 @@ export function ManagePage() {
                   return (
                     <tr
                       key={rowKey}
-                      onClick={group ? () => setHistoryGroup(group) : undefined}
+                      onClick={group ? () => setHistoryGroup(group) : () => setDetailApontamento(r)}
                       className={[
-                        'border-b last:border-0',
-                        group ? 'cursor-pointer' : '',
+                        'border-b last:border-0 cursor-pointer',
                         agendado
                           ? 'border-amber-200/70 bg-amber-50/60 hover:bg-amber-50 dark:border-amber-800/30 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
                           : group
@@ -1288,6 +1288,194 @@ export function ManagePage() {
           ) : null}
         </div>
       </div>
+
+      {detailApontamento ? (
+        <Portal>
+          <button
+            type="button"
+            className="fixed inset-0 z-[9998] bg-black/60"
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDetailApontamento(null) }}
+            aria-label="Fechar"
+          />
+          <div className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain">
+            <div className="flex min-h-[100dvh] justify-center p-4 py-6 sm:items-center sm:py-8">
+              <div
+                className="my-auto flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950"
+                onPointerDown={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Detalhes do defeito"
+              >
+                {/* Header */}
+                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 pb-3 pt-4 dark:border-slate-800">
+                  <div className="min-w-0 pr-2">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+                        <Truck size={15} />
+                      </span>
+                      <span className="font-mono text-base font-black tracking-tight text-slate-900 dark:text-slate-100">
+                        {detailApontamento.veiculoLabel}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      <DefeitoSeveridadeIcon imperativo={detailApontamento.imperativo} size={14} />
+                      <span>{formatDefeitoParaExibicao(detailApontamento.defeito)}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDetailApontamento(null)}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                    aria-label="Fechar"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                  {/* Meta info */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Operador</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{detailApontamento.responsavel || '—'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Apontado em</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">
+                        {new Date(detailApontamento.dataApontamento + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {detailApontamento.horaApontamento ? <span className="ml-1 text-slate-400">· {detailApontamento.horaApontamento}</span> : null}
+                      </p>
+                    </div>
+                    {detailApontamento.base ? (
+                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                        <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Base</p>
+                        <p className="font-bold text-slate-800 dark:text-slate-200">{detailApontamento.base}</p>
+                      </div>
+                    ) : null}
+                    {detailApontamento.prazo ? (
+                      <div className={[
+                        'rounded-xl border p-3',
+                        prazoPassou(detailApontamento.prazo, detailApontamento.resolvido)
+                          ? 'border-rose-200 bg-rose-50 dark:border-rose-900/50 dark:bg-rose-950/20'
+                          : 'border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40',
+                      ].join(' ')}>
+                        <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Prazo</p>
+                        <p className={[
+                          'font-bold',
+                          prazoPassou(detailApontamento.prazo, detailApontamento.resolvido)
+                            ? 'text-rose-700 dark:text-rose-400'
+                            : 'text-slate-800 dark:text-slate-200',
+                        ].join(' ')}>
+                          {new Date(detailApontamento.prazo + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {prazoPassou(detailApontamento.prazo, detailApontamento.resolvido) && (
+                            <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">Atrasado</span>
+                          )}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Problemas adicionais */}
+                  {detailApontamento.problemasAdicionais && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-950/20">
+                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">Problemas adicionais</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{detailApontamento.problemasAdicionais}</p>
+                      {detailApontamento.descricaoProblema && (
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Local/detalhe: {detailApontamento.descricaoProblema}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fotos da NC */}
+                  {detailApontamento.ncFotos && detailApontamento.ncFotos.length > 0 ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
+                      <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-rose-500 dark:text-rose-400">
+                        Foto(s) da não conformidade
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {detailApontamento.ncFotos.map((foto, idx) => (
+                          <a key={idx} href={foto} target="_blank" rel="noopener noreferrer" className="group relative block overflow-hidden rounded-lg border border-rose-300 dark:border-rose-800">
+                            <img
+                              src={foto}
+                              alt={`Foto ${idx + 1}`}
+                              className="h-28 w-28 object-cover transition group-hover:opacity-80 sm:h-36 sm:w-36"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
+                              <ZoomIn size={20} className="text-white drop-shadow" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 py-6 dark:border-slate-800 dark:bg-slate-900/30">
+                      <ImageIcon size={28} className="text-slate-300 dark:text-slate-700" />
+                      <p className="text-xs font-semibold text-slate-400 dark:text-slate-600">Nenhuma foto registrada</p>
+                    </div>
+                  )}
+
+                  {/* Justificativa */}
+                  {detailApontamento.justificado && detailApontamento.justificativa && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-950/20">
+                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">Justificativa</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{detailApontamento.justificativa}</p>
+                      {detailApontamento.justificativaData && (
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {new Date(detailApontamento.justificativaData + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Resolução */}
+                  {detailApontamento.resolvido && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Resolvido em</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">
+                        {detailApontamento.dataResolvido
+                          ? new Date(detailApontamento.dataResolvido + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : '—'}
+                      </p>
+                      {detailApontamento.reparoDescricao && (
+                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{detailApontamento.reparoDescricao}</p>
+                      )}
+                      {detailApontamento.reparoValor != null && detailApontamento.reparoValor > 0 && (
+                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          Custo: {(detailApontamento.reparoValor / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </p>
+                      )}
+                      {detailApontamento.reparoImagens && detailApontamento.reparoImagens.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {detailApontamento.reparoImagens.map((img, idx) => (
+                            <a key={idx} href={img} target="_blank" rel="noopener noreferrer" className="group relative block overflow-hidden rounded-lg border border-emerald-300 dark:border-emerald-800">
+                              <img src={img} alt={`Reparo ${idx + 1}`} className="h-20 w-20 object-cover transition group-hover:opacity-80" />
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
+                                <ZoomIn size={18} className="text-white drop-shadow" />
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setDetailApontamento(null)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      ) : null}
 
       {resolveOpen && canMarkResolved ? (
         <Portal>

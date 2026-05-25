@@ -1125,7 +1125,7 @@ export function ChecklistResultadosPage() {
     const cardW = (W1 - (pad / S) * 2 - gap / S * 3) / 4
     const cards = [
       { label: 'CHECKLISTS', value: String(totalRegistros), sub: 'no período filtrado', bg: '#1e293b', accent: '#94a3b8', val: '#f1f5f9' },
-      { label: 'CONFORMES', value: String(totalSemNc), sub: 'todos conformes', bg: '#052e16', accent: '#4ade80', val: '#4ade80' },
+      { label: 'RESOLVIDOS', value: String(totalSemNc), sub: 'todos resolvidos', bg: '#052e16', accent: '#4ade80', val: '#4ade80' },
       { label: 'SEM IMPEDIMENTO', value: String(totalRegistros - totalSemNc), sub: `${totalRegistros > 0 ? Math.round(((totalRegistros - totalSemNc) / totalRegistros) * 100) : 0}% dos checklists`, bg: '#1c1400', accent: '#f59e0b', val: '#f59e0b' },
       { label: 'COM IMPEDIMENTO', value: String(totalComNc), sub: `~${totalRegistros > 0 ? (totalComNc / totalRegistros).toFixed(1) : '0'} por checklist`, bg: '#1a0a0a', accent: '#f87171', val: '#f87171' },
     ]
@@ -1373,14 +1373,14 @@ export function ChecklistResultadosPage() {
                 <div>
                   <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{semNc}</div>
                   <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-500">
-                    Conformes
+                    Resolvidos
                   </div>
                 </div>
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
                   <CheckCircle2 size={17} className="text-emerald-500" />
                 </div>
               </div>
-              <div className="mt-2 text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-500/60">todos conformes</div>
+              <div className="mt-2 text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-500/60">todos resolvidos</div>
             </div>
 
             {/* Checklists com NC */}
