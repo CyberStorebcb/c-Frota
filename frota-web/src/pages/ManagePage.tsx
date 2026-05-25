@@ -53,6 +53,37 @@ import {
   placaFromApontamentoVeiculoId,
 } from '../frota/vehicleRegistry'
 
+const LOADING_MESSAGES = [
+  'Acessando os dados, aguarde...',
+  'Buscando checklists do período...',
+  'Carregando apontamentos da frota...',
+  'Processando defeitos registrados...',
+  'Organizando dados por veículo...',
+  'Verificando resoluções pendentes...',
+  'Quase lá, preparando a tabela...',
+]
+
+function LoadingApontamentos() {
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setIdx((i) => (i + 1) % LOADING_MESSAGES.length), 2500)
+    return () => window.clearInterval(id)
+  }, [])
+  return (
+    <div className="mt-4 flex flex-col items-center justify-center gap-3 py-12">
+      <Loader2 size={28} className="animate-spin text-brand-500 dark:text-brand-400" />
+      <p
+        key={idx}
+        className="animate-fade-in text-sm font-semibold text-slate-500 dark:text-slate-400"
+        style={{ animation: 'fadeIn 0.4s ease' }}
+      >
+        {LOADING_MESSAGES[idx]}
+      </p>
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+    </div>
+  )
+}
+
 function AgendaDetalheCampo({ label, value }: { label: string; value: string | null | undefined }) {
   const text = value?.trim()
   if (!text || text === '—' || text === 'N/A' || text === 'NÃO ATRIBUÍDO') return null
@@ -865,12 +896,7 @@ export function ManagePage() {
           </div>
         </div>
 
-        {carregando && (
-          <div className="mt-4 flex items-center justify-center gap-2 py-10 text-sm font-semibold text-slate-500 dark:text-slate-400">
-            <Loader2 size={18} className="animate-spin" />
-            Carregando apontamentos...
-          </div>
-        )}
+        {carregando && <LoadingApontamentos />}
         {visao === 'entrantes' && (
           <div className="mt-4 flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-950/40">
             <Inbox size={15} className="shrink-0 text-sky-600 dark:text-sky-400" />
