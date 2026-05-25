@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardX, ImageDown, X } from 'lucide-react'
+import { Bell, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, ClipboardCheck, ClipboardX, History, ImageDown, X } from 'lucide-react'
 import { useChecklistNotifications } from '../../hooks/useChecklistNotifications'
 import { useAgendaNotifications } from '../../hooks/useAgendaNotifications'
 import { useFleet } from '../../frota/FleetContext'
@@ -32,6 +32,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [agendaLida, setAgendaLida] = useState(false)
   const [exportandoAgenda, setExportandoAgenda] = useState(false)
+  const [verHistorico, setVerHistorico] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
@@ -60,6 +61,8 @@ export function NotificationBell() {
       if (!v) {
         markAllRead()
         if (agendaCount > 0) setAgendaLida(true)
+      } else {
+        setVerHistorico(false)
       }
       return !v
     })
@@ -198,62 +201,81 @@ export function NotificationBell() {
                 <p className="text-xs font-semibold">Sem notificações</p>
                 <p className="text-[10px] text-slate-400">As notificações aparecem às 10h, 16h e 18h</p>
               </div>
-            ) : (
-              notifications.map((n) => {
-                const pct = n.total > 0 ? Math.round((n.realizaram / n.total) * 100) : 0
-                const isHoje = n.hojeIso === new Date().toISOString().slice(0, 10)
-                return (
-                  <div
-                    key={n.id}
-                    className={`relative border-b border-slate-50 px-4 py-2.5 last:border-0 dark:border-slate-800/60 ${
-                      !n.lida ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''
-                    }`}
-                  >
-                    {!n.lida && (
-                      <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-blue-500" />
-                    )}
-
-                    {/* Data + hora + aderência + contadores + botão em linha */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-slate-400">
-                            {isHoje ? 'Hoje' : formatDate(n.hojeIso)} · {hourFromId(n.id)}
-                          </span>
-                          <span className={`rounded-full px-1.5 py-0 text-[10px] font-black ${
-                            pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
-                            : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
-                            : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400'
-                          }`}>
-                            {pct}%
-                          </span>
-                        </div>
-                        <div className="flex gap-3">
-                          <div className="flex items-center gap-1">
-                            <ClipboardCheck size={11} className="text-emerald-500" />
-                            <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">{n.realizaram}</span>
-                            <span className="text-[10px] text-slate-400">real.</span>
+            ) : (() => {
+              const hojeIso = new Date().toISOString().slice(0, 10)
+              const notifHoje = notifications.filter((n) => n.hojeIso === hojeIso)
+              const notifHistorico = notifications.filter((n) => n.hojeIso !== hojeIso)
+              const exibidas = verHistorico ? notifications : notifHoje
+              return (
+                <>
+                  {exibidas.map((n) => {
+                    const pct = n.total > 0 ? Math.round((n.realizaram / n.total) * 100) : 0
+                    const isHoje = n.hojeIso === hojeIso
+                    return (
+                      <div
+                        key={n.id}
+                        className={`relative border-b border-slate-50 px-4 py-2.5 last:border-0 dark:border-slate-800/60 ${
+                          !n.lida ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''
+                        }`}
+                      >
+                        {!n.lida && (
+                          <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-blue-500" />
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 flex-col gap-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-slate-400">
+                                {isHoje ? 'Hoje' : formatDate(n.hojeIso)} · {hourFromId(n.id)}
+                              </span>
+                              <span className={`rounded-full px-1.5 py-0 text-[10px] font-black ${
+                                pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                                : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
+                                : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400'
+                              }`}>
+                                {pct}%
+                              </span>
+                            </div>
+                            <div className="flex gap-3">
+                              <div className="flex items-center gap-1">
+                                <ClipboardCheck size={11} className="text-emerald-500" />
+                                <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">{n.realizaram}</span>
+                                <span className="text-[10px] text-slate-400">real.</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <ClipboardX size={11} className="text-rose-400" />
+                                <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">{n.naoRealizaram}</span>
+                                <span className="text-[10px] text-slate-400">não real.</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <ClipboardX size={11} className="text-rose-400" />
-                            <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">{n.naoRealizaram}</span>
-                            <span className="text-[10px] text-slate-400">não real.</span>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => irParaDetalhar()}
+                            className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-2.5 py-1.5 text-[10px] font-extrabold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                          >
+                            <CheckCircle2 size={11} />
+                            Detalhar
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => irParaDetalhar()}
-                        className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-2.5 py-1.5 text-[10px] font-extrabold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-                      >
-                        <CheckCircle2 size={11} />
-                        Detalhar
-                      </button>
-                    </div>
-                  </div>
-                )
-              })
-            )}
+                    )
+                  })}
+
+                  {/* Botão histórico — só aparece se houver notificações de outros dias */}
+                  {notifHistorico.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setVerHistorico((v) => !v)}
+                      className="flex w-full items-center justify-center gap-1.5 border-t border-slate-100 px-4 py-2.5 text-[11px] font-bold text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/50"
+                    >
+                      <History size={12} />
+                      {verHistorico ? 'Ocultar histórico' : `Ver histórico (${notifHistorico.length} notif.)`}
+                      {verHistorico ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                  )}
+                </>
+              )
+            })()}
           </div>
 
           {/* Footer */}
