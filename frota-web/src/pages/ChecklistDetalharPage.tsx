@@ -26,6 +26,7 @@ import {
 } from '../checklists/generateChecklistDetalharPdf'
 
 import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
+import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
 import { Select } from '../components/ui/Select'
 import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
@@ -363,6 +364,17 @@ export function ChecklistDetalharPage() {
     return m
   }, [allVehicles])
 
+  const operacionalPlacasSet = useMemo(() => {
+    const op = new Set<string>()
+    for (const row of TOTAL_VEHICLE_ROWS) {
+      if (row.setor?.trim().toUpperCase() === 'OPERACIONAL') {
+        const p = normPlaca(row.placa)
+        if (p) op.add(p)
+      }
+    }
+    return op
+  }, [])
+
   // ── checklists do período ─────────────────────────────────────────────────
   const [rawChecklists, setRawChecklists] = useState<ChecklistRow[]>([])
   const [checklistCompletionsByDay, setChecklistCompletionsByDay] = useState<Set<string>>(() => new Set())
@@ -484,11 +496,11 @@ export function ChecklistDetalharPage() {
   const total = placasRealizaram.length + placasNaoRealizaram.length
   const aderenciaStats = useMemo(
     () => computeFleetAdherence(
-      frotaFiltrada.map((v) => v.placa),
+      frotaFiltrada.filter((v) => operacionalPlacasSet.has(v.placa)).map((v) => v.placa),
       checklistCompletionsByDay,
       periodDays,
     ),
-    [frotaFiltrada, checklistCompletionsByDay, periodDays],
+    [frotaFiltrada, operacionalPlacasSet, checklistCompletionsByDay, periodDays],
   )
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
@@ -657,7 +669,7 @@ export function ChecklistDetalharPage() {
                       <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aderência no período</p>
                       <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
                         {aderenciaStats.realizados} de {aderenciaStats.esperados} checklists diários concluídos
-                        {diasNoPeriodo > 1 ? ` (${diasNoPeriodo} dias × ${total} veículos).` : '.'}
+                        {diasNoPeriodo > 1 ? ` (${diasNoPeriodo} dias × ${frotaFiltrada.filter((v) => operacionalPlacasSet.has(v.placa)).length} veículos operacionais).` : '.'}
                       </p>
                     </div>
                     <span className={`rounded-2xl px-3 py-1.5 text-xl font-black ${pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}`}>
