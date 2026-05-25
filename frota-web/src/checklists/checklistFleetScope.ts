@@ -76,7 +76,7 @@ export function filterActiveFleet(
   return [...fleetMap.values()].filter((v) => passesChecklistFleetFilters(v, filters))
 }
 
-export type ChecklistDayStats = { data: string; realizados: number; comNc: number }
+export type ChecklistDayStats = { data: string; realizados: number; comNc: number; naoRealizados: number }
 
 type ChecklistRowInput = {
   data_inspecao: unknown
@@ -84,11 +84,13 @@ type ChecklistRowInput = {
   dados_veiculo: unknown
 }
 
-/** Agrega checklists concluídos: 1 contagem por placa × dia (mesma regra do Detalhar). */
+/** Agrega checklists concluídos: 1 contagem por placa × dia (mesma regra do Detalhar).
+ *  Se `operacionalPlacas` for fornecido, calcula `naoRealizados` = operacionais que não fizeram checklist no dia. */
 export function aggregateChecklistCompletions(
   rows: ChecklistRowInput[],
   fleetMap: Map<string, ChecklistFleetVehicle>,
   filters: ChecklistFleetFilters,
+  operacionalPlacas?: Set<string>,
 ): { completions: Set<string>; porDia: ChecklistDayStats[] } {
   const scopedPlacas = new Set(filterActiveFleet(fleetMap, filters).map((v) => v.placa))
   const completions = new Set<string>()
@@ -110,6 +112,25 @@ export function aggregateChecklistCompletions(
     else if (!comNcByKey.has(key)) comNcByKey.set(key, false)
   }
 
+  // Placas operacionais dentro do escopo filtrado
+  const opPlacas = operacionalPlacas
+    ? new Set([...scopedPlacas].filter((p) => operacionalPlacas.has(p)))
+    : null
+  const totalOperacionais = opPlacas ? opPlacas.size : 0
+
+  // Conta realizados por dia (apenas placas operacionais se fornecido)
+  const realizadosPorDia = new Map<string, Set<string>>()
+  for (const key of completions) {
+    const pipeIdx = key.lastIndexOf('|')
+    const placa = key.slice(0, pipeIdx)
+    const day = key.slice(pipeIdx + 1)
+    if (!scopedPlacas.has(placa)) continue
+    if (opPlacas && !opPlacas.has(placa)) continue
+    const set = realizadosPorDia.get(day) ?? new Set<string>()
+    set.add(placa)
+    realizadosPorDia.set(day, set)
+  }
+
   const dayMap = new Map<string, { realizados: number; comNc: number }>()
   for (const key of completions) {
     const pipeIdx = key.lastIndexOf('|')
@@ -126,6 +147,10 @@ export function aggregateChecklistCompletions(
 
   return {
     completions,
-    porDia: Array.from(dayMap.entries()).map(([data, stats]) => ({ data, ...stats })),
+    porDia: Array.from(dayMap.entries()).map(([data, stats]) => {
+      const realizadosOp = realizadosPorDia.get(data)?.size ?? stats.realizados
+      const naoRealizados = opPlacas ? Math.max(0, totalOperacionais - realizadosOp) : 0
+      return { data, ...stats, naoRealizados }
+    }),
   }
 }

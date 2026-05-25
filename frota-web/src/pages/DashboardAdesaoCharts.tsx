@@ -11,11 +11,12 @@ import {
   YAxis,
 } from 'recharts'
 
-export type DashboardAdesaoChartRow = { name: string; realizados: number; naoRealizados: number }
+export type DashboardAdesaoChartRow = { name: string; realizados: number; naoRealizados: number; comNc: number }
 
 const CHART_COLORS = {
   realizados: '#1E40AF',
-  naoRealizados: '#FF8A65',
+  naoRealizados: '#EF4444',
+  comNc: '#FF8A65',
 } as const
 
 type AdesaoTooltipPayload = {
@@ -130,7 +131,7 @@ export function DashboardAdesaoCharts({
             name="Realizados"
             fill={CHART_COLORS.realizados}
             radius={[12, 12, 0, 0]}
-            barSize={40}
+            barSize={28}
             animationDuration={720}
             animationEasing="ease-out"
             animationBegin={0}
@@ -138,14 +139,25 @@ export function DashboardAdesaoCharts({
           />
           <Bar
             dataKey="naoRealizados"
-            name="Com NC"
+            name="Não realizados"
             fill={CHART_COLORS.naoRealizados}
             radius={[12, 12, 0, 0]}
-            barSize={40}
+            barSize={28}
             animationDuration={720}
             animationEasing="ease-out"
-            animationBegin={90}
-            activeBar={{ fill: CHART_COLORS.naoRealizados, stroke: '#fdba74', strokeWidth: 2, opacity: 0.98 }}
+            animationBegin={60}
+            activeBar={{ fill: CHART_COLORS.naoRealizados, stroke: '#fca5a5', strokeWidth: 2, opacity: 0.98 }}
+          />
+          <Bar
+            dataKey="comNc"
+            name="Com NC"
+            fill={CHART_COLORS.comNc}
+            radius={[12, 12, 0, 0]}
+            barSize={28}
+            animationDuration={720}
+            animationEasing="ease-out"
+            animationBegin={120}
+            activeBar={{ fill: CHART_COLORS.comNc, stroke: '#fdba74', strokeWidth: 2, opacity: 0.98 }}
           />
         </BarChart>
       ) : (
@@ -154,6 +166,10 @@ export function DashboardAdesaoCharts({
             <linearGradient id={`colorReal-${areaGradId}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#1E40AF" stopOpacity={0.35} />
               <stop offset="95%" stopColor="#1E40AF" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id={`colorNaoReal-${areaGradId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#EF4444" stopOpacity={0.28} />
+              <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
             </linearGradient>
             <linearGradient id={`colorNao-${areaGradId}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#FF8A65" stopOpacity={0.28} />
@@ -211,16 +227,30 @@ export function DashboardAdesaoCharts({
           <Area
             type="monotone"
             dataKey="naoRealizados"
-            name="Com NC"
+            name="Não realizados"
             stroke={CHART_COLORS.naoRealizados}
             strokeWidth={2.5}
-            fill={`url(#colorNao-${areaGradId})`}
+            fill={`url(#colorNaoReal-${areaGradId})`}
             fillOpacity={1}
             dot={{ r: 3.5, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.naoRealizados }}
             activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.naoRealizados }}
             animationDuration={900}
             animationEasing="ease-out"
-            animationBegin={120}
+            animationBegin={80}
+          />
+          <Area
+            type="monotone"
+            dataKey="comNc"
+            name="Com NC"
+            stroke={CHART_COLORS.comNc}
+            strokeWidth={2.5}
+            fill={`url(#colorNao-${areaGradId})`}
+            fillOpacity={1}
+            dot={{ r: 3.5, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.comNc }}
+            activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: CHART_COLORS.comNc }}
+            animationDuration={900}
+            animationEasing="ease-out"
+            animationBegin={160}
           />
         </AreaChart>
       )}

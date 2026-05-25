@@ -361,6 +361,7 @@ export function DashboardPage() {
           data,
           activeFleetMap,
           checklistFleetFilters,
+          operacionalPlacasSet,
         )
         setChecklistCompletions(completions)
         setChecklistsPorDia(porDia)
@@ -374,7 +375,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters])
+  }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters, operacionalPlacasSet])
 
   const { rows } = useApontamentos()
 
@@ -410,17 +411,19 @@ export function DashboardPage() {
     [periodoInicioIso, periodoFimIso],
   )
 
-  // Gráfico: realizados vs com NC no período
+  // Gráfico: realizados, não realizados e com NC no período
   const chartData = useMemo<DashboardAdesaoChartRow[]>(() => {
     return checklistsPorDiaNoPeriodo.map((d) => ({
       name: fmtChartLabel(periodoChartMode, d.data),
       realizados: d.realizados,
-      naoRealizados: d.comNc,
+      naoRealizados: d.naoRealizados,
+      comNc: d.comNc,
     }))
   }, [checklistsPorDiaNoPeriodo, periodoChartMode])
 
   const chartTotals = useMemo(() => ({
     realizados: checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.realizados, 0),
+    naoRealizados: checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.naoRealizados, 0),
     comNc: checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.comNc, 0),
   }), [checklistsPorDiaNoPeriodo])
 
@@ -840,7 +843,7 @@ export function DashboardPage() {
                     Adesão aos checklists
                   </h2>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 sm:text-[10px]">
-                    Realizados vs. com NC
+                    Realizados · Não realizados · Com NC
                   </p>
                 </div>
               </div>
@@ -884,6 +887,13 @@ export function DashboardPage() {
                         <span className="text-slate-300">Realizados</span>
                       </span>
                       <span className="text-white">{chartTotals.realizados}</span>
+                    </li>
+                    <li className="flex items-center justify-between gap-8 text-[13px] font-bold tabular-nums">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: '#EF4444' }} />
+                        <span className="text-slate-300">Não realizados</span>
+                      </span>
+                      <span className="text-white">{chartTotals.naoRealizados}</span>
                     </li>
                     <li className="flex items-center justify-between gap-8 text-[13px] font-bold tabular-nums">
                       <span className="flex min-w-0 items-center gap-2">
