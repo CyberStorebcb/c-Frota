@@ -27,7 +27,7 @@ import {
   MessageSquareWarning,
   Image as ImageIcon,
 } from 'lucide-react'
-import type { Apontamento } from '../apontamentos/ApontamentosContext'
+import type { Apontamento, PeriodoCarregado } from '../apontamentos/ApontamentosContext'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import {
@@ -129,6 +129,13 @@ const PAGE_SIZE_OPTIONS: SelectOption[] = [
   { value: '100', label: '100 por página' },
 ]
 
+const PERIODO_CARREGADO_OPTIONS: SelectOption[] = [
+  { value: '180d', label: 'Últimos 6 meses' },
+  { value: '1a',   label: 'Último 1 ano' },
+  { value: '2a',   label: 'Últimos 2 anos' },
+  { value: 'tudo', label: 'Histórico completo' },
+]
+
 function StatPill({
   label,
   value,
@@ -178,7 +185,7 @@ function StatPill({
 }
 
 export function ManagePage() {
-  const { rows, carregando, marcarResolvido, marcarJustificado, checklistsRealizadosTotal } = useApontamentos()
+  const { rows, carregando, marcarResolvido, marcarJustificado, checklistsRealizadosTotal, periodoCarregado, setPeriodoCarregado, recarregar } = useApontamentos()
   const { user } = useAuth()
   const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
   const [searchParams, setSearchParams] = useSearchParams()
@@ -817,6 +824,16 @@ export function ManagePage() {
                   onChange={(v) => { setSupervisor(v); setPagina(1) }}
                 />
                 <Select label="Data" value={data} options={dataOpts} onChange={(v) => { setData(v); setPagina(1) }} />
+                <Select
+                  label="Período carregado"
+                  value={periodoCarregado}
+                  options={PERIODO_CARREGADO_OPTIONS}
+                  onChange={(v) => {
+                    setPeriodoCarregado(v as PeriodoCarregado)
+                    void recarregar()
+                    setPagina(1)
+                  }}
+                />
               </div>
               <div className="flex items-end gap-3">
                 <div className="min-w-0 flex-1">

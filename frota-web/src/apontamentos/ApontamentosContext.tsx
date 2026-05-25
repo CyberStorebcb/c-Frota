@@ -197,11 +197,15 @@ function localTimeHHmm(d: Date) {
 // ---------------------------------------------------------------------------
 // Contexto
 // ---------------------------------------------------------------------------
+export type PeriodoCarregado = '180d' | '1a' | '2a' | 'tudo'
+
 type Ctx = {
   rows: Apontamento[]
   /** Total de registros na tabela `checklists` com inspeção concluída (`progresso` = 100). */
   checklistsRealizadosTotal: number
   carregando: boolean
+  periodoCarregado: PeriodoCarregado
+  setPeriodoCarregado: (p: PeriodoCarregado) => void
   marcarResolvido: (
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null; dataResolvido?: string | null },
@@ -227,19 +231,32 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando]   = useState(true)
   const [persistError, setPersistError] = useState<string | null>(null)
   const clearPersistError = useCallback(() => setPersistError(null), [])
+  const [periodoCarregado, setPeriodoCarregadoState] = useState<PeriodoCarregado>('180d')
+  const periodoCarregadoRef = useRef<PeriodoCarregado>('180d')
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const setPeriodoCarregado = useCallback((p: PeriodoCarregado) => {
+    periodoCarregadoRef.current = p
+    setPeriodoCarregadoState(p)
+  }, [])
+
   const recarregar = useCallback(async () => {
     setCarregando(true)
     localStorage.removeItem('frota-apontamentos-v1')
 
-    // Janela de 180 dias: captura todo NC ativo e histórico recente
-    const dataCorte = new Date()
-    dataCorte.setDate(dataCorte.getDate() - 180)
-    const dataCorteIso = dataCorte.toISOString().slice(0, 10)
+    // Calcula corte de data conforme período selecionado
+    let dataCorteIso: string | null = null
+    const periodo = periodoCarregadoRef.current
+    if (periodo !== 'tudo') {
+      const dataCorte = new Date()
+      if (periodo === '180d') dataCorte.setDate(dataCorte.getDate() - 180)
+      else if (periodo === '1a') dataCorte.setFullYear(dataCorte.getFullYear() - 1)
+      else if (periodo === '2a') dataCorte.setFullYear(dataCorte.getFullYear() - 2)
+      dataCorteIso = dataCorte.toISOString().slice(0, 10)
+    }
 
     // 1–3 em paralelo: count, checklists com NC e resoluções
     const [
@@ -253,27 +270,24 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         .select('id', { count: 'exact', head: true })
         .eq('progresso', 100),
 
-      // 2. Checklists concluídos nos últimos 180 dias com itens NC
-      fetchAllSupabasePages((from, to) =>
-        supabase
+      // 2. Checklists concluídos no período selecionado com itens NC
+      fetchAllSupabasePages((from, to) => {
+        let q = supabase
           .from('checklists')
           .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
           .eq('progresso', 100)
-          .gte('data_inspecao', dataCorteIso)
-          .order('data_inspecao', { ascending: true })
-          .order('id', { ascending: true })
-          .range(from, to),
-      ),
+        if (dataCorteIso) q = q.gte('data_inspecao', dataCorteIso)
+        return q.order('data_inspecao', { ascending: true }).order('id', { ascending: true }).range(from, to)
+      }),
 
-      // 3. Resoluções (apontamentos): pendentes não têm corte; resolvidos recentes cobrem histórico visível
-      fetchAllSupabasePages((from, to) =>
-        supabase
+      // 3. Resoluções no período selecionado
+      fetchAllSupabasePages((from, to) => {
+        let q = supabase
           .from('apontamentos')
           .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
-          .gte('data_apontamento', dataCorteIso)
-          .order('id', { ascending: true })
-          .range(from, to),
-      ),
+        if (dataCorteIso) q = q.gte('data_apontamento', dataCorteIso)
+        return q.order('id', { ascending: true }).range(from, to)
+      }),
     ])
 
     setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
@@ -526,6 +540,8 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       rows,
       checklistsRealizadosTotal,
       carregando,
+      periodoCarregado,
+      setPeriodoCarregado,
       marcarResolvido,
       marcarJustificado,
       buscarHistorico,
@@ -534,7 +550,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       clearPersistError,
       recarregar,
     }),
-    [rows, checklistsRealizadosTotal, carregando, marcarResolvido, marcarJustificado, buscarHistorico, hasByChecklist, persistError, clearPersistError, recarregar],
+    [rows, checklistsRealizadosTotal, carregando, periodoCarregado, setPeriodoCarregado, marcarResolvido, marcarJustificado, buscarHistorico, hasByChecklist, persistError, clearPersistError, recarregar],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>
