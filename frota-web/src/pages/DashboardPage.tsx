@@ -518,8 +518,15 @@ export function DashboardPage() {
   async function exportarImagem() {
     if (!contentRef.current || exportando) return
     setExportando(true)
+
+    // Garante que o card de veículos exiba a frente (Ativos Operacionais) na foto
+    const cardEstavaVirado = veiculosCardVirado
+    if (cardEstavaVirado) setVeiculosCardVirado(false)
+
     // Aguarda o overlay ser renderizado no DOM antes de capturar
     await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+    // Aguarda a transição do flip terminar
+    if (cardEstavaVirado) await new Promise((r) => setTimeout(r, 550))
 
     const el = contentRef.current
     if (!el) { setExportando(false); return }
@@ -563,6 +570,7 @@ export function DashboardPage() {
       el.style.minHeight = prevStyle.minHeight
       el.style.maxHeight = prevStyle.maxHeight
       for (const { el: e, prev } of overflowEls) e.style.overflow = prev
+      if (cardEstavaVirado) setVeiculosCardVirado(true)
       setExportando(false)
     }
   }
