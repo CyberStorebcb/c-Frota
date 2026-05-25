@@ -500,10 +500,10 @@ export function ChecklistDetalharPage() {
   )
 
   const aderenciaStats = useMemo(() => {
-    const realizados = placasRealizaram.filter((v) => operacionalPlacasSet.has(v.placa)).length
+    const realizados = placasRealizaram.length
     const pct = operacionaisAtivos > 0 ? Math.min(100, Math.round((realizados / operacionaisAtivos) * 100)) : 0
     return { realizados, esperados: operacionaisAtivos, pct }
-  }, [placasRealizaram, operacionalPlacasSet, operacionaisAtivos])
+  }, [placasRealizaram, operacionaisAtivos])
 
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
