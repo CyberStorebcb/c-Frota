@@ -139,7 +139,7 @@ export function NotificationBell() {
           </div>
 
           {/* Lista */}
-          <div className="custom-nb-scroll max-h-[420px] overflow-y-auto">
+          <div className="custom-nb-scroll max-h-[520px] overflow-y-auto">
 
             {/* Card de agendamentos — visível apenas para admin quando há itens para hoje/vencidos */}
             {isAdmin && agendaCount > 0 && (
@@ -205,7 +205,7 @@ export function NotificationBell() {
                 return (
                   <div
                     key={n.id}
-                    className={`relative border-b border-slate-50 px-4 py-3.5 last:border-0 dark:border-slate-800/60 ${
+                    className={`relative border-b border-slate-50 px-4 py-2.5 last:border-0 dark:border-slate-800/60 ${
                       !n.lida ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''
                     }`}
                   >
@@ -213,47 +213,43 @@ export function NotificationBell() {
                       <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-blue-500" />
                     )}
 
-                    {/* Data + hora */}
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400">
-                        {isHoje ? 'Hoje' : formatDate(n.hojeIso)} · {hourFromId(n.id)}
-                      </span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                        pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
-                        : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
-                        : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400'
-                      }`}>
-                        {pct}% aderência
-                      </span>
-                    </div>
-
-                    {/* Contadores */}
-                    <div className="mb-3 flex gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <ClipboardCheck size={13} className="text-emerald-500" />
-                        <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
-                          {n.realizaram}
-                        </span>
-                        <span className="text-[10px] font-medium text-slate-400">realizaram</span>
+                    {/* Data + hora + aderência + contadores + botão em linha */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-400">
+                            {isHoje ? 'Hoje' : formatDate(n.hojeIso)} · {hourFromId(n.id)}
+                          </span>
+                          <span className={`rounded-full px-1.5 py-0 text-[10px] font-black ${
+                            pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                            : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
+                            : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400'
+                          }`}>
+                            {pct}%
+                          </span>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="flex items-center gap-1">
+                            <ClipboardCheck size={11} className="text-emerald-500" />
+                            <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">{n.realizaram}</span>
+                            <span className="text-[10px] text-slate-400">real.</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <ClipboardX size={11} className="text-rose-400" />
+                            <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">{n.naoRealizaram}</span>
+                            <span className="text-[10px] text-slate-400">não real.</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <ClipboardX size={13} className="text-rose-400" />
-                        <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
-                          {n.naoRealizaram}
-                        </span>
-                        <span className="text-[10px] font-medium text-slate-400">não realizaram</span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => irParaDetalhar()}
+                        className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-2.5 py-1.5 text-[10px] font-extrabold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                      >
+                        <CheckCircle2 size={11} />
+                        Detalhar
+                      </button>
                     </div>
-
-                    {/* Botão detalhar */}
-                    <button
-                      type="button"
-                      onClick={() => irParaDetalhar()}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-[11px] font-extrabold text-white transition-colors hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-                    >
-                      <CheckCircle2 size={12} />
-                      Ver detalhe
-                    </button>
                   </div>
                 )
               })
