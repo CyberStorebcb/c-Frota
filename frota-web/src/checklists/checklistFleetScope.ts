@@ -35,7 +35,7 @@ export function passesChecklistFleetFilters(
   filters: ChecklistFleetFilters,
 ): boolean {
   if (filters.base !== 'todos' && !matchesBaseFilter(v.base, filters.base)) return false
-  // supervisor não filtra veículos do catálogo — é filtrado diretamente nas completions via nome_supervisor
+  if (filters.supervisor !== 'todos' && !matchesSupervisorFilter(v.supervisor, filters.supervisor)) return false
   if (filters.coordenador !== 'todos' && !matchesCoordenadorFilter(v.coordenador, filters.coordenador)) return false
   if (filters.responsavel && filters.responsavel !== 'todos') {
     if (normNome(v.responsavel) !== normNome(filters.responsavel)) return false

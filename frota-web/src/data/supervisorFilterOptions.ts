@@ -1,4 +1,5 @@
-/** Opções fixas do filtro "Supervisor" (valor normalizado para comparação). */
+import { TOTAL_VEHICLE_ROWS } from './totalVehiclesFleet.gen'
+
 export type SupervisorFilterSelectOption = { value: string; label: string }
 
 function normSup(s: string): string {
@@ -15,25 +16,23 @@ export function matchesSupervisorFilter(rowSupervisor: string, filterValue: stri
   return normSup(rowSupervisor).includes(normSup(filterValue))
 }
 
-export const SUPERVISOR_FILTER_SELECT_OPTIONS: SupervisorFilterSelectOption[] = [
-  { value: 'todos',               label: 'Todos' },
-  { value: 'Antonio Reis',        label: 'ANTONIO REIS' },
-  { value: 'Antonio Alencar',     label: 'ANTONIO ALENCAR' },
-  { value: 'Arlison Lima',        label: 'ARLISON LIMA' },
-  { value: 'Cristophe Melo',      label: 'CRISTOPHE MELO' },
-  { value: 'Deilton Ribeiro',     label: 'DEILTON RIBEIRO' },
-  { value: 'Edivan Carvalho',     label: 'EDIVAN CARVALHO' },
-  { value: 'Everaldo Filho',      label: 'EVERALDO FILHO' },
-  { value: 'Guilherme Nogueira',  label: 'GUILHERME NOGUEIRA' },
-  { value: 'Joao Junior',         label: 'JOAO JUNIOR' },
-  { value: 'Josiel Santos',       label: 'JOSIEL SANTOS' },
-  { value: 'Leonardo Anchieta',   label: 'LEONARDO ANCHIETA' },
-  { value: 'Luis Souza',          label: 'LUIS SOUZA' },
-  { value: 'Luis Alves',          label: 'LUIS ALVES' },
-  { value: 'Messias Santos',      label: 'MESSIAS SANTOS' },
-  { value: 'Mikeias Pinheiro',    label: 'MIKEIAS PINHEIRO' },
-  { value: 'Pablo Loura',         label: 'PABLO LOURA' },
-  { value: 'Raimundo Silva',      label: 'RAIMUNDO SILVA' },
-  { value: 'Raimundo Nascimento', label: 'RAIMUNDO NASCIMENTO' },
-  { value: 'Werbeth Carvalho',    label: 'WERBETH CARVALHO' },
-]
+// Gera lista de supervisores únicos a partir da coluna RESPONSÁVEL do catálogo
+function buildSupervisorOptions(): SupervisorFilterSelectOption[] {
+  const skip = new Set(['', 'FROTA', 'AVARIADO', 'DESMOBILIZADA', 'RESERVA', 'ITALO', 'PAULO'])
+  const seen = new Set<string>()
+  const opts: SupervisorFilterSelectOption[] = []
+
+  for (const row of TOTAL_VEHICLE_ROWS) {
+    const v = row.responsavel?.trim().toUpperCase()
+    if (!v || skip.has(v)) continue
+    const key = normSup(v)
+    if (seen.has(key)) continue
+    seen.add(key)
+    opts.push({ value: v, label: v })
+  }
+
+  opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  return [{ value: 'todos', label: 'Todos' }, ...opts]
+}
+
+export const SUPERVISOR_FILTER_SELECT_OPTIONS: SupervisorFilterSelectOption[] = buildSupervisorOptions()
