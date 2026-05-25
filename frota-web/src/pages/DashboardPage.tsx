@@ -445,8 +445,8 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // Aderência = realizados / (placas × dias) — mesmo critério do DetalharPage
-    const aderenciaStats = computeFleetAdherence(scopedFleetPlacas, checklistCompletions, periodDays)
+    // Aderência = checklists realizados / (operacionais × dias no período)
+    const aderenciaStats = computeFleetAdherence(scopedFleetPlacasOperacionais, checklistCompletions, periodDays)
     const aderencia = aderenciaStats.esperados > 0 ? `${aderenciaStats.pct}%` : '—'
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
