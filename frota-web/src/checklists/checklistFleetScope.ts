@@ -35,7 +35,7 @@ export function passesChecklistFleetFilters(
   filters: ChecklistFleetFilters,
 ): boolean {
   if (filters.base !== 'todos' && !matchesBaseFilter(v.base, filters.base)) return false
-  if (filters.supervisor !== 'todos' && !matchesSupervisorFilter(v.supervisor, filters.supervisor)) return false
+  // supervisor não filtra veículos do catálogo — é filtrado diretamente nas completions via nome_supervisor
   if (filters.coordenador !== 'todos' && !matchesCoordenadorFilter(v.coordenador, filters.coordenador)) return false
   if (filters.responsavel && filters.responsavel !== 'todos') {
     if (normNome(v.responsavel) !== normNome(filters.responsavel)) return false
@@ -82,6 +82,7 @@ type ChecklistRowInput = {
   data_inspecao: unknown
   nc_count: unknown
   dados_veiculo: unknown
+  nome_supervisor?: unknown
 }
 
 /** Agrega checklists concluídos: 1 contagem por placa × dia (mesma regra do Detalhar).
@@ -102,6 +103,12 @@ export function aggregateChecklistCompletions(
       : {}
     const placa = normalizePlacaChecklist(String(dv.placa ?? ''))
     if (!placa || !fleetMap.has(placa) || !scopedPlacas.has(placa)) continue
+
+    // Filtro de supervisor via nome_supervisor do checklist
+    if (filters.supervisor !== 'todos') {
+      const nomeSup = String(row.nome_supervisor ?? '')
+      if (!matchesSupervisorFilter(nomeSup, filters.supervisor)) continue
+    }
 
     const dia = String(row.data_inspecao ?? '').slice(0, 10)
     if (!dia) continue
