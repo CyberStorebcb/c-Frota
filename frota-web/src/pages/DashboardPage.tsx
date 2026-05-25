@@ -348,7 +348,7 @@ export function DashboardPage() {
   const periodoChartMode = periodoLimites.chartMode
 
   // Checklists concluídos (progresso 100) por dia — dados reais do Supabase, filtrados pela base via placa.
-  const [checklistsPorDia, setChecklistsPorDia] = useState<{ data: string; realizados: number; comNc: number }[]>([])
+  const [checklistsPorDia, setChecklistsPorDia] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
   const [checklistCompletions, setChecklistCompletions] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
