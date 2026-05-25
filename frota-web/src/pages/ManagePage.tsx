@@ -40,6 +40,10 @@ import {
   downloadAgendaScreenshot,
   generateAgendaScreenshot,
 } from '../apontamentos/generateAgendaScreenshot'
+import {
+  downloadResolvidosScreenshot,
+  generateResolvidosScreenshot,
+} from '../apontamentos/generateResolvidosScreenshot'
 import { useAuth } from '../auth/AuthContext'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
@@ -521,6 +525,7 @@ export function ManagePage() {
   const [agendaOpen, setAgendaOpen] = useState(false)
   const [agendaExpandedId, setAgendaExpandedId] = useState<string | null>(null)
   const [capturandoAgendaFoto, setCapturandoAgendaFoto] = useState(false)
+  const [capturandoResolvidosFoto, setCapturandoResolvidosFoto] = useState(false)
 
   const agendados = useMemo(() =>
     rows
@@ -554,6 +559,47 @@ export function ManagePage() {
       downloadAgendaScreenshot(dataUrl, `agenda-correcoes-${iso}.png`)
     } finally {
       setCapturandoAgendaFoto(false)
+    }
+  }
+
+  const exportarResolvidosFoto = async () => {
+    if (capturandoResolvidosFoto) return
+    setCapturandoResolvidosFoto(true)
+    try {
+      // Pega os resolvidos filtrados (mesmos critérios da tabela atual)
+      const resolvidos = sortedFiltered.filter((r) => r.resolvido)
+      const filtros: { label: string; valor: string }[] = []
+      if (base !== 'todos') filtros.push({ label: 'Base', valor: base })
+      if (coordenador !== 'todos') filtros.push({ label: 'Gerência', valor: coordenador })
+      if (supervisor !== 'todos') filtros.push({ label: 'Supervisor', valor: supervisor })
+      if (prefixo !== 'todos') filtros.push({ label: 'Prefixo', valor: prefixo })
+      if (data !== 'todos') filtros.push({ label: 'Período', valor: data })
+
+      const periodoLabel = (() => {
+        const opt = PERIODO_CARREGADO_OPTIONS.find((o) => o.value === periodoCarregado)
+        return opt?.label ?? 'Histórico'
+      })()
+
+      const dataUrl = generateResolvidosScreenshot({
+        items: resolvidos.map((r) => ({
+          veiculoLabel: r.veiculoLabel,
+          defeito: r.defeito,
+          base: r.base,
+          coordenador: r.coordenador,
+          responsavel: r.responsavel,
+          dataApontamento: r.dataApontamento,
+          dataResolvido: r.dataResolvido,
+          reparoValor: r.reparoValor,
+          reparoDescricao: r.reparoDescricao,
+          imperativo: r.imperativo,
+        })),
+        periodoLabel,
+        filtros: filtros.length > 0 ? filtros : undefined,
+      })
+      const iso = new Date().toISOString().slice(0, 10)
+      downloadResolvidosScreenshot(dataUrl, `defeitos-resolvidos-${iso}.png`)
+    } finally {
+      setCapturandoResolvidosFoto(false)
     }
   }
 
@@ -741,6 +787,19 @@ export function ManagePage() {
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          {visao === 'resolvidos' && (
+            <button
+              type="button"
+              onClick={exportarResolvidosFoto}
+              disabled={capturandoResolvidosFoto}
+              className="group relative inline-flex flex-1 items-center justify-center gap-2 overflow-hidden rounded-xl border border-emerald-400/60 bg-gradient-to-br from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-soft transition-all hover:from-emerald-600 hover:to-teal-700 hover:shadow-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-70 sm:flex-initial"
+              title="Capturar foto dos defeitos resolvidos"
+            >
+              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" aria-hidden />
+              {capturandoResolvidosFoto ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+              {capturandoResolvidosFoto ? 'Gerando…' : 'Capturar foto'}
+            </button>
+          )}
           <Link
             to="/gerenciar/evolucao"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
