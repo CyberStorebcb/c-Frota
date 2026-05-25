@@ -375,6 +375,17 @@ export function ChecklistDetalharPage() {
     return op
   }, [])
 
+  const admPlacasSet = useMemo(() => {
+    const adm = new Set<string>()
+    for (const row of TOTAL_VEHICLE_ROWS) {
+      if (row.setor?.trim().toUpperCase() === 'ADM') {
+        const p = normPlaca(row.placa)
+        if (p) adm.add(p)
+      }
+    }
+    return adm
+  }, [])
+
   // ── checklists do período ─────────────────────────────────────────────────
   const [rawChecklists, setRawChecklists] = useState<ChecklistRow[]>([])
   const [checklistCompletionsByDay, setChecklistCompletionsByDay] = useState<Set<string>>(() => new Set())
@@ -497,6 +508,11 @@ export function ChecklistDetalharPage() {
   const operacionaisAtivos = useMemo(
     () => frotaFiltrada.filter((v) => operacionalPlacasSet.has(v.placa)).length,
     [frotaFiltrada, operacionalPlacasSet],
+  )
+
+  const admAtivos = useMemo(
+    () => frotaFiltrada.filter((v) => admPlacasSet.has(v.placa)).length,
+    [frotaFiltrada, admPlacasSet],
   )
 
   const aderenciaStats = useMemo(() => {
@@ -689,11 +705,19 @@ export function ChecklistDetalharPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/55">
-                <div className="absolute inset-y-0 left-0 w-1 bg-slate-400/70" />
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Veículos ativos</p>
-                <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{total}</p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-400">ativos no recorte atual</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative overflow-hidden rounded-2xl border border-purple-200 bg-purple-50/80 p-3 shadow-sm backdrop-blur dark:border-purple-900/50 dark:bg-purple-950/20">
+                  <div className="absolute inset-y-0 left-0 w-1 bg-purple-400" />
+                  <p className="text-[9px] font-black uppercase tracking-wider text-purple-600/80 dark:text-purple-400/80 sm:text-[10px]">Veículos OP ativos</p>
+                  <p className="mt-1.5 text-2xl font-black text-purple-700 dark:text-purple-300 sm:text-3xl">{operacionaisAtivos}</p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-purple-600/60 dark:text-purple-400/60">operacionais</p>
+                </div>
+                <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/80 p-3 shadow-sm backdrop-blur dark:border-indigo-900/50 dark:bg-indigo-950/20">
+                  <div className="absolute inset-y-0 left-0 w-1 bg-indigo-400" />
+                  <p className="text-[9px] font-black uppercase tracking-wider text-indigo-600/80 dark:text-indigo-400/80 sm:text-[10px]">Veículos ADM ativos</p>
+                  <p className="mt-1.5 text-2xl font-black text-indigo-700 dark:text-indigo-300 sm:text-3xl">{admAtivos}</p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-indigo-600/60 dark:text-indigo-400/60">administrativos</p>
+                </div>
               </div>
               <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm backdrop-blur dark:border-emerald-900/60 dark:bg-emerald-950/25">
                 <div className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
