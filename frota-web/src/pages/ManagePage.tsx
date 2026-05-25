@@ -393,10 +393,25 @@ export function ManagePage() {
     if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
     if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
     if (visao === 'entrantes') list = list.filter((r) => isDefeitoEntrante(r, nowMs))
+
+    // Deduplica pendentes pelo mesmo critério do card PENDENTES (placa + ncItemId).
+    // Para cada chave única pega o representante mais recente; resolvidos/entrantes
+    // não têm chave de agrupamento, então são contados individualmente.
+    const representantes: typeof list = []
+    const seen = new Set<string>()
+    for (const r of list) {
+      const key = apontamentoGroupKey(r)
+      if (key) {
+        if (!seen.has(key)) { seen.add(key); representantes.push(r) }
+      } else {
+        representantes.push(r)
+      }
+    }
+
     return {
-      total: list.length,
-      imperativos: list.filter((r) => r.imperativo).length,
-      atencao: list.filter((r) => !r.imperativo).length,
+      total: representantes.length,
+      imperativos: representantes.filter((r) => r.imperativo).length,
+      atencao: representantes.filter((r) => !r.imperativo).length,
     }
   }, [rowsMatchingFiltros, visao, nowMs])
 
