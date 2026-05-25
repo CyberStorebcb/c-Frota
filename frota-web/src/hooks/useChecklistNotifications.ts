@@ -88,37 +88,61 @@ export function useChecklistNotifications(allVehicles: FleetVehicle[]) {
     const check = async () => {
       const now = new Date()
       const hojeIso = hojeLocalIso()
-      const hour = now.getHours()
-      const minute = now.getMinutes()
+      const currentHour = now.getHours()
+      const currentMinute = now.getMinutes()
 
-      if (!NOTIFY_HOURS.includes(hour) || minute > 5) {
-        scheduleNext()
-        return
-      }
+      let stored = loadStored()
+      let changed = false
 
-      const id = `${hojeIso}-${hour}`
-      const stored = loadStored()
+      // Horários que já passaram hoje e ainda não têm notificação gerada
+      const horasPendentes = NOTIFY_HOURS.filter((h) => {
+        if (currentHour < h) return false // ainda não chegou
+        const id = `${hojeIso}-${h}`
+        return !stored.some((n) => n.id === id)
+      })
 
-      // já gerou essa notificação hoje nesse horário?
-      if (stored.some((n) => n.id === id)) {
-        scheduleNext()
-        return
-      }
-
-      try {
-        const stats = await fetchTodayStats(allVehicles)
-        const notif: ChecklistNotification = {
-          id,
-          timestamp: Date.now(),
-          hojeIso,
-          ...stats,
-          lida: false,
+      for (const h of horasPendentes) {
+        try {
+          const stats = await fetchTodayStats(allVehicles)
+          const notif: ChecklistNotification = {
+            id: `${hojeIso}-${h}`,
+            timestamp: Date.now(),
+            hojeIso,
+            ...stats,
+            lida: false,
+          }
+          stored = [notif, ...stored]
+          changed = true
+        } catch {
+          // falha silenciosa
         }
-        const updated = [notif, ...stored]
-        saveStored(updated)
-        setNotifications(updated)
-      } catch {
-        // falha silenciosa
+      }
+
+      // Também verifica se estamos exatamente na janela de um horário (HH:00–HH:05)
+      // para gerar em tempo real quando o app já estava aberto
+      if (NOTIFY_HOURS.includes(currentHour) && currentMinute <= 5) {
+        const id = `${hojeIso}-${currentHour}`
+        if (!stored.some((n) => n.id === id)) {
+          try {
+            const stats = await fetchTodayStats(allVehicles)
+            const notif: ChecklistNotification = {
+              id,
+              timestamp: Date.now(),
+              hojeIso,
+              ...stats,
+              lida: false,
+            }
+            stored = [notif, ...stored]
+            changed = true
+          } catch {
+            // falha silenciosa
+          }
+        }
+      }
+
+      if (changed) {
+        saveStored(stored)
+        setNotifications(stored)
       }
 
       scheduleNext()
