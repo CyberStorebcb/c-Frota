@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
+import { apontamentoGroupKey } from '../apontamentos/groupApontamentos'
 import { useAuth } from '../auth/AuthContext'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import {
@@ -613,17 +614,27 @@ export function RegistroVeiculosPage() {
 
   const { rows: apontamentosRows, carregando: apontamentosCarregando } = useApontamentos()
 
-  /** NC pendentes em itens não impeditivos (sem 🚫 no checklist). */
-  const ncNaoImpeditivosPendentes = useMemo(
-    () => apontamentosRows.filter((r) => !r.resolvido && !r.imperativo).length,
-    [apontamentosRows],
-  )
+  /** NC pendentes em itens não impeditivos — deduplificados por placa + ncItemId. */
+  const ncNaoImpeditivosPendentes = useMemo(() => {
+    const seen = new Set<string>()
+    for (const r of apontamentosRows) {
+      if (r.resolvido || r.imperativo) continue
+      const key = apontamentoGroupKey(r) ?? r.id
+      seen.add(key)
+    }
+    return seen.size
+  }, [apontamentosRows])
 
-  /** NC imperativos pendentes — itens marcados com 🚫 que impedem condução. */
-  const ncImpeditivosPendentes = useMemo(
-    () => apontamentosRows.filter((r) => !r.resolvido && r.imperativo).length,
-    [apontamentosRows],
-  )
+  /** NC imperativos pendentes — deduplificados por placa + ncItemId. */
+  const ncImpeditivosPendentes = useMemo(() => {
+    const seen = new Set<string>()
+    for (const r of apontamentosRows) {
+      if (r.resolvido || !r.imperativo) continue
+      const key = apontamentoGroupKey(r) ?? r.id
+      seen.add(key)
+    }
+    return seen.size
+  }, [apontamentosRows])
 
   /** Set de placas normalizadas com pelo menos um NC imperativo não resolvido. */
   const placasComImpedimento = useMemo(
