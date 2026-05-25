@@ -153,7 +153,7 @@ function fmtIsoDateBR(iso: string): string {
 function checklistsRealizadosCardMeta(
   inicioIso: string,
   fimIso: string,
-  _checklistsPorDiaNoPeriodo: { data: string; realizados: number }[],
+  _checklistsPorDiaNoPeriodo: { data: string; realizados: number; naoRealizados: number; comNc: number }[],
   totalNoPeriodo: number,
 ): { label: string; value: number } {
   const hojeIso = hojeLocalIso()
