@@ -515,14 +515,12 @@ export function ChecklistDetalharPage() {
     [frotaFiltrada, admPlacasSet],
   )
 
-  const aderenciaStats = useMemo(
-    () => computeFleetAdherence(
-      frotaFiltrada.filter((v) => operacionalPlacasSet.has(v.placa)).map((v) => v.placa),
-      checklistCompletionsByDay,
-      periodDays,
-    ),
-    [frotaFiltrada, operacionalPlacasSet, checklistCompletionsByDay, periodDays],
-  )
+  const aderenciaStats = useMemo(() => {
+    const realizados = placasRealizaram.length
+    const esperados = operacionaisAtivos * periodDays.length
+    const pct = esperados > 0 ? Math.min(100, Math.round((realizados / esperados) * 100)) : 0
+    return { realizados, esperados, pct }
+  }, [placasRealizaram, operacionaisAtivos, periodDays])
 
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
@@ -693,8 +691,8 @@ export function ChecklistDetalharPage() {
                       </p>
                       <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
                         {diasNoPeriodo === 1
-                          ? `${aderenciaStats.realizados} de ${operacionaisAtivos} veículos operacionais fizeram o checklist hoje.`
-                          : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados concluídos (${operacionaisAtivos} veículos × ${diasNoPeriodo} dias).`
+                          ? `${aderenciaStats.realizados} de ${operacionaisAtivos} checklists realizados.`
+                          : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados (${operacionaisAtivos} veículos × ${diasNoPeriodo} dias).`
                         }
                       </p>
                     </div>

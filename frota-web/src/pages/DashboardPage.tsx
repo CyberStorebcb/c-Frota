@@ -447,13 +447,14 @@ export function DashboardPage() {
     const ativosOperacionais = scopedFleetPlacasSet.size
 
     // Aderência segue o período selecionado:
-    // - Hoje (1 dia): veículos operacionais que fizeram / operacionais ativos
-    // - Período (N dias): realizados / (operacionais × N dias)
-    const aderenciaStats = computeFleetAdherence(scopedFleetPlacasOperacionais, checklistCompletions, periodDays)
-    const aderencia = aderenciaStats.esperados > 0 ? `${aderenciaStats.pct}%` : '—'
+    // - Hoje (1 dia): checklists realizados / operacionais ativos
+    // - Período (N dias): checklists realizados / (operacionais × N dias)
+    const esperados = ativosOperacionaisFiltrado * periodDays.length
+    const pctAderencia = esperados > 0 ? Math.min(100, Math.round((checklistsNoPeriodo / esperados) * 100)) : 0
+    const aderencia = esperados > 0 ? `${pctAderencia}%` : '—'
     const aderenciaSub = periodDays.length === 1
-      ? `${aderenciaStats.realizados} de ${aderenciaStats.esperados} veículos operacionais fizeram`
-      : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} esperados (${periodDays.length} dias)`
+      ? `${checklistsNoPeriodo} de ${esperados} checklists realizados`
+      : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias)`
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
     const pendentesUnicas = new Set(
