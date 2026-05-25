@@ -1,8 +1,8 @@
 import { Outlet } from 'react-router-dom'
 import { X } from 'lucide-react'
-import { ApontamentosProvider, useApontamentos } from '../apontamentos/ApontamentosContext'
+import { useApontamentos } from '../apontamentos/ApontamentosContext'
 
-function ApontamentosShell() {
+export function ApontamentosLayout() {
   const { persistError, clearPersistError } = useApontamentos()
 
   return (
@@ -25,13 +25,5 @@ function ApontamentosShell() {
       ) : null}
       <Outlet />
     </div>
-  )
-}
-
-export function ApontamentosLayout() {
-  return (
-    <ApontamentosProvider>
-      <ApontamentosShell />
-    </ApontamentosProvider>
   )
 }
