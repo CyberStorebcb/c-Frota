@@ -236,42 +236,53 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     setCarregando(true)
     localStorage.removeItem('frota-apontamentos-v1')
 
-    // 1. Total de checklists concluídos (mesmo critério do formulário: progresso 100)
-    const { count: totalRealizados, error: countError } = await supabase
-      .from('checklists')
-      .select('id', { count: 'exact', head: true })
-      .eq('progresso', 100)
-    setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
+    // Janela de 180 dias: captura todo NC ativo e histórico recente
+    const dataCorte = new Date()
+    dataCorte.setDate(dataCorte.getDate() - 180)
+    const dataCorteIso = dataCorte.toISOString().slice(0, 10)
 
-    // 2. Checklists concluídos — filtra itens NC nas respostas (nc_count pode estar desatualizado).
-    const fetchAllNc = async () => {
-      return fetchAllSupabasePages((from, to) =>
+    // 1–3 em paralelo: count, checklists com NC e resoluções
+    const [
+      { count: totalRealizados, error: countError },
+      { data: clData, error: clError },
+      { data: resData },
+    ] = await Promise.all([
+      // 1. Total de checklists concluídos (sem corte de data — métrica global)
+      supabase
+        .from('checklists')
+        .select('id', { count: 'exact', head: true })
+        .eq('progresso', 100),
+
+      // 2. Checklists concluídos nos últimos 180 dias com itens NC
+      fetchAllSupabasePages((from, to) =>
         supabase
           .from('checklists')
           .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
           .eq('progresso', 100)
+          .gte('data_inspecao', dataCorteIso)
           .order('data_inspecao', { ascending: true })
           .order('id', { ascending: true })
           .range(from, to),
-      )
-    }
+      ),
 
-    const { data: clData, error: clError } = await fetchAllNc()
+      // 3. Resoluções (apontamentos): pendentes não têm corte; resolvidos recentes cobrem histórico visível
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from('apontamentos')
+          .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
+          .gte('data_apontamento', dataCorteIso)
+          .order('id', { ascending: true })
+          .range(from, to),
+      ),
+    ])
+
+    setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
 
     if (clError) {
       setPersistError('Erro ao carregar checklists: ' + clError.message)
       setCarregando(false)
       return
     }
-
-    // 3. Busca resoluções da tabela apontamentos
-    const { data: resData } = await fetchAllSupabasePages((from, to) =>
-      supabase
-        .from('apontamentos')
-        .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
-        .order('id', { ascending: true })
-        .range(from, to),
-    )
 
     const resolucoes = new Map<string, Resolucao>(
       ((resData ?? []) as unknown[]).map((r) => {
