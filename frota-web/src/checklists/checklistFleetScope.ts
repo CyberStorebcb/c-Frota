@@ -82,7 +82,6 @@ type ChecklistRowInput = {
   data_inspecao: unknown
   nc_count: unknown
   dados_veiculo: unknown
-  nome_supervisor?: unknown
 }
 
 /** Agrega checklists concluídos: 1 contagem por placa × dia (mesma regra do Detalhar).
@@ -103,12 +102,6 @@ export function aggregateChecklistCompletions(
       : {}
     const placa = normalizePlacaChecklist(String(dv.placa ?? ''))
     if (!placa || !fleetMap.has(placa) || !scopedPlacas.has(placa)) continue
-
-    // Filtro de supervisor via nome_supervisor do checklist
-    if (filters.supervisor !== 'todos') {
-      const nomeSup = String(row.nome_supervisor ?? '')
-      if (!matchesSupervisorFilter(nomeSup, filters.supervisor)) continue
-    }
 
     const dia = String(row.data_inspecao ?? '').slice(0, 10)
     if (!dia) continue
