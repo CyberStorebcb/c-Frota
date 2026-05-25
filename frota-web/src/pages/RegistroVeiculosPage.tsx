@@ -614,39 +614,58 @@ export function RegistroVeiculosPage() {
 
   const { rows: apontamentosRows, carregando: apontamentosCarregando } = useApontamentos()
 
+  /** Conjunto de chaves placa+ncItemId que ainda têm pelo menos uma ocorrência não resolvida e não justificada. */
+  const gruposAindaPendentes = useMemo(() => {
+    // Agrupa por placa+ncItemId. Se TODAS as ocorrências estiverem resolvidas OU justificadas, considera o grupo encerrado.
+    const grupos = new Map<string, { pendente: boolean; imperativo: boolean; placa: string }>()
+    for (const r of apontamentosRows) {
+      const key = apontamentoGroupKey(r) ?? r.id
+      const encerrada = r.resolvido || r.justificado
+      const prev = grupos.get(key)
+      if (!prev) {
+        grupos.set(key, { pendente: !encerrada, imperativo: r.imperativo, placa: normalizePlaca(r.placa) })
+      } else if (!encerrada) {
+        prev.pendente = true
+      }
+    }
+    return grupos
+  }, [apontamentosRows])
+
   /** NC pendentes em itens não impeditivos — deduplificados por placa + ncItemId. */
   const ncNaoImpeditivosPendentes = useMemo(() => {
-    const seen = new Set<string>()
-    for (const r of apontamentosRows) {
-      if (r.resolvido || r.imperativo) continue
-      const key = apontamentoGroupKey(r) ?? r.id
-      seen.add(key)
+    let n = 0
+    for (const g of gruposAindaPendentes.values()) {
+      if (g.pendente && !g.imperativo) n += 1
     }
-    return seen.size
-  }, [apontamentosRows])
+    return n
+  }, [gruposAindaPendentes])
 
   /** NC imperativos pendentes — deduplificados por placa + ncItemId. */
   const ncImpeditivosPendentes = useMemo(() => {
-    const seen = new Set<string>()
-    for (const r of apontamentosRows) {
-      if (r.resolvido || !r.imperativo) continue
-      const key = apontamentoGroupKey(r) ?? r.id
-      seen.add(key)
+    let n = 0
+    for (const g of gruposAindaPendentes.values()) {
+      if (g.pendente && g.imperativo) n += 1
     }
-    return seen.size
-  }, [apontamentosRows])
+    return n
+  }, [gruposAindaPendentes])
 
-  /** Set de placas normalizadas com pelo menos um NC imperativo não resolvido. */
-  const placasComImpedimento = useMemo(
-    () => new Set(apontamentosRows.filter((r) => !r.resolvido && r.imperativo).map((r) => normalizePlaca(r.placa)).filter(Boolean)),
-    [apontamentosRows],
-  )
+  /** Set de placas normalizadas com pelo menos um NC imperativo pendente (não resolvido e não justificado). */
+  const placasComImpedimento = useMemo(() => {
+    const s = new Set<string>()
+    for (const g of gruposAindaPendentes.values()) {
+      if (g.pendente && g.imperativo && g.placa) s.add(g.placa)
+    }
+    return s
+  }, [gruposAindaPendentes])
 
   /** Placas com NC não impeditivo pendente (Precisam de atenção). */
-  const placasComAtencao = useMemo(
-    () => new Set(apontamentosRows.filter((r) => !r.resolvido && !r.imperativo).map((r) => normalizePlaca(r.placa)).filter(Boolean)),
-    [apontamentosRows],
-  )
+  const placasComAtencao = useMemo(() => {
+    const s = new Set<string>()
+    for (const g of gruposAindaPendentes.values()) {
+      if (g.pendente && !g.imperativo && g.placa) s.add(g.placa)
+    }
+    return s
+  }, [gruposAindaPendentes])
 
   const navigate = useNavigate()
   const { user } = useAuth()
