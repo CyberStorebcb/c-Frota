@@ -515,11 +515,14 @@ export function ChecklistDetalharPage() {
     [frotaFiltrada, admPlacasSet],
   )
 
-  const aderenciaStats = useMemo(() => {
-    const realizados = placasRealizaram.length
-    const pct = operacionaisAtivos > 0 ? Math.min(100, Math.round((realizados / operacionaisAtivos) * 100)) : 0
-    return { realizados, esperados: operacionaisAtivos, pct }
-  }, [placasRealizaram, operacionaisAtivos])
+  const aderenciaStats = useMemo(
+    () => computeFleetAdherence(
+      frotaFiltrada.filter((v) => operacionalPlacasSet.has(v.placa)).map((v) => v.placa),
+      checklistCompletionsByDay,
+      periodDays,
+    ),
+    [frotaFiltrada, operacionalPlacasSet, checklistCompletionsByDay, periodDays],
+  )
 
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
@@ -687,7 +690,8 @@ export function ChecklistDetalharPage() {
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aderência no período</p>
                       <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        {aderenciaStats.realizados} de {aderenciaStats.esperados} veículos operacionais realizaram o checklist.
+                        {aderenciaStats.realizados} de {aderenciaStats.esperados} checklists esperados concluídos
+                        {diasNoPeriodo > 1 ? ` (${operacionaisAtivos} veículos × ${diasNoPeriodo} dias).` : '.'}
                       </p>
                     </div>
                     <span className={`rounded-2xl px-3 py-1.5 text-xl font-black ${pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}`}>
