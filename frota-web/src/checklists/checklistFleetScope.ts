@@ -118,19 +118,6 @@ export function aggregateChecklistCompletions(
     : null
   const totalOperacionais = opPlacas ? opPlacas.size : 0
 
-  // Conta realizados por dia (apenas placas operacionais se fornecido)
-  const realizadosPorDia = new Map<string, Set<string>>()
-  for (const key of completions) {
-    const pipeIdx = key.lastIndexOf('|')
-    const placa = key.slice(0, pipeIdx)
-    const day = key.slice(pipeIdx + 1)
-    if (!scopedPlacas.has(placa)) continue
-    if (opPlacas && !opPlacas.has(placa)) continue
-    const set = realizadosPorDia.get(day) ?? new Set<string>()
-    set.add(placa)
-    realizadosPorDia.set(day, set)
-  }
-
   const dayMap = new Map<string, { realizados: number; comNc: number }>()
   for (const key of completions) {
     const pipeIdx = key.lastIndexOf('|')
@@ -148,8 +135,9 @@ export function aggregateChecklistCompletions(
   return {
     completions,
     porDia: Array.from(dayMap.entries()).map(([data, stats]) => {
-      const realizadosOp = realizadosPorDia.get(data)?.size ?? stats.realizados
-      const naoRealizados = opPlacas ? Math.max(0, totalOperacionais - realizadosOp) : 0
+      // naoRealizados = operacionais ativos - total de checklists do dia (mesma logica da aderencia)
+      // Total bruto de checklists no numerador, operacionais no denominador
+      const naoRealizados = opPlacas ? Math.max(0, totalOperacionais - stats.realizados) : 0
       return { data, ...stats, naoRealizados }
     }),
   }
