@@ -14,6 +14,7 @@ import {
   ImageDown,
   RefreshCw,
   Truck,
+  X,
 } from 'lucide-react'
 
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
@@ -258,6 +259,7 @@ export function DashboardPage() {
     try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
     catch { return false }
   })
+  const [recorrentesOculto, setRecorrentesOculto] = useState(false)
 
   useEffect(() => {
     try {
@@ -798,13 +800,21 @@ export function DashboardPage() {
             )})}
           </div>
 
-          {gruposRecorrentes.length > 0 && (
+          {gruposRecorrentes.length > 0 && !recorrentesOculto && (
             <div data-tour="dashboard-recorrentes" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
               <div className="mb-3 flex items-center gap-2">
                 <AlertTriangle size={16} className="shrink-0 text-rose-600 dark:text-rose-400" />
-                <span className="text-sm font-extrabold text-rose-800 dark:text-rose-200">
+                <span className="flex-1 text-sm font-extrabold text-rose-800 dark:text-rose-200">
                   {gruposRecorrentes.length} defeito{gruposRecorrentes.length > 1 ? 's' : ''} recorrente{gruposRecorrentes.length > 1 ? 's' : ''} (3+ dias seguidos)
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setRecorrentesOculto(true)}
+                  className="rounded-lg p-1 text-rose-400 transition hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/40 dark:hover:text-rose-300"
+                  title="Fechar"
+                >
+                  <X size={15} />
+                </button>
               </div>
               <ul className="flex flex-col gap-2">
                 {gruposRecorrentes.map((g) => (
