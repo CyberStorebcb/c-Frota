@@ -227,6 +227,7 @@ function GomanLogo({
 type Stat = {
   label: string
   value: string
+  sub?: string
   Icon: LucideIcon
   iconWrap: string
   cardHover: string
@@ -445,9 +446,13 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // Aderência = checklists realizados / (operacionais × dias no período)
+    // "Hoje": veículos únicos que fizeram / operacionais (max 1 por veículo)
+    // Período: realizados / (operacionais × dias) — mesma fórmula, computeFleetAdherence já deduplica por placa×dia
     const aderenciaStats = computeFleetAdherence(scopedFleetPlacasOperacionais, checklistCompletions, periodDays)
     const aderencia = aderenciaStats.esperados > 0 ? `${aderenciaStats.pct}%` : '—'
+    const aderenciaSub = periodo === 'hoje'
+      ? `${aderenciaStats.realizados} de ${aderenciaStats.esperados} veículos fizeram hoje`
+      : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados`
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
     const pendentesUnicas = new Set(
@@ -489,12 +494,13 @@ export function DashboardPage() {
       {
         label: 'Aderência da Frota',
         value: aderencia,
+        sub: aderenciaSub,
         Icon: Gauge,
         iconWrap: 'bg-sky-50 text-sky-600 group-hover:scale-110 dark:bg-sky-950/50 dark:text-sky-400',
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, ativosOperacionaisFiltrado, checklistCompletions, periodDays])
+  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, ativosOperacionaisFiltrado, checklistCompletions, periodDays, periodo])
 
   const chartUi = useMemo(
     () => ({
@@ -791,6 +797,11 @@ export function DashboardPage() {
                   <h3 className="text-2xl font-black tabular-nums tracking-tighter text-slate-800 dark:text-white sm:text-3xl min-[1100px]:text-4xl">
                     {s.value}
                   </h3>
+                  {s.sub && (
+                    <p className="mt-1 text-[9px] font-semibold text-slate-400 dark:text-slate-500 sm:text-[10px]">
+                      {s.sub}
+                    </p>
+                  )}
                 </div>
               </Card>
             )})}

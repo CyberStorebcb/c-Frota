@@ -688,10 +688,14 @@ export function ChecklistDetalharPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/45">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aderência no período</p>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        {diasNoPeriodo === 1 ? 'Aderência hoje' : 'Aderência no período'}
+                      </p>
                       <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        {aderenciaStats.realizados} de {aderenciaStats.esperados} checklists esperados concluídos
-                        {diasNoPeriodo > 1 ? ` (${operacionaisAtivos} veículos × ${diasNoPeriodo} dias).` : '.'}
+                        {diasNoPeriodo === 1
+                          ? `${aderenciaStats.realizados} de ${operacionaisAtivos} veículos operacionais fizeram o checklist hoje.`
+                          : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados concluídos (${operacionaisAtivos} veículos × ${diasNoPeriodo} dias).`
+                        }
                       </p>
                     </div>
                     <span className={`rounded-2xl px-3 py-1.5 text-xl font-black ${pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : pct >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}`}>
