@@ -27,8 +27,6 @@ import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
 import {
-  computeFleetAdherence,
-  filterCompletionsToDays,
   listDaysInPeriod,
 } from '../checklists/checklistTop10Ranking'
 import {
@@ -447,11 +445,11 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    const completionsNoPeriodo = filterCompletionsToDays(checklistCompletions, periodDays)
-    const aderenciaStats = computeFleetAdherence(scopedFleetPlacasOperacionais, completionsNoPeriodo, periodDays)
+    // Aderência = checklists realizados no período ÷ veículos operacionais ativos
+    const totalOperacionais = scopedFleetPlacasOperacionais.length
     const aderencia =
-      aderenciaStats.esperados > 0
-        ? `${aderenciaStats.pct}%`
+      totalOperacionais > 0
+        ? `${Math.min(100, Math.round((checklistsNoPeriodo / totalOperacionais) * 100))}%`
         : '—'
 
     // Pendentes no período e filtro atual
