@@ -424,6 +424,13 @@ export function ManagePage() {
     tabelaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const irParaPlacaNaTabela = (placa: string) => {
+    setAgendaOpen(false)
+    setQuery(placa)
+    setPagina(1)
+    setTimeout(() => tabelaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
+
   const filtrosAtivos =
     vehicleId !== 'todos' ||
     base !== 'todos' ||
@@ -1580,12 +1587,17 @@ export function ManagePage() {
                         return (
                           <li key={r.id} className="px-5 py-4">
                             <div className="flex items-start gap-3">
-                              <div className={[
-                                'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm',
-                                isVencida ? 'bg-rose-500' : 'bg-amber-500',
-                              ].join(' ')}>
+                              <button
+                                type="button"
+                                title={`Filtrar ${r.placa} na tabela`}
+                                onClick={() => irParaPlacaNaTabela(r.placa)}
+                                className={[
+                                  'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm transition-opacity hover:opacity-75 active:scale-95',
+                                  isVencida ? 'bg-rose-500' : 'bg-amber-500',
+                                ].join(' ')}
+                              >
                                 <CalendarClock size={16} />
-                              </div>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setAgendaExpandedId((prev) => (prev === r.id ? null : r.id))}
