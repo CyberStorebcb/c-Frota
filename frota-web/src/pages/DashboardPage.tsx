@@ -25,7 +25,7 @@ import { Select } from '../components/ui/Select'
 import { useFleet } from '../frota/FleetContext'
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
-import { buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
+import { apontamentoGroupKey, buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
 import {
   listDaysInPeriod,
 } from '../checklists/checklistTop10Ranking'
@@ -427,9 +427,6 @@ export function DashboardPage() {
 
   // KPIs
   const stats = useMemo<Stat[]>(() => {
-    const { fimMsEnd } = periodoLimites
-    const inicioMs = periodoLimites.inicioMs
-
     const checklistsNoPeriodo = countUniqueCompletionsInPeriod(checklistCompletions, periodDays)
     const comNcNoPeriodo = checklistsPorDiaNoPeriodo.reduce((s, d) => s + d.comNc, 0)
     const checklistsRealizadosCard = checklistsRealizadosCardMeta(
@@ -445,18 +442,19 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // Aderência = checklists realizados no período ÷ veículos operacionais ativos
+    // Aderência = média diária de checklists realizados ÷ veículos operacionais ativos
     const totalOperacionais = scopedFleetPlacasOperacionais.length
+    const diasNoPeriodo = periodDays.length || 1
+    const mediaChecklistsDia = checklistsNoPeriodo / diasNoPeriodo
     const aderencia =
       totalOperacionais > 0
-        ? `${Math.min(100, Math.round((checklistsNoPeriodo / totalOperacionais) * 100))}%`
+        ? `${Math.min(100, Math.round((mediaChecklistsDia / totalOperacionais) * 100))}%`
         : '—'
 
-    // Pendentes no período e filtro atual
-    const pendentesNoPeriodo = pendenciasFiltradas.filter((r) => {
-      const t = new Date(r.dataApontamento + 'T00:00:00').getTime()
-      return t >= inicioMs && t <= fimMsEnd
-    }).length
+    // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
+    const pendentesUnicas = new Set(
+      pendenciasFiltradas.map((r) => apontamentoGroupKey(r) ?? r.id),
+    ).size
 
     return [
       {
@@ -484,7 +482,7 @@ export function DashboardPage() {
       },
       {
         label: 'Pendentes',
-        value: String(pendentesNoPeriodo),
+        value: String(pendentesUnicas),
         Icon: ClipboardX,
         iconWrap: 'bg-orange-50 text-orange-600 group-hover:scale-110 dark:bg-orange-950/50 dark:text-orange-400',
         cardHover: 'hover:border-orange-400 dark:hover:border-orange-500',
