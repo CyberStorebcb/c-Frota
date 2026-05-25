@@ -325,10 +325,12 @@ export function DashboardPage() {
     [scopedFleetPlacasSet, adminPlacasSet],
   )
 
-  const ativosOperacionaisFiltrado = useMemo(
-    () => [...scopedFleetPlacasSet].filter((p) => operacionalPlacasSet.has(p)).length,
-    [scopedFleetPlacasSet, operacionalPlacasSet],
+  const scopedFleetPlacasOperacionais = useMemo(
+    () => scopedFleetPlacas.filter((p) => operacionalPlacasSet.has(p)),
+    [scopedFleetPlacas, operacionalPlacasSet],
   )
+
+  const ativosOperacionaisFiltrado = scopedFleetPlacasOperacionais.length
 
   const [veiculosCardVirado, setVeiculosCardVirado] = useState(false)
   const toggleVeiculosCard = useCallback((e: React.MouseEvent) => {
@@ -443,7 +445,7 @@ export function DashboardPage() {
     const ativosOperacionais = scopedFleetPlacasSet.size
 
     const completionsNoPeriodo = filterCompletionsToDays(checklistCompletions, periodDays)
-    const aderenciaStats = computeFleetAdherence(scopedFleetPlacas, completionsNoPeriodo, periodDays)
+    const aderenciaStats = computeFleetAdherence(scopedFleetPlacasOperacionais, completionsNoPeriodo, periodDays)
     const aderencia =
       aderenciaStats.esperados > 0
         ? `${aderenciaStats.pct}%`
@@ -495,7 +497,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, checklistCompletions, periodDays])
+  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, checklistCompletions, periodDays])
 
   const chartUi = useMemo(
     () => ({
