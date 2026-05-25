@@ -251,6 +251,7 @@ export function ManagePage() {
   const [detailApontamento, setDetailApontamento] = useState<Apontamento | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const tabelaRef = useRef<HTMLDivElement | null>(null)
+  const lastModalCloseRef = useRef<number>(0)
   const syncedVehicleFromUrlRef = useRef<string | null>(null)
   const urlPlaca = searchParams.get('placa')
   const urlPrefixo = searchParams.get('prefixo')
@@ -577,6 +578,7 @@ export function ManagePage() {
   }
 
   const closeJustModal = () => {
+    lastModalCloseRef.current = Date.now()
     setJustOpen(false)
     setJustId(null)
     setJustData(new Date().toISOString().slice(0, 10))
@@ -627,6 +629,7 @@ export function ManagePage() {
   }
 
   const closeResolveModal = () => {
+    lastModalCloseRef.current = Date.now()
     setResolveOpen(false)
     setResolveId(null)
     setResolveGroupIds(null)
@@ -1044,7 +1047,10 @@ export function ManagePage() {
                   return (
                     <tr
                       key={rowKey}
-                      onClick={group ? () => setHistoryGroup(group) : () => setDetailApontamento(r)}
+                      onClick={group
+                        ? () => { if (Date.now() - lastModalCloseRef.current > 300) setHistoryGroup(group) }
+                        : () => { if (Date.now() - lastModalCloseRef.current > 300) setDetailApontamento(r) }
+                      }
                       className={[
                         'border-b last:border-0 cursor-pointer',
                         agendado
