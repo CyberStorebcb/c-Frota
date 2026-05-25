@@ -715,65 +715,56 @@ export function ChecklistDetalharPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div style={{ perspective: '900px' }} className="h-full min-h-[112px]">
-                <div
-                  style={{
-                    transformStyle: 'preserve-3d',
-                    transition: 'transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1)',
-                    transform: veiculosCardVirado ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                  }}
-                  className="relative h-full w-full"
+              <div className="relative h-full min-h-[112px] overflow-hidden rounded-2xl">
+                {/* Frente — Operacionais */}
+                <button
+                  type="button"
+                  onClick={() => setVeiculosCardVirado((v) => !v)}
+                  className={`group absolute inset-0 overflow-hidden rounded-2xl border border-purple-200 bg-purple-50/80 p-4 text-left shadow-sm backdrop-blur transition-all duration-500 hover:shadow-md dark:border-purple-900/50 dark:bg-purple-950/20 ${veiculosCardVirado ? 'pointer-events-none opacity-0 -translate-x-3' : 'opacity-100 translate-x-0'}`}
+                  aria-label="Ver veículos administrativos"
+                  aria-hidden={veiculosCardVirado}
                 >
-                  {/* Frente — Operacionais */}
-                  <button
-                    type="button"
-                    onClick={() => setVeiculosCardVirado(true)}
-                    style={{ backfaceVisibility: 'hidden' }}
-                    className="group relative h-full w-full overflow-hidden rounded-2xl border border-purple-200 bg-purple-50/80 p-4 text-left shadow-sm backdrop-blur transition-all hover:shadow-md dark:border-purple-900/50 dark:bg-purple-950/20"
-                    aria-label="Ver veículos administrativos"
-                  >
-                    <div className="absolute inset-y-0 left-0 w-1 bg-purple-400" />
-                    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-extrabold text-indigo-600 shadow-sm transition-transform group-hover:scale-105 dark:bg-indigo-950/50 dark:text-indigo-300">
-                      <RefreshCw size={9} className="transition-transform duration-500 group-hover:rotate-180" />
-                      ADM
+                  <div className="absolute inset-y-0 left-0 w-1 bg-purple-400" />
+                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-extrabold text-indigo-600 shadow-sm transition-transform group-hover:scale-105 dark:bg-indigo-950/50 dark:text-indigo-300">
+                    <RefreshCw size={9} className="transition-transform duration-500 group-hover:rotate-180" />
+                    ADM
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-xl bg-purple-100 p-2 text-purple-600 transition-transform group-hover:scale-110 dark:bg-purple-900/40 dark:text-purple-300">
+                      <Truck size={18} aria-hidden />
                     </div>
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-xl bg-purple-100 p-2 text-purple-600 transition-transform group-hover:scale-110 dark:bg-purple-900/40 dark:text-purple-300">
-                        <Truck size={18} aria-hidden />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-purple-600/80 dark:text-purple-400/80">Veículos OP ativos</p>
-                        <p className="mt-1 text-3xl font-black text-purple-700 dark:text-purple-300">{operacionaisAtivos}</p>
-                        <p className="mt-0.5 text-[10px] font-semibold text-purple-600/60 dark:text-purple-400/60">operacionais</p>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-purple-600/80 dark:text-purple-400/80">Veículos OP ativos</p>
+                      <p className="mt-1 text-3xl font-black text-purple-700 dark:text-purple-300">{operacionaisAtivos}</p>
+                      <p className="mt-0.5 text-[10px] font-semibold text-purple-600/60 dark:text-purple-400/60">operacionais</p>
                     </div>
-                  </button>
+                  </div>
+                </button>
 
-                  {/* Verso — Administrativos */}
-                  <button
-                    type="button"
-                    onClick={() => setVeiculosCardVirado(false)}
-                    style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-                    className="group absolute inset-0 overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-left shadow-sm backdrop-blur transition-all hover:shadow-md dark:border-indigo-900/50 dark:bg-indigo-950/20"
-                    aria-label="Ver veículos operacionais"
-                  >
-                    <div className="absolute inset-y-0 left-0 w-1 bg-indigo-400" />
-                    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-extrabold text-purple-600 shadow-sm transition-transform group-hover:scale-105 dark:bg-purple-950/50 dark:text-purple-300">
-                      <RefreshCw size={9} className="transition-transform duration-500 group-hover:rotate-180" />
-                      OP
+                {/* Verso — Administrativos */}
+                <button
+                  type="button"
+                  onClick={() => setVeiculosCardVirado((v) => !v)}
+                  className={`group absolute inset-0 overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-left shadow-sm backdrop-blur transition-all duration-500 hover:shadow-md dark:border-indigo-900/50 dark:bg-indigo-950/20 ${veiculosCardVirado ? 'opacity-100 translate-x-0' : 'pointer-events-none opacity-0 translate-x-3'}`}
+                  aria-label="Ver veículos operacionais"
+                  aria-hidden={!veiculosCardVirado}
+                >
+                  <div className="absolute inset-y-0 left-0 w-1 bg-indigo-400" />
+                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-extrabold text-purple-600 shadow-sm transition-transform group-hover:scale-105 dark:bg-purple-950/50 dark:text-purple-300">
+                    <RefreshCw size={9} className="transition-transform duration-500 group-hover:rotate-180" />
+                    OP
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-xl bg-indigo-100 p-2 text-indigo-600 transition-transform group-hover:scale-110 dark:bg-indigo-900/40 dark:text-indigo-300">
+                      <Briefcase size={18} aria-hidden />
                     </div>
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-xl bg-indigo-100 p-2 text-indigo-600 transition-transform group-hover:scale-110 dark:bg-indigo-900/40 dark:text-indigo-300">
-                        <Briefcase size={18} aria-hidden />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600/80 dark:text-indigo-400/80">Veículos ADM ativos</p>
-                        <p className="mt-1 text-3xl font-black text-indigo-700 dark:text-indigo-300">{admAtivos}</p>
-                        <p className="mt-0.5 text-[10px] font-semibold text-indigo-600/60 dark:text-indigo-400/60">administrativos</p>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600/80 dark:text-indigo-400/80">Veículos ADM ativos</p>
+                      <p className="mt-1 text-3xl font-black text-indigo-700 dark:text-indigo-300">{admAtivos}</p>
+                      <p className="mt-0.5 text-[10px] font-semibold text-indigo-600/60 dark:text-indigo-400/60">administrativos</p>
                     </div>
-                  </button>
-                </div>
+                  </div>
+                </button>
               </div>
               <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm backdrop-blur dark:border-emerald-900/60 dark:bg-emerald-950/25">
                 <div className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
