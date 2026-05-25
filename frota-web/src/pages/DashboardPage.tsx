@@ -445,9 +445,9 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // Aderência = checklists realizados no período / ativos operacionais
-    const aderencia = ativosOperacionais > 0
-      ? `${Math.min(100, Math.round((checklistsNoPeriodo / ativosOperacionais) * 100))}%`
+    // Aderência = checklists realizados no período / ativos operacionais (mesmo número do card "Ativos operacionais")
+    const aderencia = ativosOperacionaisFiltrado > 0
+      ? `${Math.min(100, Math.round((checklistsNoPeriodo / ativosOperacionaisFiltrado) * 100))}%`
       : '—'
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
@@ -495,7 +495,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, checklistCompletions, periodDays])
+  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, ativosOperacionaisFiltrado, checklistCompletions, periodDays])
 
   const chartUi = useMemo(
     () => ({
