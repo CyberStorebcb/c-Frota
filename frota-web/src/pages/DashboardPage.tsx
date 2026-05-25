@@ -352,6 +352,8 @@ export function DashboardPage() {
   // Checklists concluídos (progresso 100) por dia — dados reais do Supabase, filtrados pela base via placa.
   const [checklistsPorDia, setChecklistsPorDia] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
   const [checklistCompletions, setChecklistCompletions] = useState<Set<string>>(() => new Set())
+  // Completions de hoje — independente do período selecionado, para aderência sempre refletir o dia atual
+  const [completionsHoje, setCompletionsHoje] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -378,6 +380,20 @@ export function DashboardPage() {
       cancelled = true
     }
   }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters, operacionalPlacasSet])
+
+  // Fetch separado de hoje — para aderência sempre refletir o snapshot do dia atual
+  useEffect(() => {
+    let cancelled = false
+    const hoje = hojeLocalIso()
+    void fetchCompletedChecklistsInPeriod(hoje, hoje)
+      .then((data) => {
+        if (cancelled) return
+        const { completions } = aggregateChecklistCompletions(data, activeFleetMap, checklistFleetFilters, operacionalPlacasSet)
+        setCompletionsHoje(completions)
+      })
+      .catch(() => { if (!cancelled) setCompletionsHoje(new Set()) })
+    return () => { cancelled = true }
+  }, [activeFleetMap, checklistFleetFilters, operacionalPlacasSet])
 
   const { rows } = useApontamentos()
 
@@ -446,13 +462,10 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // "Hoje": veículos únicos que fizeram / operacionais (max 1 por veículo)
-    // Período: realizados / (operacionais × dias) — mesma fórmula, computeFleetAdherence já deduplica por placa×dia
-    const aderenciaStats = computeFleetAdherence(scopedFleetPlacasOperacionais, checklistCompletions, periodDays)
-    const aderencia = aderenciaStats.esperados > 0 ? `${aderenciaStats.pct}%` : '—'
-    const aderenciaSub = periodo === 'hoje'
-      ? `${aderenciaStats.realizados} de ${aderenciaStats.esperados} veículos fizeram hoje`
-      : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados`
+    // Aderência = sempre snapshot de hoje: veículos que fizeram hoje / operacionais ativos
+    const aderenciaHoje = computeFleetAdherence(scopedFleetPlacasOperacionais, completionsHoje, [hojeLocalIso()])
+    const aderencia = aderenciaHoje.esperados > 0 ? `${aderenciaHoje.pct}%` : '—'
+    const aderenciaSub = `${aderenciaHoje.realizados} de ${aderenciaHoje.esperados} veículos fizeram hoje`
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
     const pendentesUnicas = new Set(
@@ -500,7 +513,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, ativosOperacionaisFiltrado, checklistCompletions, periodDays, periodo])
+  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, ativosOperacionaisFiltrado, checklistCompletions, completionsHoje, periodDays])
 
   const chartUi = useMemo(
     () => ({
