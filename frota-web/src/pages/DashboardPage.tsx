@@ -29,6 +29,7 @@ import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { apontamentoGroupKey, buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
 import {
   listDaysInPeriod,
+  computeFleetAdherence,
 } from '../checklists/checklistTop10Ranking'
 import {
   aggregateChecklistCompletions,
@@ -444,14 +445,9 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // Aderência = média diária de checklists realizados ÷ veículos operacionais ativos
-    const totalOperacionais = scopedFleetPlacasOperacionais.length
-    const diasNoPeriodo = periodDays.length || 1
-    const mediaChecklistsDia = checklistsNoPeriodo / diasNoPeriodo
-    const aderencia =
-      totalOperacionais > 0
-        ? `${Math.min(100, Math.round((mediaChecklistsDia / totalOperacionais) * 100))}%`
-        : '—'
+    // Aderência = realizados / (placas × dias) — mesmo critério do DetalharPage
+    const aderenciaStats = computeFleetAdherence(scopedFleetPlacas, checklistCompletions, periodDays)
+    const aderencia = aderenciaStats.esperados > 0 ? `${aderenciaStats.pct}%` : '—'
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
     const pendentesUnicas = new Set(
