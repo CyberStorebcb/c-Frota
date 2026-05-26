@@ -408,12 +408,6 @@ export const CHECKLIST_SCHEMAS: ChecklistSchemaDef[] = [
         obrigatorio: true,
       },
       {
-        id: 'horimetro',
-        label: 'HORÍMETRO ATUAL',
-        tipo: 'number',
-        obrigatorio: true,
-      },
-      {
         id: 'prefixo',
         label: 'PREFIXO',
         tipo: 'text',
