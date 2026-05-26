@@ -523,10 +523,10 @@ export function DashboardPage() {
     const cardEstavaVirado = veiculosCardVirado
     if (cardEstavaVirado) setVeiculosCardVirado(false)
 
-    // Aguarda o overlay ser renderizado no DOM antes de capturar
+    // Aguarda o verso do flip card sair do DOM e a transição terminar antes de capturar
     await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
-    // Aguarda a transição do flip terminar
     if (cardEstavaVirado) await new Promise((r) => setTimeout(r, 550))
+    else await new Promise((r) => setTimeout(r, 50))
 
     const el = contentRef.current
     if (!el) { setExportando(false); return }
@@ -720,21 +720,22 @@ export function DashboardPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
             {/* Card de veículos com flip frente/verso */}
-            <div style={{ perspective: '800px' }} className="h-full">
+            <div style={{ perspective: exportando ? 'none' : '800px' }} className="h-full">
               <div
                 style={{
-                  transformStyle: 'preserve-3d',
-                  transition: 'transform 0.5s ease',
-                  transform: veiculosCardVirado ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                  transformStyle: exportando ? 'flat' : 'preserve-3d',
+                  transition: exportando ? 'none' : 'transform 0.5s ease',
+                  transform: exportando ? 'none' : veiculosCardVirado ? 'rotateY(180deg)' : 'rotateY(0deg)',
                 }}
                 className="relative h-full"
               >
                 {/* Frente — operacionais */}
                 <Link
                   to="/veiculos/status"
-                  style={{ backfaceVisibility: 'hidden' }}
+                  style={{ backfaceVisibility: exportando ? 'visible' : 'hidden' }}
                   className="group flex h-full w-full flex-col items-center justify-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5 hover:border-purple-400 dark:hover:border-purple-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40"
                 >
+                  {!exportando && (
                   <button
                     type="button"
                     onClick={toggleVeiculosCard}
@@ -744,6 +745,7 @@ export function DashboardPage() {
                     <RefreshCw size={10} className="transition-transform duration-500 hover:rotate-180" />
                     ADM
                   </button>
+                  )}
                   <div className="mb-3 shrink-0 rounded-xl p-3 transition-transform group-hover:scale-110 sm:rounded-2xl sm:p-3.5 bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
                     <Truck size={26} aria-hidden />
                   </div>
@@ -757,7 +759,8 @@ export function DashboardPage() {
                   </div>
                 </Link>
 
-                {/* Verso — administrativos */}
+                {/* Verso — administrativos (omitido na exportação: html-to-image não respeita backfaceVisibility) */}
+                {!exportando && (
                 <Link
                   to="/veiculos/status"
                   style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
@@ -784,6 +787,7 @@ export function DashboardPage() {
                     </h3>
                   </div>
                 </Link>
+                )}
               </div>
             </div>
 
