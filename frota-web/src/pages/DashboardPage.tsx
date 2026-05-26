@@ -29,7 +29,6 @@ import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { apontamentoGroupKey, buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
 import {
   listDaysInPeriod,
-  computeFleetAdherence,
 } from '../checklists/checklistTop10Ranking'
 import {
   aggregateChecklistCompletions,
