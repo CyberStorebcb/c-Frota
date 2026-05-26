@@ -17,6 +17,7 @@ import {
   Inbox,
   Loader2,
   TrendingUp,
+  RefreshCw,
   RotateCcw,
   Upload,
   Search,
@@ -800,6 +801,16 @@ export function ManagePage() {
               {capturandoResolvidosFoto ? 'Gerando…' : 'Capturar foto'}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => recarregar()}
+            disabled={carregando}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
+            title="Atualizar dados"
+          >
+            <RefreshCw size={18} className={carregando ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
           <Link
             to="/gerenciar/evolucao"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"
