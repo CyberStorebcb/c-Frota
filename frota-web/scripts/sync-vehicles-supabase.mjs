@@ -1,6 +1,9 @@
 /**
- * Migra todos os veículos da base embebida (totalVehiclesFleet.gen.ts) para o Supabase.
+ * Sincroniza veículos do catálogo embarcado (totalVehiclesFleet.gen.ts) com o Supabase.
  * Usa upsert por placa — seguro rodar múltiplas vezes.
+ *
+ * Uso:
+ *   SUPABASE_SERVICE_ROLE_KEY=... node scripts/sync-vehicles-supabase.mjs
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -20,11 +23,9 @@ if (!SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-// Lê o arquivo gerado e extrai o array de veículos via regex
-const genFilePath = join(__dirname, '../frota-web/src/data/totalVehiclesFleet.gen.ts')
+const genFilePath = join(__dirname, '../src/data/totalVehiclesFleet.gen.ts')
 const genFileContent = readFileSync(genFilePath, 'utf-8')
 
-// Extrai o JSON do array TypeScript
 const match = genFileContent.match(/export const TOTAL_VEHICLE_ROWS[^=]+=\s*(\[[\s\S]*\])/)
 if (!match) {
   console.error('Não foi possível extrair TOTAL_VEHICLE_ROWS do arquivo gerado.')
@@ -32,7 +33,7 @@ if (!match) {
 }
 
 const rows = JSON.parse(match[1])
-console.log(`Total de veículos a migrar: ${rows.length}`)
+console.log(`Total de veículos a sincronizar: ${rows.length}`)
 
 const VEHICLE_TYPE_IDS = [
   'MUNCK', 'SKY', 'MOTO', 'PICAPE 4X4', 'PICAPE LEVE',
@@ -55,7 +56,7 @@ function normalizePrefixo(s) {
   return t || 'N/A'
 }
 
-const DESMOBILIZADO_FILE = join(__dirname, '../frota-web/src/frota/fleetCatalogDesmobilizadoPlacas.ts')
+const DESMOBILIZADO_FILE = join(__dirname, '../src/frota/fleetCatalogDesmobilizadoPlacas.ts')
 const desmobContent = readFileSync(DESMOBILIZADO_FILE, 'utf-8')
 const desmobMatch = desmobContent.match(/new Set\(\[([\s\S]*?)\]\)/)
 const desmobPlacas = new Set(
@@ -77,9 +78,8 @@ const records = rows.map((row) => {
     ano: (row.ano || '').trim(),
     status: isDesmob ? 'INATIVO' : 'ATIVO',
   }
-}).filter(r => r.placa)
+}).filter(r => r.placa && r.placa.length >= 7)
 
-// Deduplica por placa (mantém o primeiro)
 const seen = new Set()
 const deduped = records.filter(r => {
   if (seen.has(r.placa)) return false
@@ -87,9 +87,9 @@ const deduped = records.filter(r => {
   return true
 })
 
-console.log(`Após deduplicação: ${deduped.length} registros`)
+const afonsoCount = deduped.filter(r => r.coordenador === 'AFONSO').length
+console.log(`Após deduplicação: ${deduped.length} registros (${afonsoCount} AFONSO)`)
 
-// Upsert em lotes de 100
 const BATCH_SIZE = 100
 let inserted = 0
 let errors = 0
@@ -105,8 +105,22 @@ for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
     errors += batch.length
   } else {
     inserted += batch.length
-    process.stdout.write(`\rMigrados: ${inserted}/${deduped.length}`)
+    process.stdout.write(`\rSincronizados: ${inserted}/${deduped.length}`)
   }
 }
 
-console.log(`\n\nMigração concluída! ✓ ${inserted} inseridos/atualizados, ✗ ${errors} erros.`)
+console.log(`\n\nConcluído: ${inserted} upserted, ${errors} erros.`)
+
+const { count: afonsoDb } = await supabase
+  .from('vehicles')
+  .select('*', { count: 'exact', head: true })
+  .eq('coordenador', 'AFONSO')
+
+const { data: sample } = await supabase
+  .from('vehicles')
+  .select('placa,coordenador,responsavel,base')
+  .eq('placa', 'RZT0J51')
+  .maybeSingle()
+
+console.log(`Verificação: ${afonsoDb} veículos com coordenador AFONSO no Supabase`)
+console.log('Amostra RZT0J51:', sample)
