@@ -191,12 +191,13 @@ type ChecklistRow = {
 function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
   return (
     <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
-      <table className="w-full min-w-[520px] border-collapse text-left">
+      <table className="w-full min-w-[620px] border-collapse text-left">
         <thead className="sticky top-0 z-[1] bg-rose-50/95 text-[9px] font-black uppercase tracking-wider text-rose-700 backdrop-blur dark:bg-rose-950/90 dark:text-rose-300">
           <tr className="border-b border-rose-100 dark:border-rose-950/50">
             <th className="px-3 py-2.5">Placa</th>
             <th className="px-3 py-2.5">Base</th>
             <th className="px-3 py-2.5">Modelo</th>
+            <th className="px-3 py-2.5">Prefixo</th>
             <th className="px-3 py-2.5">Supervisor</th>
             <th className="px-3 py-2.5">Gerência</th>
           </tr>
@@ -210,6 +211,7 @@ function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
               <td className="px-3 py-2 text-xs font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</td>
               <td className="px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{v.base || '—'}</td>
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
+              <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{v.prefixo || '—'}</td>
               <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor || '—'}</td>
               <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador || '—'}</td>
             </tr>
@@ -223,12 +225,13 @@ function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
 function ListaRealizaram({ items }: { items: ChecklistRow[] }) {
   return (
     <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
-      <table className="w-full min-w-[560px] border-collapse text-left">
+      <table className="w-full min-w-[660px] border-collapse text-left">
         <thead className="sticky top-0 z-[1] bg-emerald-50/95 text-[9px] font-black uppercase tracking-wider text-emerald-700 backdrop-blur dark:bg-emerald-950/90 dark:text-emerald-300">
           <tr className="border-b border-emerald-100 dark:border-emerald-950/50">
             <th className="px-3 py-2.5">Placa</th>
             <th className="px-3 py-2.5">Base</th>
             <th className="px-3 py-2.5">Modelo</th>
+            <th className="px-3 py-2.5">Prefixo</th>
             <th className="px-3 py-2.5">Hora</th>
             <th className="px-3 py-2.5">NC</th>
             <th className="px-3 py-2.5">Supervisor</th>
@@ -244,6 +247,7 @@ function ListaRealizaram({ items }: { items: ChecklistRow[] }) {
               <td className="px-3 py-2 text-xs font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</td>
               <td className="px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{v.base || '—'}</td>
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
+              <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{v.prefixo || '—'}</td>
               <td className="px-3 py-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">{v.hora}</td>
               <td className="px-3 py-2">
                 {v.temNc ? (
