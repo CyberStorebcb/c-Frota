@@ -33,7 +33,7 @@ import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
 import { Select } from '../components/ui/Select'
 import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
-import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
+
 import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
 import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
@@ -120,7 +120,6 @@ type ChecklistDetalharFiltersState = {
   base: string
   gerencia: string
   supervisor: string
-  responsavel: string
   tipo: string
   prefixo: string
   busca: string
@@ -287,10 +286,10 @@ export function ChecklistDetalharPage() {
     pickFilter(searchParams.get('gerencia'), savedFilters, 'gerencia', 'todos'),
   )
   const [filtroSupervisor, setFiltroSupervisor] = useState(() =>
-    pickFilter(searchParams.get('supervisor'), savedFilters, 'supervisor', 'todos'),
-  )
-  const [filtroResponsavel, setFiltroResponsavel] = useState(() =>
-    pickFilter(searchParams.get('responsavel'), savedFilters, 'responsavel', 'todos'),
+    pickFilter(
+      searchParams.get('responsavel') ?? searchParams.get('supervisor'),
+      savedFilters, 'supervisor', 'todos',
+    ),
   )
   const [filtroTipo, setFiltroTipo] = useState(() =>
     pickFilter(searchParams.get('tipo'), savedFilters, 'tipo', 'todos'),
@@ -342,7 +341,6 @@ export function ChecklistDetalharPage() {
       base: filtroBase,
       gerencia: filtroCoordenador,
       supervisor: filtroSupervisor,
-      responsavel: filtroResponsavel,
       tipo: filtroTipo,
       prefixo: filtroPrefixo,
       busca,
@@ -356,7 +354,6 @@ export function ChecklistDetalharPage() {
     filtroBase,
     filtroCoordenador,
     filtroSupervisor,
-    filtroResponsavel,
     filtroTipo,
     filtroPrefixo,
     busca,
@@ -490,13 +487,13 @@ export function ChecklistDetalharPage() {
     (r: { placa?: string; base: string; supervisor: string; coordenador: string; responsavel: string; tipo?: string; prefixo?: string }) =>
       passesChecklistFleetFilters({ tipo: '', prefixo: '', placa: r.placa ?? '', ...r }, {
         base: filtroBase,
-        supervisor: filtroSupervisor,
+        supervisor: 'todos',
         coordenador: filtroCoordenador,
-        responsavel: filtroResponsavel,
+        responsavel: filtroSupervisor,
         tipo: filtroTipo,
         prefixo: filtroPrefixo,
       }),
-    [filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel, filtroTipo, filtroPrefixo],
+    [filtroBase, filtroSupervisor, filtroCoordenador, filtroTipo, filtroPrefixo],
   )
 
   const placasRealizaram = useMemo(
@@ -566,8 +563,8 @@ export function ChecklistDetalharPage() {
   )
 
   const basesDaCascata = useMemo(
-    () => getBasesByGerenciaAndResponsavel(filtroCoordenador, filtroResponsavel),
-    [filtroCoordenador, filtroResponsavel],
+    () => getBasesByGerenciaAndResponsavel(filtroCoordenador, filtroSupervisor),
+    [filtroCoordenador, filtroSupervisor],
   )
 
   const responsavelOptions = useMemo(() => {
@@ -591,31 +588,31 @@ export function ChecklistDetalharPage() {
 
   // reset de filtros dependentes quando a gerência muda
   useEffect(() => {
-    if (responsaveisDaGerencia && filtroResponsavel !== 'todos') {
-      if (!responsaveisDaGerencia.some((r) => normNome(r) === normNome(filtroResponsavel))) setFiltroResponsavel('todos')
+    if (responsaveisDaGerencia && filtroSupervisor !== 'todos') {
+      if (!responsaveisDaGerencia.some((r) => normNome(r) === normNome(filtroSupervisor))) setFiltroSupervisor('todos')
     }
-  }, [filtroCoordenador, responsaveisDaGerencia, filtroResponsavel])
+  }, [filtroCoordenador, responsaveisDaGerencia, filtroSupervisor])
 
   useEffect(() => {
     if (basesDaCascata && filtroBase !== 'todos') {
       const allowed = basesDaCascata.map((b) => b.toLowerCase())
       if (!allowed.includes(filtroBase.toLowerCase())) setFiltroBase('todos')
     }
-  }, [filtroCoordenador, filtroResponsavel, basesDaCascata, filtroBase])
+  }, [filtroCoordenador, filtroSupervisor, basesDaCascata, filtroBase])
 
   const prefixoOptions = useMemo(() => {
     const prefixos = new Set<string>()
     for (const v of frotaMap.values()) {
       if (!passesChecklistFleetFilters(
         { placa: v.placa, base: v.base, supervisor: v.supervisor, coordenador: v.coordenador, responsavel: v.responsavel, tipo: v.tipo, prefixo: v.prefixo },
-        { base: filtroBase, coordenador: filtroCoordenador, supervisor: filtroSupervisor, responsavel: filtroResponsavel, tipo: filtroTipo, prefixo: 'todos' },
+        { base: filtroBase, coordenador: filtroCoordenador, supervisor: 'todos', responsavel: filtroSupervisor, tipo: filtroTipo, prefixo: 'todos' },
       )) continue
       const p = v.prefixo?.trim()
       if (p) prefixos.add(p)
     }
     const sorted = Array.from(prefixos).sort((a, b) => a.localeCompare(b, 'pt-BR'))
     return [{ value: 'todos', label: 'Todos' }, ...sorted.map((p) => ({ value: p, label: p }))]
-  }, [frotaMap, filtroBase, filtroCoordenador, filtroSupervisor, filtroResponsavel, filtroTipo])
+  }, [frotaMap, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo])
 
   useEffect(() => {
     if (filtroPrefixo !== 'todos' && !prefixoOptions.some((o) => o.value === filtroPrefixo)) {
@@ -627,7 +624,6 @@ export function ChecklistDetalharPage() {
     filtroBase !== 'todos' ||
     filtroCoordenador !== 'todos' ||
     filtroSupervisor !== 'todos' ||
-    filtroResponsavel !== 'todos' ||
     filtroTipo !== 'todos' ||
     filtroPrefixo !== 'todos' ||
     busca.trim().length > 0
@@ -853,7 +849,6 @@ export function ChecklistDetalharPage() {
                   setFiltroBase('todos')
                   setFiltroCoordenador('todos')
                   setFiltroSupervisor('todos')
-                  setFiltroResponsavel('todos')
                   setBusca('')
                 }}
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
@@ -943,9 +938,8 @@ export function ChecklistDetalharPage() {
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
-                <Select label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} options={responsavelOptions} />
+                <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={responsavelOptions} />
                 <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} />
-                <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
                 <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} />
                 <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} />
               </div>
