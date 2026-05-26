@@ -24,6 +24,7 @@ export const SUPERVISOR_WHATSAPP: Record<string, string> = {
   'RAIMUNDO NONATO ALMEIDA DO NASCIMENTO':   '5599991122742',  // GOMAN - PDT  (lido: 9112-1242 — confirmar se não é 9112-1242)
   'WERBETH RODRIGUES CARVALHO':              '5587981782927',  // GOMAN - BCB
   'ITALO BRUNO DA SILVA FONTES':             '5599984491810',
+  'JACKSON KENTELLY MARCULINO DE SOUZA':     '5574999854097',  // contato fornecido
 }
 
 /** Número de fallback quando o supervisor não for encontrado no mapeamento. */
