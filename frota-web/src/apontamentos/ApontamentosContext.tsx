@@ -258,37 +258,48 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       dataCorteIso = dataCorte.toISOString().slice(0, 10)
     }
 
-    // 1–3 em paralelo: count, checklists com NC e resoluções
-    const [
-      { count: totalRealizados, error: countError },
-      { data: clData, error: clError },
-      { data: resData },
-    ] = await Promise.all([
-      // 1. Total de checklists concluídos (sem corte de data — métrica global)
-      supabase
-        .from('checklists')
-        .select('id', { count: 'exact', head: true })
-        .eq('progresso', 100),
+    let totalRealizados: number | null = null
+    let countError: unknown = null
+    let clData: unknown[] | null = null
+    let clError: { message: string } | null = null
+    let resData: unknown[] | null = null
 
-      // 2. Checklists concluídos no período selecionado com itens NC
-      fetchAllSupabasePages((from, to) => {
-        let q = supabase
+    try {
+      ;[
+        { count: totalRealizados, error: countError },
+        { data: clData, error: clError },
+        { data: resData },
+      ] = await Promise.all([
+        // 1. Total de checklists concluídos (sem corte de data — métrica global)
+        supabase
           .from('checklists')
-          .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
-          .eq('progresso', 100)
-        if (dataCorteIso) q = q.gte('data_inspecao', dataCorteIso)
-        return q.order('data_inspecao', { ascending: true }).order('id', { ascending: true }).range(from, to)
-      }),
+          .select('id', { count: 'exact', head: true })
+          .eq('progresso', 100),
 
-      // 3. Resoluções no período selecionado
-      fetchAllSupabasePages((from, to) => {
-        let q = supabase
-          .from('apontamentos')
-          .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
-        if (dataCorteIso) q = q.gte('data_apontamento', dataCorteIso)
-        return q.order('id', { ascending: true }).range(from, to)
-      }),
-    ])
+        // 2. Checklists concluídos no período selecionado com itens NC
+        fetchAllSupabasePages((from, to) => {
+          let q = supabase
+            .from('checklists')
+            .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
+            .eq('progresso', 100)
+          if (dataCorteIso) q = q.gte('data_inspecao', dataCorteIso)
+          return q.order('data_inspecao', { ascending: true }).order('id', { ascending: true }).range(from, to)
+        }),
+
+        // 3. Resoluções no período selecionado
+        fetchAllSupabasePages((from, to) => {
+          let q = supabase
+            .from('apontamentos')
+            .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
+          if (dataCorteIso) q = q.gte('data_apontamento', dataCorteIso)
+          return q.order('id', { ascending: true }).range(from, to)
+        }),
+      ] as const)
+    } catch (err) {
+      setPersistError('Erro de conexão ao carregar dados: ' + String(err))
+      setCarregando(false)
+      return
+    }
 
     setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
 
