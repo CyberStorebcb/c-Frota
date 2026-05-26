@@ -25,6 +25,23 @@ export type GerenciaEntry = {
 
 export const GERENCIA_MAP: GerenciaEntry[] = [
   {
+    gerencia: 'afonso',
+    gerenciaLabel: 'AFONSO',
+    responsaveis: [
+      { nome: 'ADAILTON LIMA FERREIRA', bases: ['BCB'] },
+      { nome: 'ARLISSON ROGERIO',      bases: ['STI'] },
+      { nome: 'DEILTON RIBEIRO',       bases: ['BCB'] },
+      { nome: 'EMANUEL',               bases: ['STI'] },
+      { nome: 'GLEYSON',               bases: ['BCB'] },
+      { nome: 'JORDEN CLEYSON',        bases: ['STI'] },
+      { nome: 'LEONARDO ESTRELA',      bases: ['ITM'] },
+      { nome: 'LUCAS ALVES',           bases: ['BCB'] },
+      { nome: 'NONATO',                bases: ['ITM'] },
+      { nome: 'RENATO RAMOS CARVALHO', bases: ['STI'] },
+      { nome: 'WASHINGTON SOARES',     bases: ['ITM'] },
+    ],
+  },
+  {
     gerencia: 'frota',
     gerenciaLabel: 'FROTA',
     responsaveis: [
@@ -219,7 +236,6 @@ export const GERENCIA_MAP: GerenciaEntry[] = [
     gerencia: 'valvick',
     gerenciaLabel: 'VALVICK',
     responsaveis: [
-      { nome: 'AFONSO',               bases: ['BCB'] },
       { nome: 'EDSON DE SOUZA PEREIRA', bases: ['BCB'] },
       { nome: 'FRANCISCO WILLIAM',    bases: ['PDT'] },
       { nome: 'IGOR DIONÍSIO',        bases: ['BCB'] },

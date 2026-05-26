@@ -18,6 +18,7 @@ export function matchesCoordenadorFilter(rowCoord: string, filterValue: string):
 
 export const COORDENADOR_FILTER_SELECT_OPTIONS: CoordenadorFilterSelectOption[] = [
   { value: 'todos',       label: 'Todos' },
+  { value: 'afonso',      label: 'AFONSO' },
   { value: 'frota',       label: 'FROTA' },
   { value: 'jackson',     label: 'JACKSON' },
   { value: 'jamerson',    label: 'JAMERSON' },
