@@ -22,6 +22,7 @@ import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
 import { normalizePlaca } from '../frota/vehicleRegistry'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
+import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { Select } from '../components/ui/Select'
 import { useFleet } from '../frota/FleetContext'
 import { useTheme } from '../theme/ThemeProvider'
@@ -256,6 +257,12 @@ export function DashboardPage() {
   const [filtroSupervisor, setFiltroSupervisor] = useState<string>(() => {
     try { return localStorage.getItem('frota.dashboard.filtroSupervisor') ?? 'todos' } catch { return 'todos' }
   })
+  const [filtroTipo, setFiltroTipo] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.filtroTipo') ?? 'todos' } catch { return 'todos' }
+  })
+  const [filtroPrefixo, setFiltroPrefixo] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.filtroPrefixo') ?? '' } catch { return '' }
+  })
   const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(() => {
     try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
     catch { return false }
@@ -270,8 +277,10 @@ export function DashboardPage() {
       localStorage.setItem('frota.dashboard.filtroBase', filtroBase)
       localStorage.setItem('frota.dashboard.filtroCoordenador', filtroCoordenador)
       localStorage.setItem('frota.dashboard.filtroSupervisor', filtroSupervisor)
+      localStorage.setItem('frota.dashboard.filtroTipo', filtroTipo)
+      localStorage.setItem('frota.dashboard.filtroPrefixo', filtroPrefixo)
     } catch { /* ignore */ }
-  }, [periodo, customDesde, customAte, filtroBase, filtroCoordenador, filtroSupervisor])
+  }, [periodo, customDesde, customAte, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo])
 
   const navigate = useNavigate()
 
@@ -285,6 +294,8 @@ export function DashboardPage() {
     if (filtroBase !== 'todos') params.set('base', filtroBase)
     if (filtroCoordenador !== 'todos') params.set('gerencia', filtroCoordenador)
     if (filtroSupervisor !== 'todos') params.set('supervisor', filtroSupervisor)
+    if (filtroTipo !== 'todos') params.set('tipo', filtroTipo)
+    if (filtroPrefixo.trim()) params.set('prefixo', filtroPrefixo.trim())
     navigate(`/checklists/detalhar?${params.toString()}`)
   }
 
@@ -297,8 +308,10 @@ export function DashboardPage() {
       base: filtroBase,
       coordenador: filtroCoordenador,
       supervisor: filtroSupervisor,
+      tipo: filtroTipo,
+      prefixo: filtroPrefixo,
     }),
-    [filtroBase, filtroCoordenador, filtroSupervisor],
+    [filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo],
   )
 
   const scopedFleetPlacas = useMemo(
@@ -692,7 +705,7 @@ export function DashboardPage() {
         >
           <div className="overflow-hidden">
             <div className="border-b border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 lg:gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
                 <Select
                   label="Base"
                   value={filtroBase}
@@ -711,6 +724,32 @@ export function DashboardPage() {
                   onChange={setFiltroSupervisor}
                   options={SUPERVISOR_FILTER_SELECT_OPTIONS}
                 />
+                <Select
+                  label="Tipo"
+                  value={filtroTipo}
+                  onChange={setFiltroTipo}
+                  options={TIPO_FILTER_SELECT_OPTIONS}
+                />
+                <div className="min-w-0 flex-1 sm:min-w-[140px]">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Prefixo
+                  </div>
+                  <div className="relative mt-1">
+                    <input
+                      type="text"
+                      value={filtroPrefixo}
+                      onChange={(e) => setFiltroPrefixo(e.target.value)}
+                      placeholder="Buscar prefixo..."
+                      className={[
+                        'flex w-full rounded-xl border px-3 py-2 text-sm font-bold shadow-sm',
+                        'transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40',
+                        filtroPrefixo
+                          ? 'border-slate-900 bg-white text-slate-900 dark:border-slate-200 dark:bg-slate-950 dark:text-slate-100'
+                          : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100',
+                      ].join(' ')}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

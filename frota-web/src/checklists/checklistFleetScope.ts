@@ -1,6 +1,7 @@
 import { matchesBaseFilter } from '../data/baseFilterOptions'
 import { matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { matchesSupervisorFilter } from '../data/supervisorFilterOptions'
+import { matchesTipoFilter } from '../data/tipoFilterOptions'
 import {
   getVehicleOperationalStatusRowsWithLocals,
   getVehicleOperationalStatusSummary,
@@ -17,6 +18,8 @@ export type ChecklistFleetVehicle = {
   supervisor: string
   coordenador: string
   responsavel: string
+  tipo: string
+  prefixo: string
 }
 
 export type ChecklistFleetFilters = {
@@ -24,6 +27,8 @@ export type ChecklistFleetFilters = {
   coordenador: string
   supervisor: string
   responsavel?: string
+  tipo?: string
+  prefixo?: string
 }
 
 function normNome(s: string): string {
@@ -39,6 +44,14 @@ export function passesChecklistFleetFilters(
   if (filters.coordenador !== 'todos' && !matchesCoordenadorFilter(v.coordenador, filters.coordenador)) return false
   if (filters.responsavel && filters.responsavel !== 'todos') {
     if (normNome(v.responsavel) !== normNome(filters.responsavel)) return false
+  }
+  if (filters.tipo && filters.tipo !== 'todos') {
+    if (!matchesTipoFilter(v.tipo, filters.tipo)) return false
+  }
+  if (filters.prefixo && filters.prefixo.trim()) {
+    const norm = (s: string) =>
+      s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+    if (!norm(v.prefixo).includes(norm(filters.prefixo))) return false
   }
   return true
 }
@@ -63,6 +76,8 @@ export function buildActiveFleetMap(vehicles: FleetVehicle[]): Map<string, Check
       supervisor: v.supervisor ?? '',
       coordenador: v.coordenador ?? '',
       responsavel: v.responsavel ?? '',
+      tipo: v.tipo ?? '',
+      prefixo: v.prefixo ?? '',
     })
   }
 

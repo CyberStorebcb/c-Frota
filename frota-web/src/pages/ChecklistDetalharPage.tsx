@@ -34,6 +34,7 @@ import { Select } from '../components/ui/Select'
 import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
+import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
 import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
 import { buildActiveFleetMap, passesChecklistFleetFilters } from '../checklists/checklistFleetScope'
@@ -120,6 +121,8 @@ type ChecklistDetalharFiltersState = {
   gerencia: string
   supervisor: string
   responsavel: string
+  tipo: string
+  prefixo: string
   busca: string
   filtrosVisiveis: boolean
   viewMode: ViewMode
@@ -166,6 +169,8 @@ type VeiculoRow = {
   coordenador: string
   responsavel: string
   processo: string
+  tipo: string
+  prefixo: string
 }
 
 type ChecklistRow = {
@@ -176,6 +181,8 @@ type ChecklistRow = {
   coordenador: string
   responsavel: string
   processo: string
+  tipo: string
+  prefixo: string
   data: string
   hora: string
   temNc: boolean
@@ -281,6 +288,12 @@ export function ChecklistDetalharPage() {
   const [filtroResponsavel, setFiltroResponsavel] = useState(() =>
     pickFilter(searchParams.get('responsavel'), savedFilters, 'responsavel', 'todos'),
   )
+  const [filtroTipo, setFiltroTipo] = useState(() =>
+    pickFilter(searchParams.get('tipo'), savedFilters, 'tipo', 'todos'),
+  )
+  const [filtroPrefixo, setFiltroPrefixo] = useState(() =>
+    pickFilter(searchParams.get('prefixo'), savedFilters, 'prefixo', ''),
+  )
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
   const [veiculosCardVirado, setVeiculosCardVirado] = useState(false)
@@ -325,6 +338,8 @@ export function ChecklistDetalharPage() {
       gerencia: filtroCoordenador,
       supervisor: filtroSupervisor,
       responsavel: filtroResponsavel,
+      tipo: filtroTipo,
+      prefixo: filtroPrefixo,
       busca,
       filtrosVisiveis,
       viewMode,
@@ -337,6 +352,8 @@ export function ChecklistDetalharPage() {
     filtroCoordenador,
     filtroSupervisor,
     filtroResponsavel,
+    filtroTipo,
+    filtroPrefixo,
     busca,
     filtrosVisiveis,
     viewMode,
@@ -363,6 +380,8 @@ export function ChecklistDetalharPage() {
         coordenador: active.coordenador,
         responsavel: active.responsavel,
         processo: v.prefixo ?? '',
+        tipo: active.tipo,
+        prefixo: active.prefixo,
       })
     }
     return m
@@ -438,6 +457,8 @@ export function ChecklistDetalharPage() {
             coordenador: frotaInfo?.coordenador ?? '',
             responsavel: frotaInfo?.responsavel ?? '',
             processo: frotaInfo?.processo ?? '',
+            tipo: frotaInfo?.tipo ?? '',
+            prefixo: frotaInfo?.prefixo ?? '',
             data: dataInspecao,
             hora: row.created_at
               ? new Date(row.created_at as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -461,14 +482,16 @@ export function ChecklistDetalharPage() {
 
   // ── aplicar filtros ───────────────────────────────────────────────────────
   const passaFiltros = useCallback(
-    (r: { placa?: string; base: string; supervisor: string; coordenador: string; responsavel: string }) =>
-      passesChecklistFleetFilters({ placa: r.placa ?? '', ...r }, {
+    (r: { placa?: string; base: string; supervisor: string; coordenador: string; responsavel: string; tipo?: string; prefixo?: string }) =>
+      passesChecklistFleetFilters({ tipo: '', prefixo: '', placa: r.placa ?? '', ...r }, {
         base: filtroBase,
         supervisor: filtroSupervisor,
         coordenador: filtroCoordenador,
         responsavel: filtroResponsavel,
+        tipo: filtroTipo,
+        prefixo: filtroPrefixo,
       }),
-    [filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel],
+    [filtroBase, filtroSupervisor, filtroCoordenador, filtroResponsavel, filtroTipo, filtroPrefixo],
   )
 
   const placasRealizaram = useMemo(
@@ -580,6 +603,8 @@ export function ChecklistDetalharPage() {
     filtroCoordenador !== 'todos' ||
     filtroSupervisor !== 'todos' ||
     filtroResponsavel !== 'todos' ||
+    filtroTipo !== 'todos' ||
+    filtroPrefixo.trim().length > 0 ||
     busca.trim().length > 0
 
   const exportarPdf = useCallback(
@@ -891,11 +916,32 @@ export function ChecklistDetalharPage() {
                 </div>
               )}
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
                 <Select label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} options={responsavelOptions} />
                 <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} />
                 <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
+                <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} />
+                <div className="min-w-0 flex-1 sm:min-w-[140px]">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Prefixo
+                  </div>
+                  <div className="relative mt-1">
+                    <input
+                      type="text"
+                      value={filtroPrefixo}
+                      onChange={(e) => setFiltroPrefixo(e.target.value)}
+                      placeholder="Buscar prefixo..."
+                      className={[
+                        'flex w-full rounded-xl border px-3 py-2 text-sm font-bold shadow-sm',
+                        'transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40',
+                        filtroPrefixo
+                          ? 'border-slate-900 bg-white text-slate-900 dark:border-slate-200 dark:bg-slate-950 dark:text-slate-100'
+                          : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100',
+                      ].join(' ')}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
