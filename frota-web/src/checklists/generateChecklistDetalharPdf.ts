@@ -6,11 +6,14 @@ export type ChecklistDetalharVeiculoRow = {
   base: string
   supervisor: string
   coordenador: string
+  diasRealizados?: number
+  diasNoPeriodo?: number
 }
 
 export type ChecklistDetalharChecklistRow = ChecklistDetalharVeiculoRow & {
   hora: string
   temNc: boolean
+  dataFormatada?: string
 }
 
 export type ChecklistDetalharPdfMeta = {
@@ -185,10 +188,15 @@ export async function generateChecklistDetalharPdf(
   doc.text(`Conteúdo: ${scopeLabel}`, margin, y)
   y += 20
 
+  const multiDia = (realizados[0]?.diasNoPeriodo ?? naoRealizados[0]?.diasNoPeriodo ?? 0) > 1
+
   const naoCols: PdfColumn[] = [
     { header: 'Placa', width: 72, get: (r) => String(r.placa ?? '') },
     { header: 'Base', width: 90, get: (r) => truncate(String(r.base ?? ''), 18) },
     { header: 'Modelo', width: 110, get: (r) => truncate(String(r.modelo ?? ''), 22) },
+    ...(multiDia
+      ? [{ header: 'Dias', width: 48, get: (r) => `0/${String(r.diasNoPeriodo ?? '—')}` } satisfies PdfColumn]
+      : []),
     { header: 'Supervisor', width: 120, get: (r) => truncate(String(r.supervisor ?? ''), 24) },
     { header: 'Gerência', width: 120, get: (r) => truncate(String(r.coordenador ?? ''), 24) },
   ]
@@ -197,7 +205,15 @@ export async function generateChecklistDetalharPdf(
     { header: 'Placa', width: 68, get: (r) => String(r.placa ?? '') },
     { header: 'Base', width: 78, get: (r) => truncate(String(r.base ?? ''), 16) },
     { header: 'Modelo', width: 96, get: (r) => truncate(String(r.modelo ?? ''), 18) },
+    { header: 'Data', width: 64, get: (r) => String(r.dataFormatada ?? '—') },
     { header: 'Hora', width: 44, get: (r) => String(r.hora ?? '—') },
+    ...(multiDia
+      ? [{
+          header: 'Dias',
+          width: 48,
+          get: (r) => `${String(r.diasRealizados ?? '—')}/${String(r.diasNoPeriodo ?? '—')}`,
+        } satisfies PdfColumn]
+      : []),
     { header: 'NC', width: 32, get: (r) => (r.temNc ? 'Sim' : '—') },
     { header: 'Supervisor', width: 110, get: (r) => truncate(String(r.supervisor ?? ''), 20) },
     { header: 'Gerência', width: 110, get: (r) => truncate(String(r.coordenador ?? ''), 20) },
@@ -205,7 +221,7 @@ export async function generateChecklistDetalharPdf(
 
   if (includeNao) {
     y = drawTable(doc, {
-      title: `Não realizaram (${naoRealizados.length})`,
+      title: `Não realizaram (${naoRealizados.length}) · ${meta.periodoResumo}`,
       titleColor: [190, 24, 93],
       columns: naoCols,
       rows: naoRealizados as Record<string, unknown>[],
@@ -222,7 +238,7 @@ export async function generateChecklistDetalharPdf(
       y = margin
     }
     drawTable(doc, {
-      title: `Realizaram (${realizados.length})`,
+      title: `Realizaram (${realizados.length}) · ${meta.periodoResumo}`,
       titleColor: [5, 150, 105],
       columns: simCols,
       rows: realizados as Record<string, unknown>[],

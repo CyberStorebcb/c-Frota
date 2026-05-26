@@ -170,6 +170,8 @@ type VeiculoRow = {
   processo: string
   tipo: string
   prefixo: string
+  diasRealizados?: number
+  diasNoPeriodo?: number
 }
 
 type ChecklistRow = {
@@ -183,11 +185,14 @@ type ChecklistRow = {
   tipo: string
   prefixo: string
   data: string
+  dataFormatada: string
   hora: string
   temNc: boolean
+  diasRealizados: number
+  diasNoPeriodo: number
 }
 
-function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
+function ListaNaoRealizaram({ items, multiDia }: { items: VeiculoRow[]; multiDia: boolean }) {
   return (
     <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
       <table className="w-full min-w-[620px] border-collapse text-left">
@@ -197,6 +202,7 @@ function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
             <th className="px-3 py-2.5">Base</th>
             <th className="px-3 py-2.5">Modelo</th>
             <th className="px-3 py-2.5">Prefixo</th>
+            {multiDia && <th className="px-3 py-2.5">Dias</th>}
             <th className="px-3 py-2.5">Supervisor</th>
             <th className="px-3 py-2.5">Gerência</th>
           </tr>
@@ -211,6 +217,11 @@ function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
               <td className="px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{v.base || '—'}</td>
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{v.prefixo || '—'}</td>
+              {multiDia && (
+                <td className="px-3 py-2 text-[11px] font-black text-rose-600 dark:text-rose-300">
+                  0/{v.diasNoPeriodo ?? '—'}
+                </td>
+              )}
               <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor || '—'}</td>
               <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador || '—'}</td>
             </tr>
@@ -221,17 +232,19 @@ function ListaNaoRealizaram({ items }: { items: VeiculoRow[] }) {
   )
 }
 
-function ListaRealizaram({ items }: { items: ChecklistRow[] }) {
+function ListaRealizaram({ items, multiDia }: { items: ChecklistRow[]; multiDia: boolean }) {
   return (
     <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
-      <table className="w-full min-w-[660px] border-collapse text-left">
+      <table className="w-full min-w-[720px] border-collapse text-left">
         <thead className="sticky top-0 z-[1] bg-emerald-50/95 text-[9px] font-black uppercase tracking-wider text-emerald-700 backdrop-blur dark:bg-emerald-950/90 dark:text-emerald-300">
           <tr className="border-b border-emerald-100 dark:border-emerald-950/50">
             <th className="px-3 py-2.5">Placa</th>
             <th className="px-3 py-2.5">Base</th>
             <th className="px-3 py-2.5">Modelo</th>
             <th className="px-3 py-2.5">Prefixo</th>
+            <th className="px-3 py-2.5">Data</th>
             <th className="px-3 py-2.5">Hora</th>
+            {multiDia && <th className="px-3 py-2.5">Dias</th>}
             <th className="px-3 py-2.5">NC</th>
             <th className="px-3 py-2.5">Supervisor</th>
             <th className="px-3 py-2.5">Gerência</th>
@@ -247,7 +260,13 @@ function ListaRealizaram({ items }: { items: ChecklistRow[] }) {
               <td className="px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{v.base || '—'}</td>
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{v.prefixo || '—'}</td>
+              <td className="px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.dataFormatada}</td>
               <td className="px-3 py-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">{v.hora}</td>
+              {multiDia && (
+                <td className="px-3 py-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">
+                  {v.diasRealizados}/{v.diasNoPeriodo}
+                </td>
+              )}
               <td className="px-3 py-2">
                 {v.temNc ? (
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">NC</span>
@@ -462,10 +481,13 @@ export function ChecklistDetalharPage() {
             tipo: frotaInfo?.tipo ?? '',
             prefixo: frotaInfo?.prefixo ?? '',
             data: dataInspecao,
+            dataFormatada: formatIsoDateBR(dataInspecao),
             hora: row.created_at
               ? new Date(row.created_at as string).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
               : '—',
             temNc: (row.nc_count as number) > 0,
+            diasRealizados: 1,
+            diasNoPeriodo: 1,
           })
         }
         setChecklistCompletionsByDay(completions)
@@ -496,9 +518,28 @@ export function ChecklistDetalharPage() {
     [filtroBase, filtroSupervisor, filtroCoordenador, filtroTipo, filtroPrefixo],
   )
 
+  const diasRealizadosPorPlaca = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const key of checklistCompletionsByDay) {
+      const pipeIdx = key.lastIndexOf('|')
+      const placa = key.slice(0, pipeIdx)
+      const v = frotaMap.get(placa)
+      if (!v || !passaFiltros(v)) continue
+      map.set(placa, (map.get(placa) ?? 0) + 1)
+    }
+    return map
+  }, [checklistCompletionsByDay, frotaMap, passaFiltros])
+
   const placasRealizaram = useMemo(
-    () => rawChecklists.filter(passaFiltros),
-    [rawChecklists, passaFiltros],
+    () => rawChecklists
+      .filter(passaFiltros)
+      .map((r) => ({
+        ...r,
+        dataFormatada: formatIsoDateBR(r.data),
+        diasRealizados: diasRealizadosPorPlaca.get(r.placa) ?? 1,
+        diasNoPeriodo: diasNoPeriodo,
+      })),
+    [rawChecklists, passaFiltros, diasRealizadosPorPlaca, diasNoPeriodo],
   )
 
   const placasRealizaramSet = useMemo(
@@ -507,8 +548,14 @@ export function ChecklistDetalharPage() {
   )
 
   const placasNaoRealizaram = useMemo(
-    () => Array.from(frotaMap.values()).filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v)),
-    [frotaMap, placasRealizaramSet, passaFiltros],
+    () => Array.from(frotaMap.values())
+      .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v))
+      .map((v) => ({
+        ...v,
+        diasRealizados: 0,
+        diasNoPeriodo: diasNoPeriodo,
+      })),
+    [frotaMap, placasRealizaramSet, passaFiltros, diasNoPeriodo],
   )
 
   const frotaFiltrada = useMemo(
@@ -545,17 +592,28 @@ export function ChecklistDetalharPage() {
   )
 
   const aderenciaStats = useMemo(() => {
-    const realizados = placasRealizaram.length
+    let realizados = 0
+    for (const [placa, count] of diasRealizadosPorPlaca) {
+      if (!operacionalPlacasSet.has(placa)) continue
+      realizados += count
+    }
     const esperados = operacionaisAtivos * periodDays.length
     const pct = esperados > 0 ? Math.min(100, Math.round((realizados / esperados) * 100)) : 0
     return { realizados, esperados, pct }
-  }, [placasRealizaram, operacionaisAtivos, periodDays])
+  }, [diasRealizadosPorPlaca, operacionaisAtivos, periodDays])
 
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
   const periodoResumo = limites.ini === limites.fim
     ? formatIsoDateBR(limites.ini)
     : `${formatIsoDateBR(limites.ini)} a ${formatIsoDateBR(limites.fim)}`
+  const multiDia = diasNoPeriodo > 1
+  const subtitleNao = multiDia
+    ? `Sem checklist entre ${periodoResumo} · 0/${diasNoPeriodo} dias`
+    : `Sem checklist em ${periodoResumo}`
+  const subtitleSim = multiDia
+    ? `Último envio entre ${periodoResumo} · dias realizados no período`
+    : `Checklist em ${periodoResumo}`
   // ── opções em cascata ────────────────────────────────────────────────────
   const responsaveisDaGerencia = useMemo(
     () => getResponsaveisByGerencia(filtroCoordenador),
@@ -1063,7 +1121,7 @@ export function ChecklistDetalharPage() {
               </span>
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300">Não realizaram</span>
-                <p className="text-[10px] font-semibold text-rose-500/70 dark:text-rose-300/60">Veículos sem checklist no período</p>
+                <p className="text-[10px] font-semibold text-rose-500/70 dark:text-rose-300/60">{subtitleNao}</p>
               </div>
               <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
                 {naoRealizaramFiltrados.length}
@@ -1078,7 +1136,7 @@ export function ChecklistDetalharPage() {
                 </p>
               </div>
             ) : viewMode === 'list' ? (
-              <ListaNaoRealizaram items={naoRealizaramFiltrados} />
+              <ListaNaoRealizaram items={naoRealizaramFiltrados} multiDia={multiDia} />
             ) : (
               <div className={`custom-scrollbar space-y-3 overflow-y-auto p-3 ${isFullscreen ? 'flex-1' : 'max-h-[62vh]'}`}>
                 {naoRealizaramFiltrados.map((v) => (
@@ -1101,6 +1159,11 @@ export function ChecklistDetalharPage() {
                           )}
                         </div>
                         <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{v.modelo}</p>
+                        {multiDia && (
+                          <p className="mt-1 text-[10px] font-bold text-rose-600 dark:text-rose-300">
+                            0/{v.diasNoPeriodo} dias no período
+                          </p>
+                        )}
                       </div>
                     </div>
                     {(v.supervisor || v.coordenador) && (
@@ -1133,7 +1196,7 @@ export function ChecklistDetalharPage() {
               </span>
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Realizaram</span>
-                <p className="text-[10px] font-semibold text-emerald-500/70 dark:text-emerald-300/60">Último envio encontrado por veículo</p>
+                <p className="text-[10px] font-semibold text-emerald-500/70 dark:text-emerald-300/60">{subtitleSim}</p>
               </div>
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
                 {realizaramFiltrados.length}
@@ -1145,7 +1208,7 @@ export function ChecklistDetalharPage() {
                 {q ? 'Sem resultados.' : 'Nenhum checklist realizado no período.'}
               </div>
             ) : viewMode === 'list' ? (
-              <ListaRealizaram items={realizaramFiltrados} />
+              <ListaRealizaram items={realizaramFiltrados} multiDia={multiDia} />
             ) : (
               <div className={`custom-scrollbar space-y-3 overflow-y-auto p-3 ${isFullscreen ? 'flex-1' : 'max-h-[62vh]'}`}>
                 {realizaramFiltrados.map((v) => (
@@ -1171,8 +1234,13 @@ export function ChecklistDetalharPage() {
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/60">
-                          {v.hora}
+                          {v.dataFormatada} · {v.hora}
                         </span>
+                        {multiDia && (
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 ring-1 ring-slate-200/70 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-800">
+                            {v.diasRealizados}/{v.diasNoPeriodo} dias
+                          </span>
+                        )}
                         {v.temNc && (
                           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/60">
                             NC
