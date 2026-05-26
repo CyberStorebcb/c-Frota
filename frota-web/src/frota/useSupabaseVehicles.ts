@@ -25,6 +25,9 @@ type SupabaseVehicleRow = {
   em_manutencao: boolean
   created_at: string
   deleted_at: string | null
+  proprietario: string
+  setor: string
+  processo: string
 }
 
 function rowToFleetVehicle(r: SupabaseVehicleRow): FleetVehicle {
@@ -44,6 +47,9 @@ function rowToFleetVehicle(r: SupabaseVehicleRow): FleetVehicle {
     status: r.status === 'INATIVO' ? 'INATIVO' : 'ATIVO',
     emManutencao: r.em_manutencao ?? false,
     ano: r.ano || '',
+    proprietario: r.proprietario || '',
+    setor: r.setor || '',
+    processo: r.processo || '',
     createdAt: r.created_at,
     source: 'local',
   }
@@ -132,6 +138,9 @@ export function useSupabaseVehicles(): UseSupabaseVehiclesResult {
       base: input.base.trim().toUpperCase() || 'N/A',
       ano: input.ano.trim() || new Date().getFullYear().toString(),
       status: input.status ?? 'ATIVO',
+      proprietario: input.proprietario.trim().toUpperCase(),
+      setor: input.setor.trim().toUpperCase(),
+      processo: input.processo.trim().toUpperCase(),
     }
 
     if (editId) {

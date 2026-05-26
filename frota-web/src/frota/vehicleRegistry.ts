@@ -26,6 +26,9 @@ export type FleetVehicle = {
   status: VehicleStatus
   emManutencao: boolean
   ano: string
+  proprietario: string
+  setor: string
+  processo: string
   createdAt: string
   /** Origem: planilha total embebida ou cadastro em `localStorage`. */
   source?: 'total' | 'local'
@@ -41,11 +44,14 @@ export type AddFleetVehicleInput = {
   coordenador: string
   base: string
   ano: string
+  proprietario: string
+  setor: string
+  processo: string
 }
 
 
 type FleetCatalogFieldOverride = Partial<
-  Pick<FleetVehicle, 'modelo' | 'tipo' | 'prefixo' | 'responsavel' | 'supervisor' | 'coordenador' | 'base' | 'ano'>
+  Pick<FleetVehicle, 'modelo' | 'tipo' | 'prefixo' | 'responsavel' | 'supervisor' | 'coordenador' | 'base' | 'ano' | 'proprietario' | 'setor' | 'processo'>
 >
 
 function parseStatusValue(raw: unknown): VehicleStatus {
@@ -126,6 +132,11 @@ function readOverrideByPlaca(): Record<string, FleetCatalogFieldOverride> {
       }
       if (typeof row.base === 'string' && row.base.trim()) ov.base = row.base.trim().toUpperCase()
       if (typeof row.ano === 'string' && row.ano.trim()) ov.ano = row.ano.trim()
+      if (typeof row.proprietario === 'string' && row.proprietario.trim()) {
+        ov.proprietario = row.proprietario.trim().toUpperCase()
+      }
+      if (typeof row.setor === 'string' && row.setor.trim()) ov.setor = row.setor.trim().toUpperCase()
+      if (typeof row.processo === 'string' && row.processo.trim()) ov.processo = row.processo.trim().toUpperCase()
       if (Object.keys(ov).length > 0) out[p] = ov
     }
     return out
@@ -339,6 +350,9 @@ function totalRowToFleetVehicle(row: TotalVehicleSourceRow): FleetVehicle {
     status,
     emManutencao: false,
     ano: (row.ano || '').trim(),
+    proprietario: (row.proprietario || '').trim().toUpperCase(),
+    setor: (row.setor || '').trim().toUpperCase(),
+    processo: (row.processo || '').trim().toUpperCase(),
     createdAt: '1970-01-01T00:00:00.000Z',
     source: 'total',
   }
@@ -419,6 +433,9 @@ function parseRow(x: Record<string, unknown>): FleetVehicle | null {
   const coordenador = String(x.coordenador ?? '').trim() || 'NÃO ATRIBUÍDO'
   const base = String(x.base ?? '').trim().toUpperCase() || 'N/A'
   const ano = String(x.ano ?? '').trim() || new Date().getFullYear().toString()
+  const proprietario = String(x.proprietario ?? '').trim().toUpperCase()
+  const setor = String(x.setor ?? '').trim().toUpperCase()
+  const processo = String(x.processo ?? '').trim().toUpperCase()
 
   const rawSource = x.source
   const src: FleetVehicle['source'] | undefined =
@@ -440,6 +457,9 @@ function parseRow(x: Record<string, unknown>): FleetVehicle | null {
     status,
     emManutencao,
     ano,
+    proprietario,
+    setor,
+    processo,
     createdAt: typeof x.createdAt === 'string' ? x.createdAt : new Date().toISOString(),
     source: src,
   }

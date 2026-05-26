@@ -226,6 +226,9 @@ function vehicleToFormData(vehicle: FleetVehicle) {
     coordenador: vehicle.coordenador === 'NÃO ATRIBUÍDO' ? '' : vehicle.coordenador,
     base: vehicle.base === 'N/A' ? '' : vehicle.base,
     ano: vehicle.ano || new Date().getFullYear().toString(),
+    proprietario: vehicle.proprietario || '',
+    setor: vehicle.setor || '',
+    processo: vehicle.processo || '',
   }
 }
 
@@ -421,6 +424,9 @@ type ImportRow = {
   base: string
   supervisor: string
   coordenador: string
+  proprietario: string
+  setor: string
+  processo: string
   _error?: string
 }
 
@@ -433,6 +439,9 @@ const IMPORT_COLUMN_MAP: Record<string, keyof ImportRow> = {
   base: 'base',
   supervisor: 'supervisor',
   gerência: 'coordenador', gerencia: 'coordenador', coordenador: 'coordenador',
+  proprietário: 'proprietario', proprietario: 'proprietario',
+  setor: 'setor',
+  processo: 'processo',
 }
 
 function parseImportSheet(file: File): Promise<ImportRow[]> {
@@ -445,7 +454,7 @@ function parseImportSheet(file: File): Promise<ImportRow[]> {
         const ws = wb.Sheets[wb.SheetNames[0]]
         const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
         const rows: ImportRow[] = raw.map((r) => {
-          const row: ImportRow = { placa: '', tipo: '', modelo: '', prefixo: '', ano: '', base: '', supervisor: '', coordenador: '' }
+          const row: ImportRow = { placa: '', tipo: '', modelo: '', prefixo: '', ano: '', base: '', supervisor: '', coordenador: '', proprietario: '', setor: '', processo: '' }
           for (const [col, val] of Object.entries(r)) {
             const key = IMPORT_COLUMN_MAP[col.trim().toLowerCase()]
             if (key) row[key] = String(val ?? '').trim()
@@ -464,8 +473,8 @@ function parseImportSheet(file: File): Promise<ImportRow[]> {
 }
 
 function downloadImportTemplate() {
-  const headers = ['Placa', 'Tipo de Veículo', 'Modelo/Marca', 'Prefixo', 'Ano', 'Base', 'Supervisor', 'Gerência']
-  const example = ['ABC1D23', 'PICAPE 4X4', 'HILUX', 'STI301', '2024', 'BCB', 'NOME SUPERVISOR', 'NOME GERÊNCIA']
+  const headers = ['Placa', 'Tipo de Veículo', 'Modelo/Marca', 'Prefixo', 'Ano', 'Base', 'Supervisor', 'Gerência', 'Proprietário', 'Setor', 'Processo']
+  const example = ['ABC1D23', 'PICAPE 4X4', 'HILUX', 'STI301', '2024', 'BCB', 'NOME SUPERVISOR', 'NOME GERÊNCIA', 'PRÓPRIO', 'OPERACIONAL', 'STI']
   const ws = XLSX.utils.aoa_to_sheet([headers, example])
   ws['!cols'] = headers.map(() => ({ wch: 20 }))
   const wb = XLSX.utils.book_new()
@@ -487,6 +496,9 @@ function defaultForm() {
     coordenador: '',
     base: '',
     ano: y,
+    proprietario: '',
+    setor: '',
+    processo: '',
   }
 }
 
@@ -587,6 +599,9 @@ export function RegistroVeiculosPage() {
         coordenador: row.coordenador || 'NÃO ATRIBUÍDO',
         base: row.base || 'N/A',
         ano: row.ano || new Date().getFullYear().toString(),
+        proprietario: row.proprietario || '',
+        setor: row.setor || '',
+        processo: row.processo || '',
       })
       if (res.ok) { ok++ } else { errors.push(`${row.placa}: ${res.message}`) }
     }
@@ -1047,6 +1062,9 @@ export function RegistroVeiculosPage() {
       coordenador: formData.coordenador,
       base: formData.base,
       ano: formData.ano,
+      proprietario: formData.proprietario,
+      setor: formData.setor,
+      processo: formData.processo,
     }
 
     // Se estiver editando veículo do Supabase, atualiza lá; senão tenta adicionar no Supabase
@@ -2277,6 +2295,39 @@ export function RegistroVeiculosPage() {
                 </div>
               </div>
 
+              <div className="grid gap-5 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Proprietário</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5 text-sm font-bold uppercase text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    placeholder="PRÓPRIO / TERCEIRO"
+                    value={formData.proprietario}
+                    onChange={(e) => setFormData({ ...formData, proprietario: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Setor</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5 text-sm font-bold uppercase text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    placeholder="Ex: OPERACIONAL"
+                    value={formData.setor}
+                    onChange={(e) => setFormData({ ...formData, setor: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Processo</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5 text-sm font-bold uppercase text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    placeholder="Ex: STI"
+                    value={formData.processo}
+                    onChange={(e) => setFormData({ ...formData, processo: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-4 pt-6">
                 <button
                   type="button"
@@ -2494,7 +2545,7 @@ export function RegistroVeiculosPage() {
             <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
               <div>
                 <p className="text-xs font-extrabold text-slate-700 dark:text-slate-200">Modelo de planilha</p>
-                <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Colunas: Placa, Tipo de Veículo, Modelo/Marca, Prefixo, Ano, Base, Supervisor, Gerência</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Colunas: Placa, Tipo de Veículo, Modelo/Marca, Prefixo, Ano, Base, Supervisor, Gerência, Proprietário, Setor, Processo</p>
               </div>
               <button
                 type="button"
@@ -2525,7 +2576,7 @@ export function RegistroVeiculosPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800">
                     <tr>
-                      {['Placa','Tipo','Modelo','Prefixo','Ano','Base','Supervisor','Gerência'].map((h) => (
+                      {['Placa','Tipo','Modelo','Prefixo','Ano','Base','Supervisor','Gerência','Proprietário','Setor','Processo'].map((h) => (
                         <th key={h} className="px-3 py-2 font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">{h}</th>
                       ))}
                       <th className="px-3 py-2 font-black uppercase tracking-wide text-slate-500">Status</th>
@@ -2542,6 +2593,9 @@ export function RegistroVeiculosPage() {
                         <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.base}</td>
                         <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.supervisor}</td>
                         <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.coordenador}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.proprietario}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.setor}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{r.processo}</td>
                         <td className="px-3 py-2">
                           {r._error
                             ? <span className="font-extrabold text-rose-500">{r._error}</span>
