@@ -293,7 +293,7 @@ export function DashboardPage() {
     }
     if (filtroBase !== 'todos') params.set('base', filtroBase)
     if (filtroCoordenador !== 'todos') params.set('gerencia', filtroCoordenador)
-    if (filtroSupervisor !== 'todos') params.set('supervisor', filtroSupervisor)
+    if (filtroSupervisor !== 'todos') params.set('responsavel', filtroSupervisor)
     if (filtroTipo !== 'todos') params.set('tipo', filtroTipo)
     if (filtroPrefixo.trim()) params.set('prefixo', filtroPrefixo.trim())
     navigate(`/checklists/detalhar?${params.toString()}`)
@@ -307,7 +307,8 @@ export function DashboardPage() {
     () => ({
       base: filtroBase,
       coordenador: filtroCoordenador,
-      supervisor: filtroSupervisor,
+      supervisor: 'todos',
+      responsavel: filtroSupervisor,
       tipo: filtroTipo,
       prefixo: filtroPrefixo,
     }),
