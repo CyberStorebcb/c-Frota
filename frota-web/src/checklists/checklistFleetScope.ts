@@ -48,10 +48,10 @@ export function passesChecklistFleetFilters(
   if (filters.tipo && filters.tipo !== 'todos') {
     if (!matchesTipoFilter(v.tipo, filters.tipo)) return false
   }
-  if (filters.prefixo && filters.prefixo.trim()) {
+  if (filters.prefixo && filters.prefixo !== 'todos' && filters.prefixo.trim()) {
     const norm = (s: string) =>
       s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-    if (!norm(v.prefixo).includes(norm(filters.prefixo))) return false
+    if (norm(v.prefixo) !== norm(filters.prefixo)) return false
   }
   return true
 }

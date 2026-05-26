@@ -295,9 +295,10 @@ export function ChecklistDetalharPage() {
   const [filtroTipo, setFiltroTipo] = useState(() =>
     pickFilter(searchParams.get('tipo'), savedFilters, 'tipo', 'todos'),
   )
-  const [filtroPrefixo, setFiltroPrefixo] = useState(() =>
-    pickFilter(searchParams.get('prefixo'), savedFilters, 'prefixo', ''),
-  )
+  const [filtroPrefixo, setFiltroPrefixo] = useState(() => {
+    const v = pickFilter(searchParams.get('prefixo'), savedFilters, 'prefixo', 'todos')
+    return v === '' ? 'todos' : v
+  })
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
   const [veiculosCardVirado, setVeiculosCardVirado] = useState(false)
@@ -602,13 +603,33 @@ export function ChecklistDetalharPage() {
     }
   }, [filtroCoordenador, filtroResponsavel, basesDaCascata, filtroBase])
 
+  const prefixoOptions = useMemo(() => {
+    const prefixos = new Set<string>()
+    for (const v of frotaMap.values()) {
+      if (!passesChecklistFleetFilters(
+        { placa: v.placa, base: v.base, supervisor: v.supervisor, coordenador: v.coordenador, responsavel: v.responsavel, tipo: v.tipo, prefixo: v.prefixo },
+        { base: filtroBase, coordenador: filtroCoordenador, supervisor: filtroSupervisor, responsavel: filtroResponsavel, tipo: filtroTipo, prefixo: 'todos' },
+      )) continue
+      const p = v.prefixo?.trim()
+      if (p) prefixos.add(p)
+    }
+    const sorted = Array.from(prefixos).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    return [{ value: 'todos', label: 'Todos' }, ...sorted.map((p) => ({ value: p, label: p }))]
+  }, [frotaMap, filtroBase, filtroCoordenador, filtroSupervisor, filtroResponsavel, filtroTipo])
+
+  useEffect(() => {
+    if (filtroPrefixo !== 'todos' && !prefixoOptions.some((o) => o.value === filtroPrefixo)) {
+      setFiltroPrefixo('todos')
+    }
+  }, [prefixoOptions, filtroPrefixo])
+
   const filtrosAtivos =
     filtroBase !== 'todos' ||
     filtroCoordenador !== 'todos' ||
     filtroSupervisor !== 'todos' ||
     filtroResponsavel !== 'todos' ||
     filtroTipo !== 'todos' ||
-    filtroPrefixo.trim().length > 0 ||
+    filtroPrefixo !== 'todos' ||
     busca.trim().length > 0
 
   const exportarPdf = useCallback(
@@ -926,26 +947,7 @@ export function ChecklistDetalharPage() {
                 <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} />
                 <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
                 <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} />
-                <div className="min-w-0 flex-1 sm:min-w-[140px]">
-                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Prefixo
-                  </div>
-                  <div className="relative mt-1">
-                    <input
-                      type="text"
-                      value={filtroPrefixo}
-                      onChange={(e) => setFiltroPrefixo(e.target.value)}
-                      placeholder="Buscar prefixo..."
-                      className={[
-                        'flex w-full rounded-xl border px-3 py-2 text-sm font-bold shadow-sm',
-                        'transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40',
-                        filtroPrefixo
-                          ? 'border-slate-900 bg-white text-slate-900 dark:border-slate-200 dark:bg-slate-950 dark:text-slate-100'
-                          : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100',
-                      ].join(' ')}
-                    />
-                  </div>
-                </div>
+                <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} />
               </div>
             </div>
           </div>

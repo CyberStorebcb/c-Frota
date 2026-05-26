@@ -261,7 +261,10 @@ export function DashboardPage() {
     try { return localStorage.getItem('frota.dashboard.filtroTipo') ?? 'todos' } catch { return 'todos' }
   })
   const [filtroPrefixo, setFiltroPrefixo] = useState<string>(() => {
-    try { return localStorage.getItem('frota.dashboard.filtroPrefixo') ?? '' } catch { return '' }
+    try {
+      const v = localStorage.getItem('frota.dashboard.filtroPrefixo')
+      return v && v !== '' ? v : 'todos'
+    } catch { return 'todos' }
   })
   const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(() => {
     try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
@@ -295,7 +298,7 @@ export function DashboardPage() {
     if (filtroCoordenador !== 'todos') params.set('gerencia', filtroCoordenador)
     if (filtroSupervisor !== 'todos') params.set('responsavel', filtroSupervisor)
     if (filtroTipo !== 'todos') params.set('tipo', filtroTipo)
-    if (filtroPrefixo.trim()) params.set('prefixo', filtroPrefixo.trim())
+    if (filtroPrefixo !== 'todos') params.set('prefixo', filtroPrefixo)
     navigate(`/checklists/detalhar?${params.toString()}`)
   }
 
@@ -314,6 +317,30 @@ export function DashboardPage() {
     }),
     [filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo],
   )
+
+  const prefixoOptions = useMemo(() => {
+    const filtersForPrefixo = {
+      base: filtroBase,
+      coordenador: filtroCoordenador,
+      supervisor: 'todos' as const,
+      responsavel: filtroSupervisor,
+      tipo: filtroTipo,
+      prefixo: 'todos',
+    }
+    const prefixos = new Set<string>()
+    for (const v of filterActiveFleet(activeFleetMap, filtersForPrefixo)) {
+      const p = v.prefixo?.trim()
+      if (p) prefixos.add(p)
+    }
+    const sorted = Array.from(prefixos).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    return [{ value: 'todos', label: 'Todos' }, ...sorted.map((p) => ({ value: p, label: p }))]
+  }, [activeFleetMap, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo])
+
+  useEffect(() => {
+    if (filtroPrefixo !== 'todos' && !prefixoOptions.some((o) => o.value === filtroPrefixo)) {
+      setFiltroPrefixo('todos')
+    }
+  }, [prefixoOptions, filtroPrefixo])
 
   const scopedFleetPlacas = useMemo(
     () => filterActiveFleet(activeFleetMap, checklistFleetFilters).map((v) => v.placa),
@@ -731,26 +758,7 @@ export function DashboardPage() {
                   onChange={setFiltroTipo}
                   options={TIPO_FILTER_SELECT_OPTIONS}
                 />
-                <div className="min-w-0 flex-1 sm:min-w-[140px]">
-                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Prefixo
-                  </div>
-                  <div className="relative mt-1">
-                    <input
-                      type="text"
-                      value={filtroPrefixo}
-                      onChange={(e) => setFiltroPrefixo(e.target.value)}
-                      placeholder="Buscar prefixo..."
-                      className={[
-                        'flex w-full rounded-xl border px-3 py-2 text-sm font-bold shadow-sm',
-                        'transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40',
-                        filtroPrefixo
-                          ? 'border-slate-900 bg-white text-slate-900 dark:border-slate-200 dark:bg-slate-950 dark:text-slate-100'
-                          : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100',
-                      ].join(' ')}
-                    />
-                  </div>
-                </div>
+                <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} />
               </div>
             </div>
           </div>
