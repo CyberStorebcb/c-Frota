@@ -26,6 +26,9 @@ type SupabaseRow = {
   status: string
   created_at: string
   deleted_at: string | null
+  proprietario: string
+  setor: string
+  processo: string
 }
 
 function rowToVehicle(r: SupabaseRow): FleetVehicle {
@@ -45,6 +48,9 @@ function rowToVehicle(r: SupabaseRow): FleetVehicle {
     status: (r.status === 'INATIVO' ? 'INATIVO' : 'ATIVO') as VehicleStatus,
     emManutencao: false,
     ano: r.ano || '',
+    proprietario: r.proprietario || '',
+    setor: r.setor || '',
+    processo: r.processo || '',
     createdAt: r.created_at,
     source: 'local' as const,
   }
