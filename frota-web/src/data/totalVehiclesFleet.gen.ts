@@ -1,5 +1,5 @@
 // Gerado por: node scripts/generate-total-vehicles-fleet.mjs
-// Fonte: TOTAL DE VEICULOS.xlsx | aba: ESTRUTURA | linhas: 413 | placas únicas: 412 | gerado em: 2026-05-12T20:33:40.113Z
+// Fonte: TOTAL DE VEICULOS.xlsx | aba: ESTRUTURA | linhas: 413 | placas únicas: 412 | gerado em: 2026-05-26T11:16:50.000Z
 export type TotalVehicleSourceRow = {
   placa: string
   ano: string
