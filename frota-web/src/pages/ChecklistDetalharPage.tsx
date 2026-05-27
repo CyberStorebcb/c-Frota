@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   ClipboardX,
   FileDown,
+  FileSpreadsheet,
   Camera,
   LayoutGrid,
   List,
@@ -29,6 +30,7 @@ import {
   generateChecklistDetalharPdf,
   type ChecklistDetalharPdfScope,
 } from '../checklists/generateChecklistDetalharPdf'
+import { generateChecklistDetalharExcel } from '../checklists/generateChecklistDetalharExcel'
 
 import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
 import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
@@ -110,10 +112,12 @@ function computeLimites(periodo: string, desde: string, ate: string): { ini: str
   return { ini: a, fim: b }
 }
 
-const FILTROS_STORAGE_KEY = 'frota.filtros.checklist-detalhar.v1'
+const FILTROS_STORAGE_KEY_OP = 'frota.filtros.checklist-detalhar.v1'
+const FILTROS_STORAGE_KEY_ADM = 'frota.filtros.checklist-detalhar.adm.v1'
 const FILTROS_VISIBLE_LEGACY_KEY = 'frota.filtros.checklist-detalhar'
 
 type ViewMode = 'cards' | 'list' | 'ranking'
+type SetorVeiculoPagina = 'operacional' | 'adm'
 
 type ChecklistDetalharFiltersState = {
   periodo: string
@@ -129,21 +133,27 @@ type ChecklistDetalharFiltersState = {
   viewMode: ViewMode
 }
 
-function loadChecklistDetalharFilters(): Partial<ChecklistDetalharFiltersState> | null {
+function filtersStorageKey(setorVeiculo: SetorVeiculoPagina) {
+  return setorVeiculo === 'adm' ? FILTROS_STORAGE_KEY_ADM : FILTROS_STORAGE_KEY_OP
+}
+
+function loadChecklistDetalharFilters(setorVeiculo: SetorVeiculoPagina): Partial<ChecklistDetalharFiltersState> | null {
   try {
-    const raw = localStorage.getItem(FILTROS_STORAGE_KEY)
+    const raw = localStorage.getItem(filtersStorageKey(setorVeiculo))
     if (raw) return JSON.parse(raw) as Partial<ChecklistDetalharFiltersState>
-    const legacyVisible = localStorage.getItem(FILTROS_VISIBLE_LEGACY_KEY)
-    if (legacyVisible != null) return { filtrosVisiveis: legacyVisible === 'true' }
+    if (setorVeiculo === 'operacional') {
+      const legacyVisible = localStorage.getItem(FILTROS_VISIBLE_LEGACY_KEY)
+      if (legacyVisible != null) return { filtrosVisiveis: legacyVisible === 'true' }
+    }
   } catch {
     /* ignore */
   }
   return null
 }
 
-function saveChecklistDetalharFilters(state: ChecklistDetalharFiltersState) {
+function saveChecklistDetalharFilters(setorVeiculo: SetorVeiculoPagina, state: ChecklistDetalharFiltersState) {
   try {
-    localStorage.setItem(FILTROS_STORAGE_KEY, JSON.stringify(state))
+    localStorage.setItem(filtersStorageKey(setorVeiculo), JSON.stringify(state))
   } catch {
     /* ignore */
   }
@@ -196,7 +206,7 @@ type ChecklistRow = {
 
 function ListaNaoRealizaram({ items, multiDia }: { items: VeiculoRow[]; multiDia: boolean }) {
   return (
-    <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
+    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
       <table className="w-full min-w-[620px] border-collapse text-left">
         <thead className="sticky top-0 z-[1] bg-rose-50/95 text-[9px] font-black uppercase tracking-wider text-rose-700 backdrop-blur dark:bg-rose-950/90 dark:text-rose-300">
           <tr className="border-b border-rose-100 dark:border-rose-950/50">
@@ -236,7 +246,7 @@ function ListaNaoRealizaram({ items, multiDia }: { items: VeiculoRow[]; multiDia
 
 function ListaRealizaram({ items, multiDia }: { items: ChecklistRow[]; multiDia: boolean }) {
   return (
-    <div className="custom-scrollbar max-h-[62vh] overflow-y-auto xl:max-h-none xl:flex-1">
+    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
       <table className="w-full min-w-[720px] border-collapse text-left">
         <thead className="sticky top-0 z-[1] bg-emerald-50/95 text-[9px] font-black uppercase tracking-wider text-emerald-700 backdrop-blur dark:bg-emerald-950/90 dark:text-emerald-300">
           <tr className="border-b border-emerald-100 dark:border-emerald-950/50">
@@ -288,11 +298,16 @@ function ListaRealizaram({ items, multiDia }: { items: ChecklistRow[]; multiDia:
 
 // ─── componente ────────────────────────────────────────────────────────────
 
-export function ChecklistDetalharPage() {
+export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVeiculoPagina }) {
   const [searchParams] = useSearchParams()
-  const savedFilters = useMemo(() => loadChecklistDetalharFilters(), [])
+  const savedFilters = useMemo(() => loadChecklistDetalharFilters(setorVeiculo), [setorVeiculo])
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  const isAdmPage = setorVeiculo === 'adm'
+  const outraPaginaPath = isAdmPage
+    ? `/checklists/detalhar?${searchParams.toString()}`
+    : `/checklists/detalhar/adm?${searchParams.toString()}`
+  const outraPaginaLabel = isAdmPage ? 'Operacionais' : 'Administrativos'
 
   // URL do dashboard tem prioridade; senão restaura o último estado salvo pelo usuário
   const [periodo, setPeriodo] = useState(() => pickFilter(searchParams.get('periodo'), savedFilters, 'periodo', 'hoje'))
@@ -321,7 +336,6 @@ export function ChecklistDetalharPage() {
   })
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
-  const [veiculosCardVirado, setVeiculosCardVirado] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = savedFilters?.viewMode
     if (saved === 'ranking' && isAdmin) return 'ranking'
@@ -331,7 +345,9 @@ export function ChecklistDetalharPage() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [focusedSide, setFocusedSide] = useState<null | 'nao' | 'sim'>(null)
   const [pdfModalOpen, setPdfModalOpen] = useState(false)
+  const [excelModalOpen, setExcelModalOpen] = useState(false)
   const [pdfGerando, setPdfGerando] = useState(false)
+  const [excelGerando, setExcelGerando] = useState(false)
   const [capturandoFoto, setCapturandoFoto] = useState(false)
   const [rankingGroupBy, setRankingGroupBy] = useState<ChecklistTop10GroupBy>('responsavel')
   const columnsRef = useRef<HTMLDivElement>(null)
@@ -356,7 +372,7 @@ export function ChecklistDetalharPage() {
   }, [])
 
   useEffect(() => {
-    saveChecklistDetalharFilters({
+    saveChecklistDetalharFilters(setorVeiculo, {
       periodo,
       customDesde,
       customAte,
@@ -370,6 +386,7 @@ export function ChecklistDetalharPage() {
       viewMode,
     })
   }, [
+    setorVeiculo,
     periodo,
     customDesde,
     customAte,
@@ -432,6 +449,13 @@ export function ChecklistDetalharPage() {
     }
     return adm
   }, [])
+
+  const setorPlacasSet = useMemo(
+    () => (setorVeiculo === 'adm' ? admPlacasSet : operacionalPlacasSet),
+    [setorVeiculo, admPlacasSet, operacionalPlacasSet],
+  )
+
+  const setorVeiculoLabel = isAdmPage ? 'administrativos' : 'operacionais'
 
   // ── checklists do período ─────────────────────────────────────────────────
   const [rawChecklists, setRawChecklists] = useState<ChecklistRow[]>([])
@@ -550,15 +574,20 @@ export function ChecklistDetalharPage() {
     [placasRealizaram],
   )
 
-  const placasNaoRealizaram = useMemo(
+  const placasRealizaramLista = useMemo(
+    () => placasRealizaram.filter((r) => setorPlacasSet.has(r.placa)),
+    [placasRealizaram, setorPlacasSet],
+  )
+
+  const placasNaoRealizaramLista = useMemo(
     () => Array.from(frotaMap.values())
-      .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v) && operacionalPlacasSet.has(v.placa))
+      .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v) && setorPlacasSet.has(v.placa))
       .map((v) => ({
         ...v,
         diasRealizados: 0,
         diasNoPeriodo: diasNoPeriodo,
       })),
-    [frotaMap, placasRealizaramSet, passaFiltros, diasNoPeriodo, operacionalPlacasSet],
+    [frotaMap, placasRealizaramSet, passaFiltros, diasNoPeriodo, setorPlacasSet],
   )
 
   const frotaFiltrada = useMemo(
@@ -566,24 +595,28 @@ export function ChecklistDetalharPage() {
     [frotaMap, passaFiltros],
   )
 
+  const frotaFiltradaSetor = useMemo(
+    () => frotaFiltrada.filter((v) => setorPlacasSet.has(v.placa)),
+    [frotaFiltrada, setorPlacasSet],
+  )
+
   // ── busca ─────────────────────────────────────────────────────────────────
   const q = busca.trim().toUpperCase()
 
   const realizaramFiltrados = useMemo(() => {
-    if (!q) return placasRealizaram
-    return placasRealizaram.filter(
+    if (!q) return placasRealizaramLista
+    return placasRealizaramLista.filter(
       (r) => r.placa.includes(q) || r.modelo.toUpperCase().includes(q) || r.base.toUpperCase().includes(q),
     )
-  }, [placasRealizaram, q])
+  }, [placasRealizaramLista, q])
 
   const naoRealizaramFiltrados = useMemo(() => {
-    if (!q) return placasNaoRealizaram
-    return placasNaoRealizaram.filter(
+    if (!q) return placasNaoRealizaramLista
+    return placasNaoRealizaramLista.filter(
       (r) => r.placa.includes(q) || r.modelo.toUpperCase().includes(q) || r.base.toUpperCase().includes(q),
     )
-  }, [placasNaoRealizaram, q])
+  }, [placasNaoRealizaramLista, q])
 
-  const total = placasRealizaram.length + placasNaoRealizaram.length
   const operacionaisAtivos = useMemo(
     () => frotaFiltrada.filter((v) => operacionalPlacasSet.has(v.placa)).length,
     [frotaFiltrada, operacionalPlacasSet],
@@ -594,15 +627,27 @@ export function ChecklistDetalharPage() {
     [frotaFiltrada, admPlacasSet],
   )
 
+  const ativosSetor = isAdmPage ? admAtivos : operacionaisAtivos
+
+  const realizaramSetorCount = useMemo(
+    () => placasRealizaram.filter((r) => setorPlacasSet.has(r.placa)).length,
+    [placasRealizaram, setorPlacasSet],
+  )
+
+  const naoRealizaramCardCount = Math.max(0, ativosSetor - realizaramSetorCount)
+
+  const total = ativosSetor
+
   const aderenciaStats = useMemo(() => {
     let realizados = 0
-    for (const [, count] of diasRealizadosPorPlaca) {
+    for (const [placa, count] of diasRealizadosPorPlaca) {
+      if (!setorPlacasSet.has(placa)) continue
       realizados += count
     }
-    const esperados = operacionaisAtivos * periodDays.length
+    const esperados = ativosSetor * periodDays.length
     const pct = esperados > 0 ? Math.min(100, Math.round((realizados / esperados) * 100)) : 0
     return { realizados, esperados, pct }
-  }, [diasRealizadosPorPlaca, operacionaisAtivos, periodDays])
+  }, [diasRealizadosPorPlaca, ativosSetor, periodDays, setorPlacasSet])
 
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
@@ -675,17 +720,23 @@ export function ChecklistDetalharPage() {
     filtroPrefixo !== 'todos' ||
     busca.trim().length > 0
 
+  const exportMeta = useMemo(
+    () => ({
+      periodoLabel,
+      periodoResumo,
+      busca: q || undefined,
+      setorLabel: setorVeiculoLabel,
+    }),
+    [periodoLabel, periodoResumo, q, setorVeiculoLabel],
+  )
+
   const exportarPdf = useCallback(
     async (scope: ChecklistDetalharPdfScope) => {
       setPdfGerando(true)
       try {
         await generateChecklistDetalharPdf(
           scope,
-          {
-            periodoLabel,
-            periodoResumo,
-            busca: q || undefined,
-          },
+          exportMeta,
           naoRealizaramFiltrados,
           realizaramFiltrados,
         )
@@ -697,7 +748,28 @@ export function ChecklistDetalharPage() {
         setPdfGerando(false)
       }
     },
-    [periodoLabel, periodoResumo, q, naoRealizaramFiltrados, realizaramFiltrados],
+    [exportMeta, naoRealizaramFiltrados, realizaramFiltrados],
+  )
+
+  const exportarExcel = useCallback(
+    (scope: ChecklistDetalharPdfScope) => {
+      setExcelGerando(true)
+      try {
+        generateChecklistDetalharExcel(
+          scope,
+          exportMeta,
+          naoRealizaramFiltrados,
+          realizaramFiltrados,
+        )
+        setExcelModalOpen(false)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Não foi possível gerar o Excel.'
+        window.alert(msg)
+      } finally {
+        setExcelGerando(false)
+      }
+    },
+    [exportMeta, naoRealizaramFiltrados, realizaramFiltrados],
   )
 
   const capturarRanking = useCallback(async () => {
@@ -711,14 +783,14 @@ export function ChecklistDetalharPage() {
         diasNoPeriodo,
         groupLabel,
         pior: buildChecklistAdherenceRanking(
-          frotaFiltrada,
+          frotaFiltradaSetor,
           checklistCompletionsByDay,
           periodDays,
           rankingGroupBy,
           'worst',
         ),
         melhor: buildChecklistAdherenceRanking(
-          frotaFiltrada,
+          frotaFiltradaSetor,
           checklistCompletionsByDay,
           periodDays,
           rankingGroupBy,
@@ -736,7 +808,7 @@ export function ChecklistDetalharPage() {
     periodoResumo,
     diasNoPeriodo,
     rankingGroupBy,
-    frotaFiltrada,
+    frotaFiltradaSetor,
     checklistCompletionsByDay,
     periodDays,
     limites.ini,
@@ -745,10 +817,10 @@ export function ChecklistDetalharPage() {
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto bg-slate-50/70 px-4 py-5 dark:bg-slate-950 sm:px-6 lg:px-8">
+    <div className="-mx-3 -my-3 flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 sm:-mx-4 sm:-my-4 lg:-mx-8 lg:-my-6">
 
       {/* Cabeçalho */}
-      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+      <section className="shrink-0 overflow-hidden border-b border-slate-200/80 bg-white dark:border-slate-800/60 dark:bg-slate-900">
         <div className="relative">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.18),transparent_32%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_34%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(181,22,73,0.32),transparent_32%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.20),transparent_34%)]" />
           <div className="relative grid gap-5 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] xl:items-stretch">
@@ -769,14 +841,38 @@ export function ChecklistDetalharPage() {
                 </div>
 
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
-                  Checklist operacional
+                  {isAdmPage ? 'Checklist administrativo' : 'Checklist operacional'}
                 </p>
                 <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
                   Detalhar checklists
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  Acompanhe a aderência da frota e identifique rapidamente quem ainda precisa realizar o checklist.
+                  {isAdmPage
+                    ? 'Acompanhe a aderência dos veículos administrativos e identifique quem ainda precisa realizar o checklist.'
+                    : 'Acompanhe a aderência da frota operacional e identifique rapidamente quem ainda precisa realizar o checklist.'}
                 </p>
+                <div className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white/85 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-950/75">
+                  <Link
+                    to={`/checklists/detalhar?${searchParams.toString()}`}
+                    className={`rounded-lg px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide transition ${
+                      !isAdmPage
+                        ? 'bg-purple-600 text-white shadow-sm dark:bg-purple-500'
+                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
+                    }`}
+                  >
+                    Operacionais
+                  </Link>
+                  <Link
+                    to={`/checklists/detalhar/adm?${searchParams.toString()}`}
+                    className={`rounded-lg px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide transition ${
+                      isAdmPage
+                        ? 'bg-indigo-600 text-white shadow-sm dark:bg-indigo-500'
+                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
+                    }`}
+                  >
+                    Administrativos
+                  </Link>
+                </div>
               </div>
 
               {!loading && total > 0 && (
@@ -788,8 +884,8 @@ export function ChecklistDetalharPage() {
                       </p>
                       <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
                         {diasNoPeriodo === 1
-                          ? `${aderenciaStats.realizados} de ${operacionaisAtivos} checklists realizados.`
-                          : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados (${operacionaisAtivos} veículos × ${diasNoPeriodo} dias).`
+                          ? `${aderenciaStats.realizados} de ${ativosSetor} checklists realizados (${setorVeiculoLabel}).`
+                          : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados (${ativosSetor} veículos ${setorVeiculoLabel} × ${diasNoPeriodo} dias).`
                         }
                       </p>
                     </div>
@@ -808,67 +904,66 @@ export function ChecklistDetalharPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div className="relative h-full min-h-[112px] overflow-hidden rounded-2xl">
-                {/* Frente — Operacionais */}
-                <button
-                  type="button"
-                  onClick={() => setVeiculosCardVirado((v) => !v)}
-                  className={`group absolute inset-0 overflow-hidden rounded-2xl border border-purple-200 bg-purple-50/80 p-4 text-left shadow-sm backdrop-blur transition-all duration-500 hover:shadow-md dark:border-purple-900/50 dark:bg-purple-950/20 ${veiculosCardVirado ? 'pointer-events-none opacity-0 -translate-x-3' : 'opacity-100 translate-x-0'}`}
-                  aria-label="Ver veículos administrativos"
-                  aria-hidden={veiculosCardVirado}
-                >
-                  <div className="absolute inset-y-0 left-0 w-1 bg-purple-400" />
-                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-extrabold text-indigo-600 shadow-sm transition-transform group-hover:scale-105 dark:bg-indigo-950/50 dark:text-indigo-300">
-                    <RefreshCw size={9} className="transition-transform duration-500 group-hover:rotate-180" />
-                    ADM
+              <Link
+                to={outraPaginaPath}
+                className={`group relative block overflow-hidden rounded-2xl border p-4 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md ${
+                  isAdmPage
+                    ? 'border-indigo-200 bg-indigo-50/80 dark:border-indigo-900/50 dark:bg-indigo-950/20'
+                    : 'border-purple-200 bg-purple-50/80 dark:border-purple-900/50 dark:bg-purple-950/20'
+                }`}
+              >
+                <div className={`absolute inset-y-0 left-0 w-1 ${isAdmPage ? 'bg-indigo-400' : 'bg-purple-400'}`} />
+                <div className={`absolute right-3 top-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold shadow-sm transition-transform group-hover:scale-105 ${
+                  isAdmPage
+                    ? 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-300'
+                    : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300'
+                }`}>
+                  <RefreshCw size={9} className="transition-transform duration-500 group-hover:rotate-180" />
+                  {outraPaginaLabel}
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className={`rounded-xl p-2 transition-transform group-hover:scale-110 ${
+                    isAdmPage
+                      ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300'
+                      : 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300'
+                  }`}>
+                    {isAdmPage ? <Briefcase size={18} aria-hidden /> : <Truck size={18} aria-hidden />}
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-purple-100 p-2 text-purple-600 transition-transform group-hover:scale-110 dark:bg-purple-900/40 dark:text-purple-300">
-                      <Truck size={18} aria-hidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-purple-600/80 dark:text-purple-400/80">Veículos OP ativos</p>
-                      <p className="mt-1 text-3xl font-black text-purple-700 dark:text-purple-300">{operacionaisAtivos}</p>
-                      <p className="mt-0.5 text-[10px] font-semibold text-purple-600/60 dark:text-purple-400/60">operacionais</p>
-                    </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${
+                      isAdmPage
+                        ? 'text-indigo-600/80 dark:text-indigo-400/80'
+                        : 'text-purple-600/80 dark:text-purple-400/80'
+                    }`}>
+                      {isAdmPage ? 'Veículos ADM ativos' : 'Veículos OP ativos'}
+                    </p>
+                    <p className={`mt-1 text-3xl font-black ${
+                      isAdmPage
+                        ? 'text-indigo-700 dark:text-indigo-300'
+                        : 'text-purple-700 dark:text-purple-300'
+                    }`}>
+                      {ativosSetor}
+                    </p>
+                    <p className={`mt-0.5 text-[10px] font-semibold ${
+                      isAdmPage
+                        ? 'text-indigo-600/60 dark:text-indigo-400/60'
+                        : 'text-purple-600/60 dark:text-purple-400/60'
+                    }`}>
+                      {setorVeiculoLabel}
+                    </p>
                   </div>
-                </button>
-
-                {/* Verso — Administrativos */}
-                <button
-                  type="button"
-                  onClick={() => setVeiculosCardVirado((v) => !v)}
-                  className={`group absolute inset-0 overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-left shadow-sm backdrop-blur transition-all duration-500 hover:shadow-md dark:border-indigo-900/50 dark:bg-indigo-950/20 ${veiculosCardVirado ? 'opacity-100 translate-x-0' : 'pointer-events-none opacity-0 translate-x-3'}`}
-                  aria-label="Ver veículos operacionais"
-                  aria-hidden={!veiculosCardVirado}
-                >
-                  <div className="absolute inset-y-0 left-0 w-1 bg-indigo-400" />
-                  <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-extrabold text-purple-600 shadow-sm transition-transform group-hover:scale-105 dark:bg-purple-950/50 dark:text-purple-300">
-                    <RefreshCw size={9} className="transition-transform duration-500 group-hover:rotate-180" />
-                    OP
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-indigo-100 p-2 text-indigo-600 transition-transform group-hover:scale-110 dark:bg-indigo-900/40 dark:text-indigo-300">
-                      <Briefcase size={18} aria-hidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600/80 dark:text-indigo-400/80">Veículos ADM ativos</p>
-                      <p className="mt-1 text-3xl font-black text-indigo-700 dark:text-indigo-300">{admAtivos}</p>
-                      <p className="mt-0.5 text-[10px] font-semibold text-indigo-600/60 dark:text-indigo-400/60">administrativos</p>
-                    </div>
-                  </div>
-                </button>
-              </div>
+                </div>
+              </Link>
               <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm backdrop-blur dark:border-emerald-900/60 dark:bg-emerald-950/25">
                 <div className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
                 <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700/70 dark:text-emerald-300/80">Realizaram</p>
-                <p className="mt-2 text-3xl font-black text-emerald-700 dark:text-emerald-300">{placasRealizaram.length}</p>
+                <p className="mt-2 text-3xl font-black text-emerald-700 dark:text-emerald-300">{realizaramSetorCount}</p>
                 <p className="mt-1 text-[11px] font-semibold text-emerald-700/60 dark:text-emerald-300/60">checklists concluídos</p>
               </div>
               <div className="group relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/80 p-4 shadow-sm backdrop-blur dark:border-rose-900/60 dark:bg-rose-950/25">
                 <div className="absolute inset-y-0 left-0 w-1 bg-rose-500" />
                 <p className="text-[10px] font-black uppercase tracking-wider text-rose-700/70 dark:text-rose-300/80">Não realizaram</p>
-                <p className="mt-2 text-3xl font-black text-rose-700 dark:text-rose-300">{placasNaoRealizaram.length}</p>
+                <p className="mt-2 text-3xl font-black text-rose-700 dark:text-rose-300">{naoRealizaramCardCount}</p>
                 <p className="mt-1 text-[11px] font-semibold text-rose-700/60 dark:text-rose-300/60">pendentes no período</p>
               </div>
             </div>
@@ -877,7 +972,7 @@ export function ChecklistDetalharPage() {
       </section>
 
       {/* Filtros e busca */}
-      <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-900">
+      <section className="shrink-0 overflow-hidden border-b border-slate-200/80 bg-white dark:border-slate-800/60 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</p>
@@ -996,6 +1091,7 @@ export function ChecklistDetalharPage() {
       </section>
 
       {/* Abas + listas */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {loading ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <span className="size-7 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400" />
@@ -1003,11 +1099,13 @@ export function ChecklistDetalharPage() {
       ) : (
         <div
           ref={columnsRef}
-          className={`flex min-h-0 flex-1 flex-col gap-3 ${isFullscreen ? 'bg-slate-50 p-4 dark:bg-slate-950' : ''}`}
+          className={`flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 py-3 sm:px-4 sm:py-3 lg:px-5 ${isFullscreen ? 'bg-slate-50 dark:bg-slate-950' : ''}`}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {viewMode === 'ranking' ? 'Rankings do período' : 'Resultados por veículo'}
+              {viewMode === 'ranking'
+                ? `Rankings do período · ${setorVeiculoLabel}`
+                : `Resultados por veículo · ${setorVeiculoLabel}`}
             </p>
             <div className="flex items-center gap-2">
               <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -1065,6 +1163,16 @@ export function ChecklistDetalharPage() {
                   {capturandoFoto ? 'Gerando…' : 'Foto'}
                 </button>
               ) : (
+                <>
+                <button
+                  type="button"
+                  onClick={() => setExcelModalOpen(true)}
+                  title="Exportar Excel"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <FileSpreadsheet size={14} />
+                  Excel
+                </button>
                 <button
                   type="button"
                   onClick={() => setPdfModalOpen(true)}
@@ -1074,6 +1182,7 @@ export function ChecklistDetalharPage() {
                   <FileDown size={14} />
                   PDF
                 </button>
+                </>
               )}
               <button
                 type="button"
@@ -1089,7 +1198,7 @@ export function ChecklistDetalharPage() {
 
         {viewMode === 'ranking' && isAdmin ? (
           <ChecklistTop10Section
-            frota={frotaFiltrada}
+            frota={frotaFiltradaSetor}
             completions={checklistCompletionsByDay}
             diasNoPeriodo={diasNoPeriodo}
             periodDays={periodDays}
@@ -1100,14 +1209,14 @@ export function ChecklistDetalharPage() {
             fullscreen={isFullscreen}
           />
         ) : (
-        <div className={`grid min-h-0 flex-1 gap-4 xl:items-stretch transition-all duration-300 ${
+        <div className={`grid min-h-0 flex-1 gap-3 xl:items-stretch transition-all duration-300 ${
           focusedSide === 'nao' ? 'xl:grid-cols-[3fr_1fr]' :
           focusedSide === 'sim' ? 'xl:grid-cols-[1fr_3fr]' :
           'xl:grid-cols-2'
         } ${isFullscreen ? 'min-h-0' : ''}`}>
 
           {/* Coluna: Não realizaram */}
-          <div className={`flex flex-col overflow-hidden rounded-[1.5rem] border border-rose-200/80 bg-white shadow-soft dark:border-rose-950/60 dark:bg-slate-900 ${isFullscreen ? 'min-h-0 flex-1' : 'min-h-[420px]'}`}>
+          <div className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-rose-200/80 bg-white shadow-soft dark:border-rose-950/60 dark:bg-slate-900 ${isFullscreen ? 'flex-1' : 'min-h-[320px] xl:min-h-0'}`}>
             <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-rose-100 bg-rose-50/85 px-4 py-3 backdrop-blur dark:border-rose-950/50 dark:bg-rose-950/25">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-rose-500 shadow-sm dark:bg-slate-950">
                 <ClipboardX size={15} />
@@ -1138,7 +1247,7 @@ export function ChecklistDetalharPage() {
             ) : viewMode === 'list' ? (
               <ListaNaoRealizaram items={naoRealizaramFiltrados} multiDia={multiDia} />
             ) : (
-              <div className={`custom-scrollbar space-y-3 overflow-y-auto p-3 ${isFullscreen ? 'flex-1' : 'max-h-[62vh]'}`}>
+              <div className={`custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3`}>
                 {naoRealizaramFiltrados.map((v) => (
                   <div
                     key={v.placa}
@@ -1189,7 +1298,7 @@ export function ChecklistDetalharPage() {
           </div>
 
           {/* Coluna: Realizaram */}
-          <div className={`flex flex-col overflow-hidden rounded-[1.5rem] border border-emerald-200/80 bg-white shadow-soft dark:border-emerald-950/60 dark:bg-slate-900 ${isFullscreen ? 'min-h-0 flex-1' : 'min-h-[420px]'}`}>
+          <div className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-200/80 bg-white shadow-soft dark:border-emerald-950/60 dark:bg-slate-900 ${isFullscreen ? 'flex-1' : 'min-h-[320px] xl:min-h-0'}`}>
             <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-emerald-100 bg-emerald-50/85 px-4 py-3 backdrop-blur dark:border-emerald-950/50 dark:bg-emerald-950/25">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-emerald-500 shadow-sm dark:bg-slate-950">
                 <ClipboardCheck size={15} />
@@ -1217,7 +1326,7 @@ export function ChecklistDetalharPage() {
             ) : viewMode === 'list' ? (
               <ListaRealizaram items={realizaramFiltrados} multiDia={multiDia} />
             ) : (
-              <div className={`custom-scrollbar space-y-3 overflow-y-auto p-3 ${isFullscreen ? 'flex-1' : 'max-h-[62vh]'}`}>
+              <div className={`custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3`}>
                 {realizaramFiltrados.map((v) => (
                   <div
                     key={v.placa}
@@ -1279,6 +1388,87 @@ export function ChecklistDetalharPage() {
 
         </div>
         )}
+
+        {excelModalOpen &&
+          createPortal(
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-base font-black text-slate-900 dark:text-slate-100">Exportar Excel</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Escolha quais listas incluir na planilha (.xlsx).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !excelGerando && setExcelModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={excelGerando || naoRealizaramFiltrados.length === 0}
+                onClick={() => exportarExcel('nao')}
+                className="flex w-full items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-950/60 dark:bg-rose-950/20 dark:hover:bg-rose-950/30"
+              >
+                <ClipboardX size={18} className="shrink-0 text-rose-600 dark:text-rose-400" />
+                <div>
+                  <p className="text-sm font-extrabold text-rose-800 dark:text-rose-200">Somente não realizados</p>
+                  <p className="text-[11px] font-semibold text-rose-600/80 dark:text-rose-300/70">
+                    {naoRealizaramFiltrados.length} veículo(s)
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={excelGerando || realizaramFiltrados.length === 0}
+                onClick={() => exportarExcel('sim')}
+                className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-950/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30"
+              >
+                <ClipboardCheck size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <div>
+                  <p className="text-sm font-extrabold text-emerald-800 dark:text-emerald-200">Somente realizados</p>
+                  <p className="text-[11px] font-semibold text-emerald-600/80 dark:text-emerald-300/70">
+                    {realizaramFiltrados.length} veículo(s)
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={excelGerando || (naoRealizaramFiltrados.length === 0 && realizaramFiltrados.length === 0)}
+                onClick={() => exportarExcel('ambos')}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800"
+              >
+                <FileSpreadsheet size={18} className="shrink-0 text-slate-600 dark:text-slate-300" />
+                <div>
+                  <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">Ambos</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {naoRealizaramFiltrados.length} não realizados · {realizaramFiltrados.length} realizados
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              disabled={excelGerando}
+              onClick={() => setExcelModalOpen(false)}
+              className="mt-5 w-full rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-extrabold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              {excelGerando ? 'Gerando Excel…' : 'Cancelar'}
+            </button>
+          </div>
+            </div>,
+            (document.fullscreenElement as HTMLElement | null) ?? document.body,
+          )}
 
         {pdfModalOpen &&
           createPortal(
@@ -1362,6 +1552,8 @@ export function ChecklistDetalharPage() {
           )}
         </div>
       )}
+
+      </div>
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }

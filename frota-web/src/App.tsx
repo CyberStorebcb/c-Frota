@@ -104,7 +104,8 @@ export default function App() {
               <Route path="checklists/resultados" element={<ChecklistResultadosPage />} />
             </Route>
             <Route path="/veiculos/status" element={<VeiculosStatusPage />} />
-            <Route path="/checklists/detalhar" element={<ChecklistDetalharPage />} />
+            <Route path="/checklists/detalhar" element={<ChecklistDetalharPage setorVeiculo="operacional" />} />
+            <Route path="/checklists/detalhar/adm" element={<ChecklistDetalharPage setorVeiculo="adm" />} />
             <Route path="/veiculos" element={<Navigate to="/gerenciar" replace />} />
             <Route
               path="/usuarios"

@@ -4,6 +4,7 @@ export type ChecklistDetalharVeiculoRow = {
   placa: string
   modelo: string
   base: string
+  prefixo?: string
   supervisor: string
   coordenador: string
   diasRealizados?: number
@@ -20,6 +21,7 @@ export type ChecklistDetalharPdfMeta = {
   periodoLabel: string
   periodoResumo: string
   busca?: string
+  setorLabel?: string
 }
 
 type PdfColumn = { header: string; width: number; get: (row: Record<string, unknown>) => string }
