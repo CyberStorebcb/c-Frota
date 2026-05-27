@@ -250,9 +250,9 @@ function TelaIdentificacao({
                 readOnly={isDemo}
                 data-demo-field="nome"
                 value={nomeValue}
-                onChange={(e) => { if (!isDemo) { setNome(e.target.value); setErros((prev) => ({ ...prev, nome: undefined })) } }}
-                placeholder="Ex: João Silva"
-                className="mt-0.5 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                onChange={(e) => { if (!isDemo) { setNome(e.target.value.toUpperCase()); setErros((prev) => ({ ...prev, nome: undefined })) } }}
+                placeholder="Ex: JOÃO SILVA"
+                className="mt-0.5 w-full bg-transparent text-base font-semibold uppercase text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
               />
               {erros.nome && <p className="mt-1 text-xs font-semibold text-rose-500">{erros.nome}</p>}
             </div>
@@ -847,12 +847,12 @@ function SupervisorField({ value, onChange, forceOpen }: { value: string; onChan
         <div className="flex items-center gap-2">
           <input
             value={value}
-            onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+            onChange={(e) => { onChange(e.target.value.toUpperCase()); setOpen(true) }}
             onFocus={() => setOpen(true)}
             placeholder="Digite para buscar o supervisor..."
             autoComplete="off"
             data-demo-form-field="supervisor"
-            className="min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+            className="min-w-0 flex-1 bg-transparent text-base font-semibold uppercase text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
           {reconhecido && (
             <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
@@ -999,8 +999,8 @@ const ItemChecklist = memo(function ItemChecklist({
               data-demo-item-obs={item.id}
               value={obs}
               onChange={(e) => onObs(item.id, e.target.value)}
-              placeholder="O que foi encontrado de errado? Seja específico..."
-              className="w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 dark:border-rose-800/60 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:ring-rose-900/30"
+              placeholder="O QUE FOI ENCONTRADO DE ERRADO? SEJA ESPECÍFICO..."
+              className="w-full resize-none rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold uppercase text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-100 dark:border-rose-800/60 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:ring-rose-900/30"
             />
           </div>
           {fotoFaltando && (
@@ -1730,8 +1730,9 @@ function FormularioChecklist({
   }, [todosItens, setFotosItem, setItemDestacado, setRespostas])
 
   const setDado = (id: string, valor: string) => {
+    const valorUpper = valor.toUpperCase()
     setDadosVeiculo((prev) => {
-      const next = { ...prev, [id]: valor }
+      const next = { ...prev, [id]: valorUpper }
       // Ao escolher uma placa, preenche modelo e prefixo automaticamente
       if (id === 'placa' && valor) {
         const normalizada = normalizePlaca(valor)
@@ -1791,13 +1792,13 @@ function FormularioChecklist({
           const cidade = a.city ?? a.town ?? a.village ?? a.municipality ?? ''
           const partes = [rua, bairro, cidade].filter(Boolean)
           const uniq = partes.filter((v, i, arr) => arr.indexOf(v) === i)
-          setDadosVeiculo((p) => ({ ...p, localidade: uniq.join(', ') || coordsStr }))
+          setDadosVeiculo((p) => ({ ...p, localidade: (uniq.join(', ') || coordsStr).toUpperCase() }))
         } else {
-          setDadosVeiculo((p) => ({ ...p, localidade: coordsStr }))
+          setDadosVeiculo((p) => ({ ...p, localidade: coordsStr.toUpperCase() }))
         }
       } catch {
         // Sem internet ou timeout — salva coordenadas brutas
-        setDadosVeiculo((p) => ({ ...p, localidade: coordsStr }))
+        setDadosVeiculo((p) => ({ ...p, localidade: coordsStr.toUpperCase() }))
       }
       setLocalidadeGeoLoading(false)
     }
@@ -1850,7 +1851,7 @@ function FormularioChecklist({
   , [])
 
   const setObservacaoCb = useCallback((id: string, valor: string) =>
-    setObservacoes((prev) => ({ ...prev, [id]: valor }))
+    setObservacoes((prev) => ({ ...prev, [id]: valor.toUpperCase() }))
   , [])
 
 
@@ -2255,8 +2256,8 @@ function FormularioChecklist({
                           setGpsErroCodigo(null)
                           setDado('localidade', e.target.value)
                         }}
-                        placeholder="Endereço ou use o GPS"
-                        className="min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                        placeholder="ENDEREÇO OU USE O GPS"
+                        className="min-w-0 flex-1 bg-transparent text-base font-semibold uppercase text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
                       />
                       <button
                         type="button"
@@ -2417,8 +2418,8 @@ function FormularioChecklist({
                         data-demo-form-field={campo.id}
                         value={dadosVeiculo[campo.id] ?? ''}
                         onChange={(e) => setDado(campo.id, e.target.value)}
-                        placeholder={opcoes.length > 0 ? 'Escolher ou digitar...' : '—'}
-                        className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                        placeholder={opcoes.length > 0 ? 'ESCOLHER OU DIGITAR...' : '-'}
+                        className="w-full bg-transparent text-base font-semibold uppercase text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
                       />
                       <datalist id={listId}>
                         {opcoes.map((op) => <option key={op} value={op} />)}
@@ -2432,8 +2433,8 @@ function FormularioChecklist({
                     data-demo-form-field={campo.id}
                     value={dadosVeiculo[campo.id] ?? ''}
                     onChange={(e) => setDado(campo.id, e.target.value)}
-                    placeholder="—"
-                    className="w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100"
+                    placeholder="-"
+                    className={`w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100${campo.tipo !== 'number' ? ' uppercase' : ''}`}
                   />
                 )}
               </div>
@@ -2527,9 +2528,9 @@ function FormularioChecklist({
                 rows={4}
                 data-demo-form-field="problemas"
                 value={problemas}
-                onChange={(e) => setProblemas(e.target.value)}
-                placeholder="Ex: 'Barulho no câmbio ao trocar de marcha' ou 'Nenhum problema adicional'..."
-                className="w-full resize-none bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 dark:text-slate-100"
+                onChange={(e) => setProblemas(e.target.value.toUpperCase())}
+                placeholder="EX: 'BARULHO NO CÂMBIO AO TROCAR DE MARCHA' OU 'NENHUM PROBLEMA ADICIONAL'..."
+                className="w-full resize-none bg-transparent text-sm font-semibold uppercase text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 dark:text-slate-100"
               />
               {problemas && (
                 <>
@@ -2540,9 +2541,9 @@ function FormularioChecklist({
                   <textarea
                     rows={2}
                     value={descricaoProblema}
-                    onChange={(e) => setDescricaoProblema(e.target.value)}
-                    placeholder="Ex: 'Lado traseiro direito', 'Ao frear em alta velocidade'..."
-                    className="w-full resize-none bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 dark:text-slate-100"
+                    onChange={(e) => setDescricaoProblema(e.target.value.toUpperCase())}
+                    placeholder="EX: 'LADO TRASEIRO DIREITO', 'AO FREAR EM ALTA VELOCIDADE'..."
+                    className="w-full resize-none bg-transparent text-sm font-semibold uppercase text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 dark:text-slate-100"
                   />
                 </>
               )}
