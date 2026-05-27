@@ -37,7 +37,22 @@ const CAMPO_LABELS: Record<string, string> = {
   tipo_operacao: 'Tipo de Operação',
 }
 
-export async function generateChecklistPublicoPdf(data: ChecklistPublicoPdfData): Promise<void> {
+export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData): Promise<void> {
+  // Normaliza campos que podem chegar undefined por compatibilidade de versão
+  const data: ChecklistPublicoPdfData = {
+    schemaNome:     raw.schemaNome     ?? 'Checklist',
+    operador:       raw.operador       ?? '',
+    matricula:      raw.matricula      ?? '',
+    nomeSupervisor: raw.nomeSupervisor ?? '',
+    veiculo:        raw.veiculo        ?? '',
+    dadosVeiculo:   raw.dadosVeiculo   ?? {},
+    grupos:         raw.grupos         ?? [],
+    respostas:      raw.respostas      ?? {},
+    observacoes:    raw.observacoes    ?? {},
+    submittedAt:    raw.submittedAt    ?? new Date(),
+    offline:        raw.offline        ?? false,
+  }
+
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
