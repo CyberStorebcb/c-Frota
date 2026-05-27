@@ -1180,6 +1180,8 @@ function FormularioChecklist({
   const [fleetTick, setFleetTick] = useState(0)
   const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
   const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
+  const [prefixoSuggestOpen, setPrefixoSuggestOpen] = useState(false)
+  const [prefixoHighlightIdx, setPrefixoHighlightIdx] = useState(0)
 
   // Mapa de placa → veículo (precisa estar antes do efeito demo)
   const fleetByPlaca = useMemo(() => {
@@ -1631,6 +1633,25 @@ function FormularioChecklist({
   const placaHighlightSafe =
     placasSugeridas.length === 0 ? 0 : Math.min(placaHighlightIdx, placasSugeridas.length - 1)
 
+  // Placa fora do escopo: preenchida mas não encontrada no banco de veículos
+  const placaForaEscopo = useMemo(() => {
+    const raw = normalizePlaca(dadosVeiculo.placa ?? '')
+    if (!raw) return false
+    return !fleetByPlaca.has(raw)
+  }, [dadosVeiculo.placa, fleetByPlaca])
+
+  // Prefixo: combobox com sugestões do banco
+  const prefixosSugeridos = useMemo(() => {
+    const q = (dadosVeiculo.prefixo ?? '').trim().toUpperCase()
+    const opts = opcoesVeiculo.prefixo
+    const limite = 30
+    if (!q) return opts.slice(0, limite)
+    return opts.filter((p) => p.toUpperCase().includes(q)).slice(0, limite)
+  }, [opcoesVeiculo.prefixo, dadosVeiculo.prefixo])
+
+  const prefixoHighlightSafe =
+    prefixosSugeridos.length === 0 ? 0 : Math.min(prefixoHighlightIdx, prefixosSugeridos.length - 1)
+
   const selecionarPlacaSugestao = useCallback(
     (placaEscolhida: string) => {
       const raw = normalizePlaca(placaEscolhida)
@@ -1688,7 +1709,7 @@ function FormularioChecklist({
   )
   const fotosNcOk = itensNcSemFoto.length === 0
 
-  const podEnviar = tudo100 && camposPreenchidos && evidenciaNr12Ok && fotosNcOk
+  const podEnviar = tudo100 && camposPreenchidos && evidenciaNr12Ok && fotosNcOk && !placaForaEscopo
   const mostrarBarraEnvio = tudo100 || enviando
 
   // Mapa: itemId → número sequencial global (calculado uma vez)
@@ -2233,15 +2254,18 @@ function FormularioChecklist({
                         ))}
                       </ul>
                     ) : placaSuggestOpen && (dadosVeiculo.placa ?? '').length > 0 && placasSugeridas.length === 0 ? (
-                      <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-xl dark:border-slate-600 dark:bg-slate-900">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Placa não encontrada no cadastro.{' '}
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">
-                            Continue digitando para usar manualmente.
-                          </span>
+                      <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 shadow-xl dark:border-rose-800 dark:bg-rose-950/80">
+                        <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+                          Placa não encontrada no cadastro de veículos.{' '}
+                          <span className="font-bold">O envio será bloqueado.</span>
                         </p>
                       </div>
                     ) : null}
+                    {!placaSuggestOpen && placaForaEscopo && (
+                      <p className="mt-1 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                        ⚠ Esta placa não está no cadastro — o envio está bloqueado.
+                      </p>
+                    )}
                   </div>
                 ) : campo.id === 'localidade' ? (
                   <div className="flex flex-col gap-2">
@@ -2405,6 +2429,74 @@ function FormularioChecklist({
                       )
                     })() : null}
                   </div>
+                ) : campo.tipo === 'select' && campo.id === 'prefixo' ? (
+                  // Prefixo: combobox com sugestões do banco de veículos
+                  <div className="relative z-10">
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      aria-autocomplete="list"
+                      aria-expanded={prefixoSuggestOpen}
+                      aria-controls={`checklist-prefixo-sugestoes-${schema.id}`}
+                      role="combobox"
+                      data-demo-form-field="prefixo"
+                      value={dadosVeiculo.prefixo ?? ''}
+                      onChange={(e) => {
+                        setDado('prefixo', e.target.value)
+                        setPrefixoSuggestOpen(true)
+                        setPrefixoHighlightIdx(0)
+                      }}
+                      onFocus={() => setPrefixoSuggestOpen(true)}
+                      onBlur={() => window.setTimeout(() => setPrefixoSuggestOpen(false), 200)}
+                      onKeyDown={(e) => {
+                        if (!prefixoSuggestOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                          setPrefixoSuggestOpen(true)
+                          return
+                        }
+                        if (e.key === 'Escape') { setPrefixoSuggestOpen(false); return }
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setPrefixoHighlightIdx((i) => Math.min(prefixosSugeridos.length - 1, i + 1))
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setPrefixoHighlightIdx((i) => Math.max(0, i - 1))
+                        } else if (e.key === 'Enter' && prefixoSuggestOpen && prefixosSugeridos[prefixoHighlightSafe]) {
+                          e.preventDefault()
+                          const p = prefixosSugeridos[prefixoHighlightSafe]
+                          if (p) { setDado('prefixo', p); setPrefixoSuggestOpen(false) }
+                        }
+                      }}
+                      placeholder="BUSCAR PREFIXO..."
+                      className="w-full bg-transparent text-base font-semibold uppercase tracking-wide text-slate-900 outline-none placeholder:normal-case placeholder:text-slate-300 dark:text-slate-100"
+                    />
+                    {prefixoSuggestOpen && prefixosSugeridos.length > 0 && (
+                      <ul
+                        id={`checklist-prefixo-sugestoes-${schema.id}`}
+                        role="listbox"
+                        className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-600 dark:bg-slate-900"
+                      >
+                        {prefixosSugeridos.map((pref, idx) => (
+                          <li key={pref}>
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={idx === prefixoHighlightSafe}
+                              className={`flex w-full px-3 py-2 text-left text-sm font-bold uppercase tracking-wide ${
+                                idx === prefixoHighlightSafe
+                                  ? 'bg-[#7f1022]/12 text-[#7f1022] dark:bg-rose-500/20 dark:text-rose-200'
+                                  : 'text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800'
+                              }`}
+                              onMouseDown={(ev) => ev.preventDefault()}
+                              onMouseEnter={() => setPrefixoHighlightIdx(idx)}
+                              onClick={() => { setDado('prefixo', pref); setPrefixoSuggestOpen(false) }}
+                            >
+                              {pref}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 ) : campo.tipo === 'select' ? (() => {
                   // Opções: schema estático OU dinâmico do registro de veículos
                   const opcoesDinamicas = (opcoesVeiculo as Record<string, string[]>)[campo.id] ?? []
@@ -2444,6 +2536,13 @@ function FormularioChecklist({
             <div className="border-t border-rose-100 bg-rose-50 px-4 py-2.5 dark:border-rose-900/30 dark:bg-rose-900/10">
               <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
                 ⚠ Preencha todos os campos obrigatórios (*) para poder enviar.
+              </p>
+            </div>
+          )}
+          {placaForaEscopo && (
+            <div className="border-t border-rose-200 bg-rose-50 px-4 py-2.5 dark:border-rose-800/50 dark:bg-rose-900/20">
+              <p className="text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                ⚠ A placa informada não pertence ao cadastro de veículos — corrija a placa para enviar.
               </p>
             </div>
           )}
@@ -2635,6 +2734,8 @@ function FormularioChecklist({
           <div className="min-w-0">
             {erroEnvio ? (
               <p className="text-sm font-extrabold text-rose-500">{erroEnvio}</p>
+            ) : placaForaEscopo ? (
+              <p className="text-sm font-extrabold text-rose-500">⚠ Placa fora do cadastro</p>
             ) : ncImperativos > 0 ? (
               <p className="text-sm font-extrabold text-rose-500">🚫 {ncImperativos} item(s) impeditivo(s)</p>
             ) : ncCount > 0 ? (
