@@ -348,9 +348,10 @@ export function ManagePage() {
 
 
   const dataOpts = useMemo<SelectOption[]>(() => {
-    const anos = [...new Set(rows.map((r) => r.dataApontamento.slice(0, 4)).filter(Boolean))]
-      .sort((a, b) => Number(b) - Number(a))
     const anoAtual = String(new Date().getFullYear())
+    const anos = [...new Set(rows.map((r) => r.dataApontamento.slice(0, 4)).filter(Boolean))]
+      .filter((a) => a !== anoAtual)
+      .sort((a, b) => Number(b) - Number(a))
     return [
       { value: 'todos', label: 'Todos' },
       { value: 'hoje', label: 'Hoje' },
