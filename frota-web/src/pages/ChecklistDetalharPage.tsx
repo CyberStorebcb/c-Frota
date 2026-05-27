@@ -552,13 +552,13 @@ export function ChecklistDetalharPage() {
 
   const placasNaoRealizaram = useMemo(
     () => Array.from(frotaMap.values())
-      .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v))
+      .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v) && operacionalPlacasSet.has(v.placa))
       .map((v) => ({
         ...v,
         diasRealizados: 0,
         diasNoPeriodo: diasNoPeriodo,
       })),
-    [frotaMap, placasRealizaramSet, passaFiltros, diasNoPeriodo],
+    [frotaMap, placasRealizaramSet, passaFiltros, diasNoPeriodo, operacionalPlacasSet],
   )
 
   const frotaFiltrada = useMemo(
