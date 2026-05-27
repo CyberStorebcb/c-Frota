@@ -27,7 +27,9 @@ import {
 } from '../apontamentos/evolucaoAnalytics'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
-import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
+import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
+import { RESPONSAVEL_FILTER_SELECT_OPTIONS, matchesResponsavelFilter } from '../data/responsavelFilterOptions'
+import { PREFIXO_FILTER_SELECT_OPTIONS } from '../data/prefixoFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { FilterPanel, FilterPanelGroup, useFilterPanelVisible } from '../components/ui/FilterPanel'
 
@@ -43,10 +45,6 @@ const DATA_OPTS: SelectOption[] = [
   { value: 'ano', label: 'Ano atual (resolução)' },
 ]
 
-function uniqSorted(values: string[]): SelectOption[] {
-  const u = [...new Set(values)].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  return u.map((v) => ({ value: v, label: v }))
-}
 
 function classifyCelula(dias: number | null) {
   if (dias == null) return { cellClass: 'bg-slate-600 dark:bg-slate-700', textClass: 'text-slate-200', label: 'Sem dados' }
@@ -503,6 +501,7 @@ export function EvolucaoPage() {
   const [filtroBase, setFiltroBase] = useState(() => lsGet('frota.evolucao.base', 'todos'))
   const [filtroCoord, setFiltroCoord] = useState(() => lsGet('frota.evolucao.coord', 'todos'))
   const [filtroResp, setFiltroResp] = useState(() => lsGet('frota.evolucao.resp', 'todos'))
+  const [filtroSupervisor, setFiltroSupervisor] = useState(() => lsGet('frota.evolucao.supervisor', 'todos'))
   const [filtroPrefixo, setFiltroPrefixo] = useState(() => lsGet('frota.evolucao.prefixo', 'todos'))
   const [filtroData, setFiltroData] = useState<EvolucaoFiltros['data']>(
     () => (lsGet('frota.evolucao.data', 'todos') as EvolucaoFiltros['data'])
@@ -513,10 +512,11 @@ export function EvolucaoPage() {
       localStorage.setItem('frota.evolucao.base', filtroBase)
       localStorage.setItem('frota.evolucao.coord', filtroCoord)
       localStorage.setItem('frota.evolucao.resp', filtroResp)
+      localStorage.setItem('frota.evolucao.supervisor', filtroSupervisor)
       localStorage.setItem('frota.evolucao.prefixo', filtroPrefixo)
       localStorage.setItem('frota.evolucao.data', filtroData)
     } catch { /* ignore */ }
-  }, [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData])
+  }, [filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo, filtroData])
 
   useEffect(() => {
     const el = wrapRef.current
@@ -527,14 +527,11 @@ export function EvolucaoPage() {
     return () => ro.disconnect()
   }, [])
 
-  const optPrefixo = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.prefixo))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
+  const optPrefixo = PREFIXO_FILTER_SELECT_OPTIONS
 
   const filtrosObj = useMemo<EvolucaoFiltros>(
-    () => ({ base: filtroBase, coordenador: filtroCoord, responsavel: filtroResp, prefixo: filtroPrefixo, data: filtroData }),
-    [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData],
+    () => ({ base: filtroBase, coordenador: filtroCoord, responsavel: filtroResp, supervisor: filtroSupervisor, prefixo: filtroPrefixo, data: filtroData }),
+    [filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo, filtroData],
   )
 
   const resolvidosFiltrados = useMemo(() => filterResolvidosParaEvolucao(rows, filtrosObj), [rows, filtrosObj])
@@ -584,7 +581,8 @@ export function EvolucaoPage() {
     const filtered = rows.filter((r) => {
       if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
-      if (filtroResp !== 'todos' && r.responsavel !== filtroResp) return false
+      if (filtroResp !== 'todos' && !matchesResponsavelFilter(r.responsavel, filtroResp)) return false
+      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
       if (filtroPrefixo !== 'todos' && r.prefixo !== filtroPrefixo) return false
       if (boundaryRange) {
         if (r.dataApontamento < boundaryRange.from) return false
@@ -605,18 +603,19 @@ export function EvolucaoPage() {
       const d = map.get(p.chave) ?? { abertos: 0, resolvidos: 0, pendentes: 0 }
       return { chave: p.chave, periodo: p.periodo, ...d }
     })
-  }, [rows, filtroBase, filtroCoord, filtroResp, filtroPrefixo, agregacao, chartData, boundaryRange])
+  }, [rows, filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo, agregacao, chartData, boundaryRange])
 
   // KPIs globais: total de defeitos no recorte (resolvidos + pendentes)
   const totalDefeitos = useMemo(() => {
     return rows.filter((r) => {
       if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
-      if (filtroResp !== 'todos' && r.responsavel !== filtroResp) return false
+      if (filtroResp !== 'todos' && !matchesResponsavelFilter(r.responsavel, filtroResp)) return false
+      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
       if (filtroPrefixo !== 'todos' && r.prefixo !== filtroPrefixo) return false
       return true
     }).length
-  }, [rows, filtroBase, filtroCoord, filtroResp, filtroPrefixo])
+  }, [rows, filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo])
 
   const totalPendentes = totalDefeitos - resolvidosFiltrados.length
 
@@ -645,16 +644,17 @@ export function EvolucaoPage() {
   const defeitosRows = useMemo(() => {
     const filtered = rows.filter((r) => {
       if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
-      if (filtroResp !== 'todos' && r.responsavel !== filtroResp) return false
+      if (filtroResp !== 'todos' && !matchesResponsavelFilter(r.responsavel, filtroResp)) return false
+      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
       if (filtroPrefixo !== 'todos' && r.prefixo !== filtroPrefixo) return false
       return true
     })
     return filtered
-  }, [rows, filtroCoord, filtroResp, filtroPrefixo])
+  }, [rows, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo])
 
   const limparFiltros = () => {
     setFiltroBase('todos'); setFiltroCoord('todos')
-    setFiltroResp('todos'); setFiltroPrefixo('todos'); setFiltroData('todos')
+    setFiltroResp('todos'); setFiltroSupervisor('todos'); setFiltroPrefixo('todos'); setFiltroData('todos')
   }
 
   const filtrosAtivosCount = useMemo(() => {
@@ -662,23 +662,25 @@ export function EvolucaoPage() {
     if (filtroBase !== 'todos') n += 1
     if (filtroCoord !== 'todos') n += 1
     if (filtroResp !== 'todos') n += 1
+    if (filtroSupervisor !== 'todos') n += 1
     if (filtroPrefixo !== 'todos') n += 1
     if (filtroData !== 'todos') n += 1
     return n
-  }, [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData])
+  }, [filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo, filtroData])
 
   const filtrosResumo = useMemo(() => {
     const parts: string[] = []
     if (filtroBase !== 'todos') parts.push(`base ${filtroBase}`)
     if (filtroCoord !== 'todos') parts.push(`gerência ${filtroCoord}`)
     if (filtroResp !== 'todos') parts.push(`resp. ${filtroResp}`)
+    if (filtroSupervisor !== 'todos') parts.push(`supervisor ${filtroSupervisor}`)
     if (filtroPrefixo !== 'todos') parts.push(`prefixo ${filtroPrefixo}`)
     if (filtroData !== 'todos') {
       const label = DATA_OPTS.find((o) => o.value === filtroData)?.label ?? filtroData
       parts.push(label)
     }
     return parts.join(' · ') || undefined
-  }, [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData])
+  }, [filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo, filtroData])
 
   const isMobile = wrapW > 0 && wrapW < 640
   const cellSize = isMobile ? 60 : 80
@@ -736,10 +738,11 @@ export function EvolucaoPage() {
         summary={filtrosResumo}
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-3">
-            <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} tone="dark" />
+          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-2 lg:grid-cols-4">
             <Select label="Gerência" value={filtroCoord} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setFiltroCoord} tone="dark" />
-            <Select label="Responsável" value={filtroResp} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={setFiltroResp} tone="dark" />
+            <Select label="Responsável" value={filtroResp} options={RESPONSAVEL_FILTER_SELECT_OPTIONS} onChange={setFiltroResp} tone="dark" />
+            <Select label="Supervisor" value={filtroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={setFiltroSupervisor} tone="dark" />
+            <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} tone="dark" />
           </FilterPanelGroup>
           <FilterPanelGroup title="Veículo e período" columns="sm:grid-cols-2">
             <Select label="Prefixo" value={filtroPrefixo} options={optPrefixo} onChange={setFiltroPrefixo} tone="dark" />
