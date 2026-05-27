@@ -327,6 +327,7 @@ function TelaConclusao({
   isDemo,
   autoOpenWhatsapp,
   embeddedInFrame,
+  submittedAt,
 }: {
   ncImperativos: number
   ncCount: number
@@ -342,6 +343,7 @@ function TelaConclusao({
   isDemo?: boolean
   autoOpenWhatsapp?: boolean
   embeddedInFrame?: boolean
+  submittedAt: Date
 }) {
   const { theme } = useTheme()
   const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
@@ -528,6 +530,20 @@ function TelaConclusao({
             </div>
           </div>
         )}
+
+        {/* Data e hora de envio */}
+        <div className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center dark:border-slate-700/60 dark:bg-slate-900/60 ${embeddedInFrame ? 'text-xs' : 'text-sm'}`}>
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+            {offline ? 'Salvo em' : 'Enviado em'}
+          </p>
+          <p className={`mt-1 font-black tabular-nums text-slate-700 dark:text-slate-200 ${embeddedInFrame ? 'text-base' : 'text-lg'}`}>
+            {submittedAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            {' '}
+            <span className="text-slate-400 dark:text-slate-500">·</span>
+            {' '}
+            {submittedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </p>
+        </div>
 
         <p className="text-xs font-semibold text-slate-400">Você já pode fechar esta página.</p>
       </div>
@@ -1073,6 +1089,7 @@ function FormularioChecklist({
     fotosUrls: string[]
     problemas: string
     descricaoProblema: string
+    submittedAt: Date
   } | null>(null)
   // highlight do item atual após scroll
   const [itemDestacado, setItemDestacado] = useState<string | null>(null)
@@ -1446,6 +1463,7 @@ function FormularioChecklist({
         fotosUrls: [],
         problemas: 'Pneu dianteiro esquerdo com desgaste irregular',
         descricaoProblema: '',
+        submittedAt: new Date(),
       })
       clearFormDraft()
       setConcluido(true)
@@ -1834,7 +1852,7 @@ function FormularioChecklist({
           .filter((it) => respostas[it.id] === 'nc')
           .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
         const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-        setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema })
+        setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema, submittedAt: new Date() })
         clearFormDraft()
         onConcluido?.()
         setConcluido(true)
@@ -1890,7 +1908,7 @@ function FormularioChecklist({
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
       const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: false, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema })
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: false, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema, submittedAt: new Date() })
       clearFormDraft()
       onConcluido?.()
       setConcluido(true)
@@ -1918,6 +1936,7 @@ function FormularioChecklist({
         isDemo={demoMode?.enabled}
         autoOpenWhatsapp={demoAutoWhatsapp}
         embeddedInFrame={embeddedInFrame}
+        submittedAt={resultadoFinal.submittedAt}
       />
     )
   }
