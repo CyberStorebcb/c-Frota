@@ -3,17 +3,18 @@ import { supabase } from './supabase'
 const SUPABASE_BUCKET = 'checklist-evidencias'
 
 /**
- * URLs públicas das evidências de checklist.
+ * Upload de evidências de checklist.
  *
- * **Supabase (predefinido)** — `supabase.storage` bucket `checklist-evidencias`.
+ * **Cloudflare R2 (preferencial)** — envia o arquivo diretamente ao Worker
+ * (`/upload` via multipart/form-data). O Worker faz o PUT no R2 server-side,
+ * eliminando erros de CORS que ocorreriam em uploads diretos do browser.
  *
- * **Cloudflare R2** — sem expor chaves R2 no browser: configure um endpoint que
- * devolva um URL de upload assinado (Worker, Supabase Edge Function, etc.) e o URL público final.
+ * **Supabase Storage (fallback)** — usado quando R2 não está configurado
+ * ou quando o Worker falha.
  *
  * Variáveis:
- * - `VITE_R2_PRESIGN_URL` — POST JSON `{ "key": string, "contentType": string }` →
- *   `{ "uploadUrl": string, "publicUrl": string }`. O cliente faz `PUT uploadUrl` com o corpo = ficheiro.
- * - `VITE_R2_PRESIGN_API_KEY` (opcional) — enviado como `Authorization: Bearer …` no pedido de presign.
+ * - `VITE_R2_PRESIGN_URL` — base do Worker (ex.: https://frota-r2-presigner.workers.dev).
+ * - `VITE_R2_PRESIGN_API_KEY` (opcional) — enviado como `Authorization: Bearer …`.
  */
 export function isChecklistEvidenceR2Enabled(): boolean {
   const u = (import.meta.env.VITE_R2_PRESIGN_URL as string | undefined)?.trim()
@@ -22,9 +23,9 @@ export function isChecklistEvidenceR2Enabled(): boolean {
 
 export async function uploadChecklistEvidenceFile(file: File, storageKey: string): Promise<string | null> {
   if (isChecklistEvidenceR2Enabled()) {
-    const url = await uploadToR2ViaPresign(file, storageKey)
+    const url = await uploadToR2ViaWorker(file, storageKey)
     if (url) return url
-    // fallback se o presigner falhar
+    // fallback se o Worker falhar
   }
   return uploadToSupabaseStorage(file, storageKey)
 }
@@ -35,42 +36,33 @@ async function uploadToSupabaseStorage(file: File, path: string): Promise<string
   return supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path).data.publicUrl
 }
 
-type PresignResponse = { uploadUrl: string; publicUrl: string }
-
-async function uploadToR2ViaPresign(file: File, key: string): Promise<string | null> {
-  const endpoint = (import.meta.env.VITE_R2_PRESIGN_URL as string).trim()
+/**
+ * Envia o arquivo ao Worker via multipart/form-data.
+ * O Worker faz o PUT no R2 server-side — sem CORS no bucket.
+ */
+async function uploadToR2ViaWorker(file: File, key: string): Promise<string | null> {
+  const baseUrl = (import.meta.env.VITE_R2_PRESIGN_URL as string).trim().replace(/\/$/, '')
   const apiKey = (import.meta.env.VITE_R2_PRESIGN_API_KEY as string | undefined)?.trim()
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = {}
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`
 
-  const presignRes = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      key,
-      contentType: file.type || 'application/octet-stream',
-    }),
-  })
+  const formData = new FormData()
+  formData.append('key', key)
+  formData.append('file', file)
 
-  if (!presignRes.ok) return null
-
-  let data: PresignResponse
   try {
-    data = (await presignRes.json()) as PresignResponse
+    const res = await fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+
+    if (!res.ok) return null
+
+    const data = (await res.json()) as { publicUrl?: string }
+    return data.publicUrl ?? null
   } catch {
     return null
   }
-  if (!data.uploadUrl || !data.publicUrl) return null
-
-  const putRes = await fetch(data.uploadUrl, {
-    method: 'PUT',
-    body: file,
-    headers: {
-      'Content-Type': file.type || 'application/octet-stream',
-    },
-  })
-
-  if (!putRes.ok) return null
-  return data.publicUrl
 }
