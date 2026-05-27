@@ -1,5 +1,6 @@
 /**
  * Sincroniza veículos do catálogo embarcado (totalVehiclesFleet.gen.ts) com o Supabase.
+ * Marca veículos da lixeira (fleetTrash.gen.ts) com deleted_at.
  * Usa upsert por placa — seguro rodar múltiplas vezes.
  *
  * Uso:
@@ -23,17 +24,24 @@ if (!SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-const genFilePath = join(__dirname, '../src/data/totalVehiclesFleet.gen.ts')
-const genFileContent = readFileSync(genFilePath, 'utf-8')
-
-const match = genFileContent.match(/export const TOTAL_VEHICLE_ROWS[^=]+=\s*(\[[\s\S]*\])/)
-if (!match) {
-  console.error('Não foi possível extrair TOTAL_VEHICLE_ROWS do arquivo gerado.')
-  process.exit(1)
+function extractJsonArray(filePath, exportName) {
+  const content = readFileSync(filePath, 'utf-8')
+  const match = content.match(new RegExp(`export const ${exportName}[^=]+=\\s*(\\[[\\s\\S]*\\])`))
+  if (!match) {
+    console.error(`Não foi possível extrair ${exportName} de ${filePath}`)
+    process.exit(1)
+  }
+  return JSON.parse(match[1])
 }
 
-const rows = JSON.parse(match[1])
-console.log(`Total de veículos a sincronizar: ${rows.length}`)
+const genFilePath = join(__dirname, '../src/data/totalVehiclesFleet.gen.ts')
+const trashFilePath = join(__dirname, '../src/data/fleetTrash.gen.ts')
+
+const rows = extractJsonArray(genFilePath, 'TOTAL_VEHICLE_ROWS')
+const trashRows = extractJsonArray(trashFilePath, 'FLEET_TRASH_ROWS')
+
+console.log(`Catálogo ativo: ${rows.length} veículos`)
+console.log(`Lixeira: ${trashRows.length} veículos`)
 
 const VEHICLE_TYPE_IDS = [
   'MUNCK', 'SKY', 'MOTO', 'PICAPE 4X4', 'PICAPE LEVE',
@@ -56,6 +64,24 @@ function normalizePrefixo(s) {
   return t || 'N/A'
 }
 
+function rowToRecord(row, { deletedAt, status }) {
+  const placa = normalizePlaca(row.placa)
+  const responsavel = (row.responsavel || 'NÃO ATRIBUÍDO').trim().toUpperCase() || 'NÃO ATRIBUÍDO'
+  return {
+    placa,
+    modelo: (row.modelo || '—').trim().toUpperCase() || '—',
+    tipo: normalizeVehicleTipo(row.tipo),
+    prefixo: normalizePrefixo(row.prefixo),
+    responsavel,
+    supervisor: responsavel,
+    coordenador: (row.gerencia || 'NÃO ATRIBUÍDO').trim().toUpperCase() || 'NÃO ATRIBUÍDO',
+    base: (row.base || 'N/A').trim().toUpperCase() || 'N/A',
+    ano: (row.ano || '').trim(),
+    status,
+    deleted_at: deletedAt,
+  }
+}
+
 const DESMOBILIZADO_FILE = join(__dirname, '../src/frota/fleetCatalogDesmobilizadoPlacas.ts')
 const desmobContent = readFileSync(DESMOBILIZADO_FILE, 'utf-8')
 const desmobMatch = desmobContent.match(/new Set\(\[([\s\S]*?)\]\)/)
@@ -63,39 +89,43 @@ const desmobPlacas = new Set(
   desmobMatch ? desmobMatch[1].match(/'([A-Z0-9]+)'/g)?.map(s => s.replace(/'/g, '')) ?? [] : []
 )
 
-const records = rows.map((row) => {
-  const placa = normalizePlaca(row.placa)
-  const isDesmob = desmobPlacas.has(placa)
-  return {
-    placa,
-    modelo: (row.modelo || '—').trim().toUpperCase() || '—',
-    tipo: normalizeVehicleTipo(row.tipo),
-    prefixo: isDesmob ? 'DESMOBILIZADO' : normalizePrefixo(row.prefixo),
-    responsavel: (row.responsavel || 'NÃO ATRIBUÍDO').trim().toUpperCase() || 'NÃO ATRIBUÍDO',
-    supervisor: (row.responsavel || 'NÃO ATRIBUÍDO').trim().toUpperCase() || 'NÃO ATRIBUÍDO',
-    coordenador: (row.gerencia || 'NÃO ATRIBUÍDO').trim().toUpperCase() || 'NÃO ATRIBUÍDO',
-    base: (row.base || 'N/A').trim().toUpperCase() || 'N/A',
-    ano: (row.ano || '').trim(),
-    status: isDesmob ? 'INATIVO' : 'ATIVO',
-  }
-}).filter(r => r.placa && r.placa.length >= 7)
+const deletedAt = new Date().toISOString()
 
-const seen = new Set()
-const deduped = records.filter(r => {
-  if (seen.has(r.placa)) return false
-  seen.add(r.placa)
-  return true
-})
+const activeRecords = rows
+  .map((row) => {
+    const placa = normalizePlaca(row.placa)
+    const isDesmob = desmobPlacas.has(placa)
+    const rec = rowToRecord(row, { deletedAt: null, status: isDesmob ? 'INATIVO' : 'ATIVO' })
+    if (isDesmob) rec.prefixo = 'DESMOBILIZADO'
+    return rec
+  })
+  .filter((r) => r.placa)
 
-const afonsoCount = deduped.filter(r => r.coordenador === 'AFONSO').length
-console.log(`Após deduplicação: ${deduped.length} registros (${afonsoCount} AFONSO)`)
+const trashRecords = trashRows
+  .map((row) => rowToRecord(row, { deletedAt, status: 'INATIVO' }))
+  .filter((r) => r.placa)
+
+function dedupeByPlaca(list) {
+  const seen = new Set()
+  return list.filter((r) => {
+    if (seen.has(r.placa)) return false
+    seen.add(r.placa)
+    return true
+  })
+}
+
+const dedupedActive = dedupeByPlaca(activeRecords)
+const dedupedTrash = dedupeByPlaca(trashRecords)
+const allRecords = [...dedupedActive, ...dedupedTrash]
+
+console.log(`Upsert total: ${allRecords.length} (${dedupedActive.length} ativos + ${dedupedTrash.length} lixeira)`)
 
 const BATCH_SIZE = 100
 let inserted = 0
 let errors = 0
 
-for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
-  const batch = deduped.slice(i, i + BATCH_SIZE)
+for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
+  const batch = allRecords.slice(i, i + BATCH_SIZE)
   const { error } = await supabase
     .from('vehicles')
     .upsert(batch, { onConflict: 'placa', ignoreDuplicates: false })
@@ -105,22 +135,20 @@ for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
     errors += batch.length
   } else {
     inserted += batch.length
-    process.stdout.write(`\rSincronizados: ${inserted}/${deduped.length}`)
+    process.stdout.write(`\rSincronizados: ${inserted}/${allRecords.length}`)
   }
 }
 
 console.log(`\n\nConcluído: ${inserted} upserted, ${errors} erros.`)
 
-const { count: afonsoDb } = await supabase
+const { count: trashDb } = await supabase
   .from('vehicles')
   .select('*', { count: 'exact', head: true })
-  .eq('coordenador', 'AFONSO')
+  .not('deleted_at', 'is', null)
 
-const { data: sample } = await supabase
+const { count: activeDb } = await supabase
   .from('vehicles')
-  .select('placa,coordenador,responsavel,base')
-  .eq('placa', 'RZT0J51')
-  .maybeSingle()
+  .select('*', { count: 'exact', head: true })
+  .is('deleted_at', null)
 
-console.log(`Verificação: ${afonsoDb} veículos com coordenador AFONSO no Supabase`)
-console.log('Amostra RZT0J51:', sample)
+console.log(`Verificação Supabase: ${activeDb ?? '?'} ativos, ${trashDb ?? '?'} na lixeira (deleted_at)`)
