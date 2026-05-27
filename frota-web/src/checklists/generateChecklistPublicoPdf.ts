@@ -14,7 +14,7 @@ export type ChecklistPublicoPdfData = {
   offline: boolean
 }
 
-const COR_PRIMARIA: [number, number, number] = [30, 41, 98]   // azul CGB
+const COR_PRIMARIA: [number, number, number] = [30, 41, 98]
 const COR_VERDE:   [number, number, number] = [22, 163, 74]
 const COR_VERMELHO:[number, number, number] = [220, 38, 38]
 const COR_CINZA:   [number, number, number] = [100, 116, 139]
@@ -28,18 +28,26 @@ function fmtTime(d: Date): string {
 }
 
 /**
- * Converte caracteres fora do Latin-1 (ISO-8859-1) para equivalentes ASCII.
- * jsPDF com fontes padrão (Helvetica) só suporta Latin-1; caracteres fora
- * desse range corrompem o stream da página silenciosamente.
+ * Converte chars fora do Latin-1 para ASCII.
+ * Implementado sem literais Unicode nos padroes para evitar erros de build
+ * em ambientes com encoding diferente (ex: Vercel + TypeScript 6).
  */
 function sanitize(text: string): string {
-  return text
-    .replace(/—/g, ‘-’)      // em dash → hyphen
-    .replace(/–/g, ‘-’)      // en dash → hyphen
-    .replace(/‘|’/g, “’”) // curly single quotes → apostrophe
-    .replace(/“|”/g, ‘”’) // curly double quotes → straight
-    .replace(/…/g, ‘...’)    // ellipsis → three dots
-    .replace(/[Ā-￿]/g, ‘?’) // demais fora do Latin-1
+  // Mapa de code points acima de Latin-1 para equivalentes ASCII
+  const MAP: Record<number, string> = {
+    0x2014: ‘-’,   // em dash
+    0x2013: ‘-’,   // en dash
+    0x2018: “’”,   // left single quote
+    0x2019: “’”,   // right single quote
+    0x201C: ‘”’,   // left double quote
+    0x201D: ‘”’,   // right double quote
+    0x2026: ‘...’, // ellipsis
+  }
+  return Array.from(text).map((ch) => {
+    const code = ch.codePointAt(0) ?? 0
+    if (code <= 0xFF) return ch          // Latin-1: mantem
+    return MAP[code] ?? ‘?’              // fora do Latin-1: converte ou ‘?’
+  }).join(‘’)
 }
 
 const CAMPO_LABELS: Record<string, string> = {
@@ -53,8 +61,7 @@ const CAMPO_LABELS: Record<string, string> = {
 }
 
 export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData): Promise<void> {
-  // Diagnóstico — visível no console do browser para depuração
-  console.log('[PDF] gerando relatório', {
+  console.log('[PDF] gerando relatorio', {
     schemaNome:   raw.schemaNome,
     operador:     raw.operador,
     matricula:    raw.matricula,
@@ -63,7 +70,6 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     respostas:    Object.keys(raw.respostas ?? {}).length,
   })
 
-  // Normaliza campos que podem chegar undefined por compatibilidade de versão
   const data: ChecklistPublicoPdfData = {
     schemaNome:     raw.schemaNome     ?? 'Checklist',
     operador:       raw.operador       ?? '',
@@ -95,31 +101,34 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     }
   }
 
-  // ── Rodapé em cada página ─────────────────────────────────────────────────
   const drawFooter = (pageNum: number, totalPages: number) => {
     const py = pageH - 6
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7)
     doc.setTextColor(...COR_CINZA)
+    const status = data.offline ? 'Salvo offline' : 'Enviado'
     doc.text(
-      `${data.offline ? 'Salvo offline' : 'Enviado'} em ${fmtDate(data.submittedAt)} às ${fmtTime(data.submittedAt)}`,
+      `${status} em ${fmtDate(data.submittedAt)} às ${fmtTime(data.submittedAt)}`,
       margin,
       py,
     )
     doc.text(`Página ${pageNum} / ${totalPages}`, pageW - margin, py, { align: 'right' })
   }
 
-  // ── Cabeçalho de página (exceto o primeiro) ───────────────────────────────
   const drawPageHeader = () => {
     doc.setFillColor(...COR_PRIMARIA)
     doc.rect(margin, margin, contentW, 10, 'F')
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
     doc.setTextColor(255, 255, 255)
-    doc.text(`CGB FROTA  ·  ${sanitize(data.schemaNome).toUpperCase()}  ·  ${data.veiculo}`, margin + 3, margin + 6.5)
+    doc.text(
+      `CGB FROTA  ·  ${sanitize(data.schemaNome).toUpperCase()}  ·  ${data.veiculo}`,
+      margin + 3,
+      margin + 6.5,
+    )
   }
 
-  // ── Cabeçalho principal (página 1) ────────────────────────────────────────
+  // Cabecalho principal (pagina 1)
   doc.setFillColor(...COR_PRIMARIA)
   doc.rect(0, 0, pageW, 28, 'F')
 
@@ -150,7 +159,6 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
 
   y = 36
 
-  // ── Seção: informações gerais ─────────────────────────────────────────────
   const drawSectionTitle = (title: string) => {
     ensureSpace(14)
     doc.setFont('helvetica', 'bold')
@@ -163,22 +171,9 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     y += 7
   }
 
-  const drawInfoRow = (label: string, value: string, halfWidth = false, offsetX = 0) => {
-    const colW = halfWidth ? contentW / 2 : contentW
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(...COR_CINZA)
-    doc.text(label.toUpperCase(), margin + offsetX, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(30, 30, 30)
-    doc.text(sanitize(value) || '-', margin + offsetX, y + 5, { maxWidth: colW - 4 })
-    return y + 13
-  }
-
   drawSectionTitle('Identificação')
 
-  // Linha 1: Operador + Matrícula
+  // Linha 1: Operador + Matricula
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7)
   doc.setTextColor(...COR_CINZA)
@@ -202,13 +197,11 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
   doc.text(sanitize(data.nomeSupervisor) || '-', margin, y + 5)
   y += 13
 
-  // ── Seção: dados do veículo ───────────────────────────────────────────────
   drawSectionTitle('Dados do Veículo')
 
   const camposOrdem = ['placa', 'marca_modelo', 'km_atual', 'localidade', 'prefixo', 'base', 'tipo_operacao']
   const camposExibir = camposOrdem.filter((k) => data.dadosVeiculo[k])
 
-  // Pares lado-a-lado
   for (let i = 0; i < camposExibir.length; i += 2) {
     ensureSpace(14)
     const k1 = camposExibir[i]!
@@ -232,7 +225,6 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     y += 13
   }
 
-  // ── Seção: itens de inspeção ──────────────────────────────────────────────
   drawSectionTitle('Itens de Inspeção')
 
   const badgeW = 10
@@ -272,7 +264,6 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
   }
 
   for (const grupo of data.grupos) {
-    // Título do grupo
     ensureSpace(12)
     doc.setFillColor(241, 245, 249)
     doc.rect(margin, y - 5.5, contentW, 8, 'F')
@@ -291,13 +282,11 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
       const needed = hasObs ? itemH + 7 : itemH
       ensureSpace(needed)
 
-      // Zebra
       if (idx % 2 === 0) {
         doc.setFillColor(250, 252, 255)
         doc.rect(margin, y - 5, contentW, needed, 'F')
       }
 
-      // Imperativo badge
       if (item.imperativo) {
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(6.5)
@@ -305,17 +294,14 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
         doc.text('(!)', margin + 2, y - 1)
       }
 
-      // Label do item
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(8)
       doc.setTextColor(status === 'nc' ? 180 : 50, status === 'nc' ? 30 : 50, status === 'nc' ? 30 : 50)
       const labelX = item.imperativo ? margin + 6 : margin + 2
       doc.text(sanitize(item.label), labelX, y - 1, { maxWidth: contentW - badgeW - 10 })
 
-      // Badge de status
       drawBadge(status, pageW - margin - badgeW - 2, y)
 
-      // Observação NC
       if (hasObs) {
         y += 5
         doc.setFont('helvetica', 'italic')
@@ -332,7 +318,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     y += 3
   }
 
-  // ── Seção: resumo de NCs ──────────────────────────────────────────────────
+  // Secao: resumo de NCs
   const ncItens = data.grupos.flatMap((g) =>
     g.itens
       .filter((it) => data.respostas[it.id] === 'nc')
@@ -370,7 +356,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     }
   }
 
-  // ── Finaliza — adiciona rodapés em todas as páginas ───────────────────────
+  // Finaliza -- rodapes em todas as paginas
   const totalPages = (doc.internal as unknown as { pages: unknown[] }).pages.length - 1 || 1
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p)
