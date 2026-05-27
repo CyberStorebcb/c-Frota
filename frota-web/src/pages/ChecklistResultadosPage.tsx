@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SelectCustom } from '../components/ui/SelectCustom'
+import { FilterPanel, FilterPanelGroup, FilterSearchField, useFilterPanelVisible } from '../components/ui/FilterPanel'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -20,7 +21,6 @@ import {
   Pencil,
   RefreshCw,
   Save,
-  Search,
   Trash2,
   X,
 } from 'lucide-react'
@@ -894,10 +894,7 @@ export function ChecklistResultadosPage() {
 
   const [capturando, setCapturando]   = useState(false)
   const [rows, setRows]               = useState<ChecklistRow[]>([])
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
-    try { return localStorage.getItem('frota.filtros.checklists') === 'true' }
-    catch { return false }
-  })
+  const [filtrosVisiveis, setFiltrosVisiveis] = useFilterPanelVisible('frota.filtros.checklists')
   const [carregando, setCarregando]   = useState(true)
   const [exportando, setExportando]   = useState(false)
   const [erro, setErro]               = useState('')
@@ -1065,6 +1062,38 @@ export function ChecklistResultadosPage() {
     }
   }
 
+  const limparFiltros = () => {
+    setDataInicio('')
+    setDataFim('')
+    setTipoFiltro('')
+    setSomenteNc(false)
+    setQueryInput('')
+    setQuery('')
+    setPaginaAtual(1)
+  }
+
+  const filtrosAtivosCount = useMemo(() => {
+    let n = 0
+    if (dataInicio) n += 1
+    if (dataFim) n += 1
+    if (tipoFiltro) n += 1
+    if (somenteNc) n += 1
+    if (queryInput.trim()) n += 1
+    return n
+  }, [dataInicio, dataFim, tipoFiltro, somenteNc, queryInput])
+
+  const filtrosResumo = useMemo(() => {
+    const parts: string[] = []
+    if (dataInicio || dataFim) parts.push(`${dataInicio || '…'} → ${dataFim || '…'}`)
+    if (tipoFiltro) {
+      const label = TIPOS.find((t) => t.id === tipoFiltro)?.label ?? tipoFiltro
+      parts.push(label)
+    }
+    if (somenteNc) parts.push('somente NC')
+    if (queryInput.trim()) parts.push(`busca "${queryInput.trim()}"`)
+    return parts.join(' · ') || undefined
+  }, [dataInicio, dataFim, tipoFiltro, somenteNc, queryInput])
+
   const semanas = calcSemanas(sparkRows, (dataInicio || dataFim) ? Infinity : 8)
 
   const handleExportar = async () => {
@@ -1125,7 +1154,7 @@ export function ChecklistResultadosPage() {
     const cardW = (W1 - (pad / S) * 2 - gap / S * 3) / 4
     const cards = [
       { label: 'CHECKLISTS', value: String(totalRegistros), sub: 'no período filtrado', bg: '#1e293b', accent: '#94a3b8', val: '#f1f5f9' },
-      { label: 'RESOLVIDOS', value: String(totalSemNc), sub: 'todos resolvidos', bg: '#052e16', accent: '#4ade80', val: '#4ade80' },
+      { label: 'CONFORMES', value: String(totalSemNc), sub: 'todos conformes', bg: '#052e16', accent: '#4ade80', val: '#4ade80' },
       { label: 'SEM IMPEDIMENTO', value: String(totalRegistros - totalSemNc), sub: `${totalRegistros > 0 ? Math.round(((totalRegistros - totalSemNc) / totalRegistros) * 100) : 0}% dos checklists`, bg: '#1c1400', accent: '#f59e0b', val: '#f59e0b' },
       { label: 'COM IMPEDIMENTO', value: String(totalComNc), sub: `~${totalRegistros > 0 ? (totalComNc / totalRegistros).toFixed(1) : '0'} por checklist`, bg: '#1a0a0a', accent: '#f87171', val: '#f87171' },
     ]
@@ -1367,20 +1396,20 @@ export function ChecklistResultadosPage() {
               <div className="mt-2 text-[10px] font-semibold text-slate-400">no período filtrado</div>
             </div>
 
-            {/* Aprovados */}
+            {/* Conformes */}
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-soft dark:border-emerald-900/30 dark:bg-emerald-950/20">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{semNc}</div>
                   <div className="mt-0.5 text-xs font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-500">
-                    Resolvidos
+                    Conformes
                   </div>
                 </div>
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40">
                   <CheckCircle2 size={17} className="text-emerald-500" />
                 </div>
               </div>
-              <div className="mt-2 text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-500/60">todos resolvidos</div>
+              <div className="mt-2 text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-500/60">todos conformes</div>
             </div>
 
             {/* Checklists com NC */}
@@ -1423,108 +1452,66 @@ export function ChecklistResultadosPage() {
       {/* Sparkline de tendência NC */}
       <Sparkline semanas={semanas} />
 
-      {/* Filtros */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-center justify-between px-4 py-3">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
+      <FilterPanel
+        visible={filtrosVisiveis}
+        onVisibleChange={setFiltrosVisiveis}
+        activeCount={filtrosAtivosCount}
+        onClear={limparFiltros}
+        summary={filtrosResumo}
+        headerExtra={
+          <div className="hidden items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 sm:flex">
+            <CalendarCheck2 size={14} />
+            {totalRegistros.toLocaleString('pt-BR')} resultado{totalRegistros !== 1 ? 's' : ''}
+          </div>
+        }
+      >
+        <FilterPanelGroup title="Busca e tipo" columns="lg:grid-cols-[minmax(0,1.2fr)_minmax(180px,0.6fr)_auto]">
+          <FilterSearchField
+            value={queryInput}
+            onChange={(v) => { setQueryInput(v); setPaginaAtual(1) }}
+            placeholder="Operador, matrícula ou placa..."
+          />
+          <SelectCustom
+            value={tipoFiltro}
+            onChange={(v) => { setTipoFiltro(v); setPaginaAtual(1) }}
+            options={TIPOS.map((t) => ({ value: t.id, label: t.label }))}
+            placeholder="Todos"
+          />
           <button
             type="button"
-            onClick={() => setFiltrosVisiveis((v) => {
-              const next = !v
-              try { localStorage.setItem('frota.filtros.checklists', String(next)) } catch { /* ignore */ }
-              return next
-            })}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
+            onClick={() => { setSomenteNc((v) => !v); setPaginaAtual(1) }}
+            className={`inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-extrabold transition-all duration-150 active:scale-95 ${
+              somenteNc
+                ? 'border-rose-300 bg-rose-50 text-rose-600 shadow-sm shadow-rose-200/60 hover:border-rose-400 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400'
+            }`}
           >
-            {filtrosVisiveis
-              ? <><ChevronUp size={13} className="text-slate-400" /> Ocultar filtros</>
-              : <><ChevronDown size={13} className="text-slate-400" /> Mostrar filtros</>
-            }
+            <AlertTriangle size={14} className={`transition-transform duration-150 ${somenteNc ? 'scale-110' : ''}`} />
+            Somente NC
           </button>
-        </div>
-        <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-          <div className="overflow-hidden">
-            <div className="flex flex-col gap-3 border-t border-slate-100 px-4 pb-4 pt-3 dark:border-slate-800">
-              {/* linha 1: busca + tipo + toggle NC */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                  <Search size={15} className="shrink-0 text-slate-400" />
-                  <input
-                    value={queryInput}
-                    onChange={(e) => setQueryInput(e.target.value)}
-                    placeholder="Operador, matrícula ou placa..."
-                    className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100"
-                  />
-                </div>
+        </FilterPanelGroup>
 
-                <SelectCustom
-                  value={tipoFiltro}
-                  onChange={(v) => { setTipoFiltro(v); setPaginaAtual(1) }}
-                  options={TIPOS.map((t) => ({ value: t.id, label: t.label }))}
-                  placeholder="Todos"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => { setSomenteNc((v) => !v); setPaginaAtual(1) }}
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-extrabold transition-all duration-150 active:scale-95 ${
-                    somenteNc
-                      ? 'border-rose-300 bg-rose-50 text-rose-600 shadow-sm shadow-rose-200/60 hover:border-rose-400 hover:bg-rose-100 hover:shadow-rose-300/50 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/35'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-800 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <AlertTriangle size={14} className={`transition-transform duration-150 ${somenteNc ? 'scale-110' : ''}`} />
-                  Somente NC
-                </button>
-              </div>
-
-              {/* linha 2: datas */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">De</span>
-                  <input
-                    type="date"
-                    value={dataInicio}
-                    onChange={(e) => { setDataInicio(e.target.value); setPaginaAtual(1) }}
-                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
-                  />
-                </div>
-                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">Até</span>
-                  <input
-                    type="date"
-                    value={dataFim}
-                    onChange={(e) => { setDataFim(e.target.value); setPaginaAtual(1) }}
-                    className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
-                  />
-                </div>
-                {(dataInicio || dataFim || tipoFiltro || somenteNc || queryInput) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDataInicio('')
-                      setDataFim('')
-                      setTipoFiltro('')
-                      setSomenteNc(false)
-                      setQueryInput('')
-                      setQuery('')
-                      setPaginaAtual(1)
-                    }}
-                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
-                  >
-                    <X size={12} />
-                    Limpar filtros
-                  </button>
-                )}
-                <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  <CalendarCheck2 size={14} />
-                  {totalRegistros.toLocaleString('pt-BR')} resultado{totalRegistros !== 1 ? 's' : ''}
-                </div>
-              </div>
-            </div>
+        <FilterPanelGroup title="Período" columns="sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">De</label>
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => { setDataInicio(e.target.value); setPaginaAtual(1) }}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]"
+            />
           </div>
-        </div>
-      </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Até</label>
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(e) => { setDataFim(e.target.value); setPaginaAtual(1) }}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]"
+            />
+          </div>
+        </FilterPanelGroup>
+      </FilterPanel>
 
       {/* Tabela */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">

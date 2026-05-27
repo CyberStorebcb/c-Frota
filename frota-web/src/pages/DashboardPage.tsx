@@ -7,7 +7,6 @@ import {
   Calendar,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
   ClipboardCheck,
   ClipboardX,
   Gauge,
@@ -24,6 +23,7 @@ import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { Select } from '../components/ui/Select'
+import { FilterPanel, FilterPanelGroup, useFilterPanelVisible } from '../components/ui/FilterPanel'
 import { useFleet } from '../frota/FleetContext'
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
@@ -266,11 +266,9 @@ export function DashboardPage() {
       return v && v !== '' ? v : 'todos'
     } catch { return 'todos' }
   })
-  const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useState(() => {
-    try { return localStorage.getItem('frota.filtros.dashboard') === 'true' }
-    catch { return false }
-  })
-  const [recorrentesOculto, setRecorrentesOculto] = useState(false)
+  const [filtrosAvancadosVisiveis, setFiltrosAvancadosVisiveis] = useFilterPanelVisible('frota.filtros.dashboard')
+  const [recorrentesExpandido, setRecorrentesExpandido] = useState(false)
+  const [recorrentesIconFloating, setRecorrentesIconFloating] = useState(false)
 
   useEffect(() => {
     try {
@@ -341,6 +339,34 @@ export function DashboardPage() {
       setFiltroPrefixo('todos')
     }
   }, [prefixoOptions, filtroPrefixo])
+
+  const limparFiltrosAvancados = useCallback(() => {
+    setFiltroBase('todos')
+    setFiltroCoordenador('todos')
+    setFiltroSupervisor('todos')
+    setFiltroTipo('todos')
+    setFiltroPrefixo('todos')
+  }, [])
+
+  const filtrosAvancadosCount = useMemo(() => {
+    let n = 0
+    if (filtroBase !== 'todos') n += 1
+    if (filtroCoordenador !== 'todos') n += 1
+    if (filtroSupervisor !== 'todos') n += 1
+    if (filtroTipo !== 'todos') n += 1
+    if (filtroPrefixo !== 'todos') n += 1
+    return n
+  }, [filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo])
+
+  const filtrosAvancadosResumo = useMemo(() => {
+    const parts: string[] = []
+    if (filtroBase !== 'todos') parts.push(`base ${filtroBase}`)
+    if (filtroCoordenador !== 'todos') parts.push(`gerência ${filtroCoordenador}`)
+    if (filtroSupervisor !== 'todos') parts.push(`supervisor ${filtroSupervisor}`)
+    if (filtroTipo !== 'todos') parts.push(`tipo ${filtroTipo}`)
+    if (filtroPrefixo !== 'todos') parts.push(`prefixo ${filtroPrefixo}`)
+    return parts.join(' · ') || undefined
+  }, [filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo])
 
   const scopedFleetPlacas = useMemo(
     () => filterActiveFleet(activeFleetMap, checklistFleetFilters).map((v) => v.placa),
@@ -441,6 +467,18 @@ export function DashboardPage() {
       .filter((g) => g.diasConsecutivos >= 3)
       .slice(0, 5) // máx 5 alertas
   }, [pendenciasFiltradas])
+
+  useEffect(() => {
+    if (gruposRecorrentes.length === 0) {
+      setRecorrentesExpandido(false)
+      setRecorrentesIconFloating(false)
+      return
+    }
+    setRecorrentesExpandido(false)
+    setRecorrentesIconFloating(true)
+    const t = window.setTimeout(() => setRecorrentesIconFloating(false), 5000)
+    return () => window.clearTimeout(t)
+  }, [gruposRecorrentes])
 
   const checklistsPorDiaNoPeriodo = useMemo(() => {
     return checklistsPorDia
@@ -615,6 +653,24 @@ export function DashboardPage() {
     }
   }
 
+  const recorrentesCount = gruposRecorrentes.length
+  const showRecorrentesIcon = recorrentesCount > 0 && !recorrentesExpandido
+  const recorrentesIconButton = showRecorrentesIcon ? (
+    <button
+      type="button"
+      onClick={() => setRecorrentesExpandido(true)}
+      data-tour="dashboard-recorrentes"
+      title={`${recorrentesCount} defeito${recorrentesCount > 1 ? 's' : ''} recorrente${recorrentesCount > 1 ? 's' : ''} — clique para ver`}
+      aria-label={`${recorrentesCount} defeitos recorrentes. Clique para expandir.`}
+      className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 shadow-sm transition hover:scale-105 hover:bg-rose-100 hover:shadow-md dark:border-rose-900/50 dark:bg-rose-950/50 dark:text-rose-400 dark:hover:bg-rose-950/70"
+    >
+      <AlertTriangle size={16} aria-hidden />
+      <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-black text-white shadow-sm">
+        {recorrentesCount}
+      </span>
+    </button>
+  ) : null
+
   return (
     <div className="-mx-3 -my-3 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-transparent text-slate-900 dark:text-slate-100 sm:-mx-4 sm:-my-4 lg:-mx-8 lg:-my-6">
       <div className="shrink-0 overflow-hidden border-b border-slate-200/80 bg-transparent dark:border-slate-800/60 dark:bg-transparent sm:rounded-t-xl lg:rounded-t-2xl">
@@ -685,27 +741,6 @@ export function DashboardPage() {
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
-              id="dashboard-toggle-filtros"
-              aria-expanded={filtrosAvancadosVisiveis}
-              aria-controls="dashboard-filtros-avancados"
-              onClick={() => setFiltrosAvancadosVisiveis((v) => {
-                const next = !v
-                try { localStorage.setItem('frota.filtros.dashboard', String(next)) } catch { /* ignore */ }
-                return next
-              })}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:bg-transparent dark:text-slate-200 dark:hover:bg-white/5 sm:gap-2 sm:px-3.5 sm:text-[11px]"
-            >
-              {filtrosAvancadosVisiveis ? (
-                <ChevronUp size={15} className="shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-              ) : (
-                <ChevronDown size={15} className="shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
-              )}
-              <span className="max-w-[9rem] truncate sm:max-w-none">
-                {filtrosAvancadosVisiveis ? 'Ocultar filtros' : 'Mostrar filtros'}
-              </span>
-            </button>
-            <button
-              type="button"
               onClick={exportarImagem}
               disabled={exportando}
               title="Exportar imagem do dashboard"
@@ -726,43 +761,39 @@ export function DashboardPage() {
 
       </div>
 
-      <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
-        <div
-          id="dashboard-filtros-avancados"
-          className={`shrink-0 grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosAvancadosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-        >
-          <div className="overflow-hidden">
-            <div className="border-b border-slate-100/80 bg-transparent px-4 py-3 dark:border-slate-800/60 dark:bg-transparent sm:px-6 sm:py-4 lg:px-8">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
-                <Select
-                  label="Base"
-                  value={filtroBase}
-                  onChange={setFiltroBase}
-                  options={BASE_FILTER_SELECT_OPTIONS}
-                />
-                <Select
-                  label="Gerência"
-                  value={filtroCoordenador}
-                  onChange={setFiltroCoordenador}
-                  options={COORDENADOR_FILTER_SELECT_OPTIONS}
-                />
-                <Select
-                  label="Supervisor"
-                  value={filtroSupervisor}
-                  onChange={setFiltroSupervisor}
-                  options={SUPERVISOR_FILTER_SELECT_OPTIONS}
-                />
-                <Select
-                  label="Tipo"
-                  value={filtroTipo}
-                  onChange={setFiltroTipo}
-                  options={TIPO_FILTER_SELECT_OPTIONS}
-                />
-                <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} />
-              </div>
-            </div>
+      <FilterPanel
+        variant="section"
+        visible={filtrosAvancadosVisiveis}
+        onVisibleChange={setFiltrosAvancadosVisiveis}
+        activeCount={filtrosAvancadosCount}
+        onClear={limparFiltrosAvancados}
+        summary={filtrosAvancadosResumo}
+        toggleButtonProps={{ id: 'dashboard-toggle-filtros', 'aria-controls': 'dashboard-filtros-avancados' }}
+        contentProps={{ id: 'dashboard-filtros-avancados' }}
+        beforeToggleExtra={showRecorrentesIcon && !recorrentesIconFloating ? recorrentesIconButton : null}
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-3">
+            <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={BASE_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} tone="dark" />
+          </FilterPanelGroup>
+          <FilterPanelGroup title="Veículo" columns="sm:grid-cols-2">
+            <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} tone="dark" />
+          </FilterPanelGroup>
+        </div>
+      </FilterPanel>
+
+      {showRecorrentesIcon && recorrentesIconFloating ? (
+        <div className="pointer-events-none fixed inset-y-0 right-0 z-40 flex items-center pr-2 sm:pr-4">
+          <div className="pointer-events-auto animate-pulse">
+            {recorrentesIconButton}
           </div>
         </div>
+      ) : null}
+
+      <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:flex-row lg:gap-5 lg:p-5">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
@@ -868,18 +899,19 @@ export function DashboardPage() {
             )})}
           </div>
 
-          {gruposRecorrentes.length > 0 && !recorrentesOculto && (
-            <div data-tour="dashboard-recorrentes" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
+          {recorrentesExpandido && recorrentesCount > 0 && (
+            <div data-tour="dashboard-recorrentes-panel" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
               <div className="mb-3 flex items-center gap-2">
                 <AlertTriangle size={16} className="shrink-0 text-rose-600 dark:text-rose-400" />
                 <span className="flex-1 text-sm font-extrabold text-rose-800 dark:text-rose-200">
-                  {gruposRecorrentes.length} defeito{gruposRecorrentes.length > 1 ? 's' : ''} recorrente{gruposRecorrentes.length > 1 ? 's' : ''} (3+ dias seguidos)
+                  {recorrentesCount} defeito{recorrentesCount > 1 ? 's' : ''} recorrente{recorrentesCount > 1 ? 's' : ''} (3+ dias seguidos)
                 </span>
                 <button
                   type="button"
-                  onClick={() => setRecorrentesOculto(true)}
+                  onClick={() => setRecorrentesExpandido(false)}
                   className="rounded-lg p-1 text-rose-400 transition hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/40 dark:hover:text-rose-300"
-                  title="Fechar"
+                  title="Recolher"
+                  aria-label="Recolher defeitos recorrentes"
                 >
                   <X size={15} />
                 </button>

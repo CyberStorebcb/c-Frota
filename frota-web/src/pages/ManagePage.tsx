@@ -18,9 +18,7 @@ import {
   Loader2,
   TrendingUp,
   RefreshCw,
-  RotateCcw,
   Upload,
-  Search,
   Settings2,
   Truck,
   X,
@@ -50,6 +48,7 @@ import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilte
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
+import { FilterPanel, FilterPanelGroup, FilterSearchField } from '../components/ui/FilterPanel'
 import { Portal } from '../components/ui/Portal'
 import {
   apontamentoMatchesVehicleFilter,
@@ -493,7 +492,29 @@ export function ManagePage() {
     responsavel !== 'todos' ||
     supervisor !== 'todos' ||
     prefixo !== 'todos' ||
-    data !== 'todos'
+    data !== 'todos' ||
+    query.trim().length > 0
+
+  const filtrosAtivosCount = useMemo(() => {
+    let n = 0
+    if (vehicleId !== 'todos') n += 1
+    if (base !== 'todos') n += 1
+    if (coordenador !== 'todos') n += 1
+    if (supervisor !== 'todos') n += 1
+    if (data !== 'todos') n += 1
+    if (query.trim().length > 0) n += 1
+    return n
+  }, [vehicleId, base, coordenador, supervisor, data, query])
+
+  const filtrosResumo = useMemo(() => {
+    const parts: string[] = []
+    if (data !== 'todos') {
+      const label = dataOpts.find((o) => o.value === data)?.label ?? data
+      parts.push(label)
+    }
+    if (query.trim()) parts.push(`busca "${query.trim()}"`)
+    return parts.join(' · ') || undefined
+  }, [data, dataOpts, query])
 
   const limparFiltros = () => {
     setVehicleId('todos')
@@ -505,6 +526,7 @@ export function ManagePage() {
     setData('todos')
     setDataCustomDe('')
     setDataCustomAte('')
+    setQuery('')
     setPagina(1)
     if (searchParams.get('veiculo') || searchParams.get('placa') || searchParams.get('prefixo')) {
       const next = new URLSearchParams(searchParams)
@@ -893,119 +915,69 @@ export function ManagePage() {
         />
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
-          <button
-            type="button"
-            data-tour="manage-filtros-btn"
-            onClick={() => setFiltrosVisiveis((v) => {
-              const next = !v
-              try { localStorage.setItem('frota.filtros.manage', String(next)) } catch { /* ignore */ }
-              return next
-            })}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
-          >
-            {filtrosVisiveis
-              ? <><ChevronUp size={13} className="text-slate-400" /> Ocultar filtros</>
-              : <><ChevronDown size={13} className="text-slate-400" /> Mostrar filtros</>
-            }
-          </button>
-        </div>
-        <div data-tour="manage-filtros" className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-          <div className="overflow-hidden">
-            <div className="flex flex-col gap-3 p-4">
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
-                <Select
-                  label="Filtrar por veículo"
-                  value={vehicleId}
-                  options={vehicleOptions}
-                  onChange={(v) => { setVehicleId(v); setPagina(1) }}
-                />
-                <Select
-                  label="Base"
-                  value={base}
-                  options={BASE_FILTER_SELECT_OPTIONS}
-                  onChange={(v) => { setBase(v); setPagina(1) }}
-                />
-                <Select
-                  label="Gerência"
-                  value={coordenador}
-                  options={COORDENADOR_FILTER_SELECT_OPTIONS}
-                  onChange={(v) => { setCoordenador(v); setPagina(1) }}
-                />
-                <Select
-                  label="Supervisor"
-                  value={supervisor}
-                  options={SUPERVISOR_FILTER_SELECT_OPTIONS}
-                  onChange={(v) => { setSupervisor(v); setPagina(1) }}
-                />
-                <div className="flex flex-col gap-2">
-                  <Select label="Data" value={data} options={dataOpts} onChange={(v) => { setData(v); setPagina(1) }} />
-                  {data === 'custom' && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">De</label>
-                        <input
-                          type="date"
-                          value={dataCustomDe}
-                          onChange={(e) => { setDataCustomDe(e.target.value); lsSet('frota.manage.dataCustomDe', e.target.value); setPagina(1) }}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-blue-500"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Até</label>
-                        <input
-                          type="date"
-                          value={dataCustomAte}
-                          onChange={(e) => { setDataCustomAte(e.target.value); lsSet('frota.manage.dataCustomAte', e.target.value); setPagina(1) }}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <Select
-                  label="Período carregado"
-                  value={periodoCarregado}
-                  options={PERIODO_CARREGADO_OPTIONS}
-                  onChange={(v) => {
-                    setPeriodoCarregado(v as PeriodoCarregado)
-                    void recarregar()
-                    setPagina(1)
-                  }}
+      <FilterPanel
+        visible={filtrosVisiveis}
+        onVisibleChange={(visible) => {
+          setFiltrosVisiveis(visible)
+          try { localStorage.setItem('frota.filtros.manage', String(visible)) } catch { /* ignore */ }
+        }}
+        activeCount={filtrosAtivosCount}
+        onClear={limparFiltros}
+        summary={filtrosResumo}
+        toggleButtonProps={{ id: 'manage-toggle-filtros', 'data-tour': 'manage-filtros-btn', 'aria-controls': 'manage-filtros-panel' }}
+        contentProps={{ id: 'manage-filtros-panel', 'data-tour': 'manage-filtros' }}
+      >
+        <FilterPanelGroup title="Período e busca" columns="lg:grid-cols-[minmax(180px,0.7fr)_minmax(180px,0.7fr)_minmax(0,1fr)]">
+          <Select label="Data do apontamento" value={data} options={dataOpts} onChange={(v) => { setData(v); setPagina(1) }} tone="dark" />
+          <Select
+            label="Período carregado"
+            value={periodoCarregado}
+            options={PERIODO_CARREGADO_OPTIONS}
+            onChange={(v) => {
+              setPeriodoCarregado(v as PeriodoCarregado)
+              void recarregar()
+              setPagina(1)
+            }}
+            tone="dark"
+          />
+          <FilterSearchField
+            value={query}
+            onChange={(v) => { setQuery(v); setPagina(1) }}
+            placeholder="Texto do defeito, prefixo ou placa..."
+          />
+          {data === 'custom' ? (
+            <div className="col-span-full grid gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">De</label>
+                <input
+                  type="date"
+                  value={dataCustomDe}
+                  onChange={(e) => { setDataCustomDe(e.target.value); lsSet('frota.manage.dataCustomDe', e.target.value); setPagina(1) }}
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                 />
               </div>
-              <div className="flex items-end gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="whitespace-nowrap text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Buscar defeito ou veículo
-                  </div>
-                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                    <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
-                    <input
-                      value={query}
-                      onChange={(e) => { setQuery(e.target.value); setPagina(1) }}
-                      placeholder="Texto do defeito, prefixo ou placa..."
-                      className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={limparFiltros}
-                  disabled={!filtrosAtivos}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-                  title="Limpar filtros"
-                >
-                  <RotateCcw size={18} aria-hidden />
-                  Limpar
-                </button>
+              <div>
+                <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Até</label>
+                <input
+                  type="date"
+                  value={dataCustomAte}
+                  onChange={(e) => { setDataCustomAte(e.target.value); lsSet('frota.manage.dataCustomAte', e.target.value); setPagina(1) }}
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                />
               </div>
             </div>
-          </div>
-        </div>
+          ) : null}
+        </FilterPanelGroup>
 
+        <FilterPanelGroup title="Gestão e veículo" columns="sm:grid-cols-2 lg:grid-cols-4">
+          <Select label="Gerência" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setCoordenador(v); setPagina(1) }} tone="dark" />
+          <Select label="Supervisor" value={supervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setSupervisor(v); setPagina(1) }} tone="dark" />
+          <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={(v) => { setBase(v); setPagina(1) }} tone="dark" />
+          <Select label="Veículo" value={vehicleId} options={vehicleOptions} onChange={(v) => { setVehicleId(v); setPagina(1) }} tone="dark" />
+        </FilterPanelGroup>
+      </FilterPanel>
+
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
         {carregando && <LoadingApontamentos />}
         {visao === 'entrantes' && (
           <div className="mt-4 flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-950/40">

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CalendarCheck2, ChevronLeft, ChevronRight, FileDown, History, Search, TrendingUp, Truck, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CalendarCheck2, ChevronLeft, ChevronRight, FileDown, History, TrendingUp, Truck, X } from 'lucide-react'
 import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import { buildHistoricoResolvidoEntries, type HistoricoResolvidoEntry } from '../apontamentos/groupApontamentos'
 import { Portal } from '../components/ui/Portal'
 import { Select } from '../components/ui/Select'
+import { FilterPanel, FilterPanelGroup, FilterSearchField, useFilterPanelVisible } from '../components/ui/FilterPanel'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 
@@ -207,6 +208,7 @@ export function HistoricoPage() {
   const [base, setBase] = useState(() => lsGet('frota.historico.base', 'todos'))
   const [coordenador, setCoordenador] = useState(() => lsGet('frota.historico.coordenador', 'todos'))
   const [pagina, setPagina] = useState(1)
+  const [filtrosVisiveis, setFiltrosVisiveis] = useFilterPanelVisible('frota.filtros.historico')
 
   useEffect(() => {
     try {
@@ -272,6 +274,38 @@ export function HistoricoPage() {
     }
     return s
   }, [historico])
+
+  const limparFiltros = () => {
+    setQuery('')
+    setValorMin('')
+    setValorMax('')
+    setDataInicio('')
+    setDataFim('')
+    setBase('todos')
+    setCoordenador('todos')
+    setPagina(1)
+  }
+
+  const filtrosAtivosCount = useMemo(() => {
+    let n = 0
+    if (base !== 'todos') n += 1
+    if (coordenador !== 'todos') n += 1
+    if (query.trim()) n += 1
+    if (valorMin.trim()) n += 1
+    if (valorMax.trim()) n += 1
+    if (dataInicio) n += 1
+    if (dataFim) n += 1
+    return n
+  }, [base, coordenador, query, valorMin, valorMax, dataInicio, dataFim])
+
+  const filtrosResumo = useMemo(() => {
+    const parts: string[] = []
+    if (base !== 'todos') parts.push(`base ${base}`)
+    if (coordenador !== 'todos') parts.push(`gerência ${coordenador}`)
+    if (dataInicio || dataFim) parts.push(`${dataInicio || '…'} → ${dataFim || '…'}`)
+    if (query.trim()) parts.push(`busca "${query.trim()}"`)
+    return parts.join(' · ') || undefined
+  }, [base, coordenador, dataInicio, dataFim, query])
 
   const totalPaginas = Math.max(1, Math.ceil(historico.length / PAGE_SIZE))
   const paginaRows = historico.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE)
@@ -796,100 +830,84 @@ export function HistoricoPage() {
         </div>
       </div>
 
-      <div data-tour="historico-lista" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
-        <div data-tour="historico-filtros" className="mb-3 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-          <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={(v) => { setBase(v); setPagina(1) }} />
-          <Select label="Gerência" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setCoordenador(v); setPagina(1) }} />
-        </div>
-
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex w-full flex-col gap-2 sm:max-w-3xl sm:flex-row sm:items-center">
-            <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <Search size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
+      <FilterPanel
+        visible={filtrosVisiveis}
+        onVisibleChange={setFiltrosVisiveis}
+        activeCount={filtrosAtivosCount}
+        onClear={limparFiltros}
+        summary={filtrosResumo}
+        contentProps={{ 'data-tour': 'historico-filtros' }}
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-2">
+            <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={(v) => { setBase(v); setPagina(1) }} tone="dark" />
+            <Select label="Gerência" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setCoordenador(v); setPagina(1) }} tone="dark" />
+          </FilterPanelGroup>
+          <FilterPanelGroup title="Período" columns="sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">De</label>
               <input
-                value={query}
-                onChange={(e) => { setQuery(e.target.value); setPagina(1) }}
-                placeholder="Buscar por defeito ou veículo..."
-                className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                type="date"
+                value={dataInicio}
+                onChange={(e) => { setDataInicio(e.target.value); setPagina(1) }}
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]"
               />
             </div>
-
-            <div className="flex w-full max-w-md items-center gap-2">
-              <div className="flex w-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Valor mín.
-                </span>
-                <input
-                  value={valorMin}
-                  onChange={(e) => { setValorMin(e.target.value); setPagina(1) }}
-                  inputMode="decimal"
-                  placeholder="0"
-                  className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
-              </div>
-              <div className="flex w-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Valor máx.
-                </span>
-                <input
-                  value={valorMax}
-                  onChange={(e) => { setValorMax(e.target.value); setPagina(1) }}
-                  inputMode="decimal"
-                  placeholder="9999"
-                  className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-                />
-              </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Até</label>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(e) => { setDataFim(e.target.value); setPagina(1) }}
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]"
+              />
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="flex min-w-[10rem] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Total gasto
-              </span>
-              <span className="text-sm font-black tabular-nums text-slate-900 dark:text-slate-100">
-                {formatMoneyBRL(totalGastoHistorico)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              <CalendarCheck2 size={14} />
-              {historico.length} registro(s) resolvido(s)
-            </div>
-          </div>
+          </FilterPanelGroup>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              De
-            </span>
+        <FilterPanelGroup title="Busca e valores" columns="lg:grid-cols-[minmax(0,1.2fr)_minmax(140px,0.5fr)_minmax(140px,0.5fr)]">
+          <FilterSearchField
+            value={query}
+            onChange={(v) => { setQuery(v); setPagina(1) }}
+            placeholder="Buscar por defeito ou veículo..."
+          />
+          <div>
+            <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Valor mín.</label>
             <input
-              type="date"
-              value={dataInicio}
-              onChange={(e) => { setDataInicio(e.target.value); setPagina(1) }}
-              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
+              value={valorMin}
+              onChange={(e) => { setValorMin(e.target.value); setPagina(1) }}
+              inputMode="decimal"
+              placeholder="0"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
             />
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Até
-            </span>
+          <div>
+            <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Valor máx.</label>
             <input
-              type="date"
-              value={dataFim}
-              onChange={(e) => { setDataFim(e.target.value); setPagina(1) }}
-              className="bg-transparent text-sm font-semibold text-slate-900 outline-none dark:text-slate-100 dark:[color-scheme:dark]"
+              value={valorMax}
+              onChange={(e) => { setValorMax(e.target.value); setPagina(1) }}
+              inputMode="decimal"
+              placeholder="9999"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
             />
           </div>
-          {(dataInicio || dataFim) && (
-            <button
-              type="button"
-              onClick={() => { setDataInicio(''); setDataFim('') }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400 dark:hover:bg-slate-900"
-            >
-              <X size={12} aria-hidden />
-              Limpar datas
-            </button>
-          )}
+        </FilterPanelGroup>
+      </FilterPanel>
+
+      <div data-tour="historico-lista" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+          <div className="flex min-w-[10rem] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
+            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Total gasto
+            </span>
+            <span className="text-sm font-black tabular-nums text-slate-900 dark:text-slate-100">
+              {formatMoneyBRL(totalGastoHistorico)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <CalendarCheck2 size={14} />
+            {historico.length} registro(s) resolvido(s)
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">

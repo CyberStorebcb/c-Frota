@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   ClipboardCheck,
   ClipboardX,
   FileDown,
@@ -20,7 +19,6 @@ import {
   Maximize2,
   Minimize2,
   RefreshCw,
-  Search,
   Trophy,
   Truck,
   X,
@@ -34,6 +32,7 @@ import { generateChecklistDetalharExcel } from '../checklists/generateChecklistD
 
 import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
 import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
+import { FilterPanel, FilterPanelGroup, FilterSearchField } from '../components/ui/FilterPanel'
 import { Select } from '../components/ui/Select'
 import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
@@ -712,13 +711,29 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     }
   }, [prefixoOptions, filtroPrefixo])
 
-  const filtrosAtivos =
-    filtroBase !== 'todos' ||
-    filtroCoordenador !== 'todos' ||
-    filtroSupervisor !== 'todos' ||
-    filtroTipo !== 'todos' ||
-    filtroPrefixo !== 'todos' ||
-    busca.trim().length > 0
+  const filtrosAtivosCount = useMemo(() => {
+    let n = 0
+    if (periodo !== 'hoje') n += 1
+    if (filtroCoordenador !== 'todos') n += 1
+    if (filtroSupervisor !== 'todos') n += 1
+    if (filtroBase !== 'todos') n += 1
+    if (filtroTipo !== 'todos') n += 1
+    if (filtroPrefixo !== 'todos') n += 1
+    if (busca.trim().length > 0) n += 1
+    return n
+  }, [periodo, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo, busca])
+
+  const limparFiltros = useCallback(() => {
+    setPeriodo('hoje')
+    setCustomDesde(defaultDesde())
+    setCustomAte(hojeLocalIso())
+    setFiltroBase('todos')
+    setFiltroCoordenador('todos')
+    setFiltroSupervisor('todos')
+    setFiltroTipo('todos')
+    setFiltroPrefixo('todos')
+    setBusca('')
+  }, [])
 
   const exportMeta = useMemo(
     () => ({
@@ -971,124 +986,65 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         </div>
       </section>
 
-      {/* Filtros e busca */}
-      <section className="shrink-0 overflow-hidden border-b border-slate-200/80 bg-white dark:border-slate-800/60 dark:bg-slate-900">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</p>
-            {filtrosAtivos && !filtrosVisiveis ? (
-              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                Ativos
-              </span>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-
-            {filtrosAtivos && filtrosVisiveis ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setFiltroBase('todos')
-                  setFiltroCoordenador('todos')
-                  setFiltroSupervisor('todos')
-                  setBusca('')
-                }}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
-              >
-                <X size={13} className="text-slate-400" />
-                Limpar
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setFiltrosVisiveis((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
+      <FilterPanel
+        variant="section"
+        visible={filtrosVisiveis}
+        onVisibleChange={setFiltrosVisiveis}
+        activeCount={filtrosAtivosCount}
+        onClear={limparFiltros}
+        summary={`${periodoLabel} · ${periodoResumo}${busca.trim() ? ` · busca "${busca.trim()}"` : ''}`}
+      >
+        <FilterPanelGroup title="Período e busca" columns="lg:grid-cols-[minmax(200px,0.85fr)_minmax(0,1.15fr)]">
+          <div className="relative">
+            <Calendar size={14} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400" />
+            <select
+              value={periodo}
+              onChange={(e) => setPeriodo(e.target.value)}
+              className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm font-extrabold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
             >
-              {filtrosVisiveis ? (
-                <>
-                  <ChevronUp size={13} className="text-slate-400" />
-                  Ocultar filtros
-                </>
-              ) : (
-                <>
-                  <ChevronDown size={13} className="text-slate-400" />
-                  Mostrar filtros
-                </>
-              )}
-            </button>
+              {PERIODO_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
           </div>
-        </div>
-
-        <div
-          className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-        >
-          <div className="overflow-hidden">
-            <div className="flex flex-col gap-3 p-4">
-              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Refine por período, localidade, gestão e supervisor.
-              </p>
-
-              <div className="grid gap-3 lg:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.35fr)]">
-                <div className="relative">
-                  <Calendar size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <select
-                    value={periodo}
-                    onChange={(e) => setPeriodo(e.target.value)}
-                    className="h-11 w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm font-extrabold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                  >
-                    {PERIODO_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                </div>
-
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-950">
-                  <Search size={15} className="shrink-0 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por placa, modelo ou base..."
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 outline-none dark:text-slate-200"
-                  />
-                  {busca && (
-                    <button type="button" onClick={() => setBusca('')} className="text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200">
-                      <X size={15} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {periodo === 'custom' && (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    type="date"
-                    value={customDesde}
-                    onChange={(e) => setCustomDesde(e.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                  />
-                  <span className="hidden text-xs font-bold text-slate-400 sm:inline">até</span>
-                  <input
-                    type="date"
-                    value={customAte}
-                    onChange={(e) => setCustomAte(e.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                  />
-                </div>
-              )}
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
-                <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
-                <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} />
-                <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} />
-                <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} />
-              </div>
+          <FilterSearchField
+            value={busca}
+            onChange={setBusca}
+            placeholder="Buscar por placa, modelo ou base..."
+          />
+          {periodo === 'custom' ? (
+            <div className="col-span-full mt-1 flex flex-col gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Intervalo</label>
+              <input
+                type="date"
+                value={customDesde}
+                onChange={(e) => setCustomDesde(e.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+              />
+              <span className="hidden text-xs font-bold text-slate-400 sm:inline">até</span>
+              <input
+                type="date"
+                value={customAte}
+                onChange={(e) => setCustomAte(e.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+              />
             </div>
-          </div>
+          ) : null}
+        </FilterPanelGroup>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-3">
+            <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} tone="dark" />
+          </FilterPanelGroup>
+          <FilterPanelGroup title="Veículo" columns="sm:grid-cols-2">
+            <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} tone="dark" />
+          </FilterPanelGroup>
         </div>
-      </section>
+      </FilterPanel>
 
       {/* Abas + listas */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

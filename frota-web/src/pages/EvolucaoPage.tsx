@@ -4,11 +4,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock,
   Download,
-  RotateCcw,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -32,6 +29,7 @@ import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilte
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
+import { FilterPanel, FilterPanelGroup, useFilterPanelVisible } from '../components/ui/FilterPanel'
 
 const TOOLTIP_EXEMPLOS_MAX = 5
 const TOOLTIP_W = 240
@@ -500,10 +498,7 @@ export function EvolucaoPage() {
   } | null>(null)
 
   const [visao, setVisao] = useState<'grafico' | 'heatmap' | 'defeitos'>('grafico')
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
-    try { return localStorage.getItem('frota.filtros.evolucao') === 'true' }
-    catch { return false }
-  })
+  const [filtrosVisiveis, setFiltrosVisiveis] = useFilterPanelVisible('frota.filtros.evolucao')
   const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
   const [filtroBase, setFiltroBase] = useState(() => lsGet('frota.evolucao.base', 'todos'))
   const [filtroCoord, setFiltroCoord] = useState(() => lsGet('frota.evolucao.coord', 'todos'))
@@ -662,8 +657,28 @@ export function EvolucaoPage() {
     setFiltroResp('todos'); setFiltroPrefixo('todos'); setFiltroData('todos')
   }
 
-  const filtrosAtivos = filtroBase !== 'todos' || filtroCoord !== 'todos' ||
-    filtroResp !== 'todos' || filtroPrefixo !== 'todos' || filtroData !== 'todos'
+  const filtrosAtivosCount = useMemo(() => {
+    let n = 0
+    if (filtroBase !== 'todos') n += 1
+    if (filtroCoord !== 'todos') n += 1
+    if (filtroResp !== 'todos') n += 1
+    if (filtroPrefixo !== 'todos') n += 1
+    if (filtroData !== 'todos') n += 1
+    return n
+  }, [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData])
+
+  const filtrosResumo = useMemo(() => {
+    const parts: string[] = []
+    if (filtroBase !== 'todos') parts.push(`base ${filtroBase}`)
+    if (filtroCoord !== 'todos') parts.push(`gerência ${filtroCoord}`)
+    if (filtroResp !== 'todos') parts.push(`resp. ${filtroResp}`)
+    if (filtroPrefixo !== 'todos') parts.push(`prefixo ${filtroPrefixo}`)
+    if (filtroData !== 'todos') {
+      const label = DATA_OPTS.find((o) => o.value === filtroData)?.label ?? filtroData
+      parts.push(label)
+    }
+    return parts.join(' · ') || undefined
+  }, [filtroBase, filtroCoord, filtroResp, filtroPrefixo, filtroData])
 
   const isMobile = wrapW > 0 && wrapW < 640
   const cellSize = isMobile ? 60 : 80
@@ -713,47 +728,25 @@ export function EvolucaoPage() {
         </div>
       </div>
 
-      {/* ── Filtros ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-center justify-between px-4 py-3">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Filtros</span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={limparFiltros}
-              disabled={!filtrosAtivos}
-              className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-extrabold transition',
-                filtrosAtivos ? 'text-brand-700 hover:bg-slate-100 dark:text-brand-400 dark:hover:bg-slate-800' : 'cursor-not-allowed text-slate-400 dark:text-slate-600',
-              ].join(' ')}
-            >
-              <RotateCcw size={14} />
-              Limpar filtros
-            </button>
-            <button
-              type="button"
-              onClick={() => setFiltrosVisiveis((v) => {
-                const next = !v
-                try { localStorage.setItem('frota.filtros.evolucao', String(next)) } catch { /* ignore */ }
-                return next
-              })}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600/60 dark:text-slate-200 dark:hover:bg-white/5"
-            >
-              {filtrosVisiveis ? <><ChevronUp size={13} className="text-slate-400" /> Ocultar filtros</> : <><ChevronDown size={13} className="text-slate-400" /> Mostrar filtros</>}
-            </button>
-          </div>
+      <FilterPanel
+        visible={filtrosVisiveis}
+        onVisibleChange={setFiltrosVisiveis}
+        activeCount={filtrosAtivosCount}
+        onClear={limparFiltros}
+        summary={filtrosResumo}
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-3">
+            <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} tone="dark" />
+            <Select label="Gerência" value={filtroCoord} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setFiltroCoord} tone="dark" />
+            <Select label="Responsável" value={filtroResp} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={setFiltroResp} tone="dark" />
+          </FilterPanelGroup>
+          <FilterPanelGroup title="Veículo e período" columns="sm:grid-cols-2">
+            <Select label="Prefixo" value={filtroPrefixo} options={optPrefixo} onChange={setFiltroPrefixo} tone="dark" />
+            <Select label="Data" value={filtroData} options={DATA_OPTS} onChange={(v) => setFiltroData(v as EvolucaoFiltros['data'])} tone="dark" />
+          </FilterPanelGroup>
         </div>
-        <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${filtrosVisiveis ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-          <div className="overflow-hidden">
-            <div className="grid grid-cols-1 gap-3 border-t border-slate-100 px-4 pb-4 pt-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 dark:border-slate-800">
-              <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} />
-              <Select label="Coordenador" value={filtroCoord} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setFiltroCoord} />
-              <Select label="Responsável" value={filtroResp} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={setFiltroResp} />
-              <Select label="Prefixo" value={filtroPrefixo} options={optPrefixo} onChange={setFiltroPrefixo} />
-              <Select label="Data" value={filtroData} options={DATA_OPTS} onChange={(v) => setFiltroData(v as EvolucaoFiltros['data'])} />
-            </div>
-          </div>
-        </div>
-      </div>
+      </FilterPanel>
 
       {/* ── KPIs principais ── */}
       <div data-tour="evolucao-kpis" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
