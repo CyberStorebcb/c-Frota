@@ -27,6 +27,21 @@ function fmtTime(d: Date): string {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+/**
+ * Converte caracteres fora do Latin-1 (ISO-8859-1) para equivalentes ASCII.
+ * jsPDF com fontes padrão (Helvetica) só suporta Latin-1; caracteres fora
+ * desse range corrompem o stream da página silenciosamente.
+ */
+function sanitize(text: string): string {
+  return text
+    .replace(/—/g, ‘-’)      // em dash → hyphen
+    .replace(/–/g, ‘-’)      // en dash → hyphen
+    .replace(/‘|’/g, “’”) // curly single quotes → apostrophe
+    .replace(/“|”/g, ‘”’) // curly double quotes → straight
+    .replace(/…/g, ‘...’)    // ellipsis → three dots
+    .replace(/[Ā-￿]/g, ‘?’) // demais fora do Latin-1
+}
+
 const CAMPO_LABELS: Record<string, string> = {
   placa: 'Placa',
   marca_modelo: 'Marca/Modelo',
@@ -38,6 +53,16 @@ const CAMPO_LABELS: Record<string, string> = {
 }
 
 export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData): Promise<void> {
+  // Diagnóstico — visível no console do browser para depuração
+  console.log('[PDF] gerando relatório', {
+    schemaNome:   raw.schemaNome,
+    operador:     raw.operador,
+    matricula:    raw.matricula,
+    veiculo:      raw.veiculo,
+    grupos:       raw.grupos?.length ?? 'undefined',
+    respostas:    Object.keys(raw.respostas ?? {}).length,
+  })
+
   // Normaliza campos que podem chegar undefined por compatibilidade de versão
   const data: ChecklistPublicoPdfData = {
     schemaNome:     raw.schemaNome     ?? 'Checklist',
@@ -91,7 +116,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
     doc.setTextColor(255, 255, 255)
-    doc.text(`CGB FROTA  ·  ${data.schemaNome.toUpperCase()}  ·  ${data.veiculo}`, margin + 3, margin + 6.5)
+    doc.text(`CGB FROTA  ·  ${sanitize(data.schemaNome).toUpperCase()}  ·  ${data.veiculo}`, margin + 3, margin + 6.5)
   }
 
   // ── Cabeçalho principal (página 1) ────────────────────────────────────────
@@ -111,7 +136,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(255, 255, 255)
-  doc.text(data.schemaNome.toUpperCase(), pageW - margin, 12, { align: 'right' })
+  doc.text(sanitize(data.schemaNome).toUpperCase(), pageW - margin, 12, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
@@ -147,7 +172,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(30, 30, 30)
-    doc.text(value || '—', margin + offsetX, y + 5, { maxWidth: colW - 4 })
+    doc.text(sanitize(value) || '-', margin + offsetX, y + 5, { maxWidth: colW - 4 })
     return y + 13
   }
 
@@ -162,8 +187,8 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(30, 30, 30)
-  doc.text(data.operador || '—', margin, y + 5)
-  doc.text(data.matricula || '—', margin + contentW / 2, y + 5)
+  doc.text(sanitize(data.operador) || '-', margin, y + 5)
+  doc.text(data.matricula || '-', margin + contentW / 2, y + 5)
   y += 13
 
   // Linha 2: Supervisor
@@ -174,7 +199,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(30, 30, 30)
-  doc.text(data.nomeSupervisor || '—', margin, y + 5)
+  doc.text(sanitize(data.nomeSupervisor) || '-', margin, y + 5)
   y += 13
 
   // ── Seção: dados do veículo ───────────────────────────────────────────────
@@ -190,8 +215,8 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     const k2 = camposExibir[i + 1]
     const label1 = CAMPO_LABELS[k1] ?? k1
     const label2 = k2 ? (CAMPO_LABELS[k2] ?? k2) : ''
-    const val1 = data.dadosVeiculo[k1] ?? '—'
-    const val2 = k2 ? (data.dadosVeiculo[k2] ?? '—') : ''
+    const val1 = data.dadosVeiculo[k1] ?? '-'
+    const val2 = k2 ? (data.dadosVeiculo[k2] ?? '-') : ''
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(7)
@@ -202,8 +227,8 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(30, 30, 30)
-    doc.text(val1, margin, y + 5, { maxWidth: contentW / 2 - 4 })
-    if (val2) doc.text(val2, margin + contentW / 2, y + 5, { maxWidth: contentW / 2 - 4 })
+    doc.text(sanitize(val1), margin, y + 5, { maxWidth: contentW / 2 - 4 })
+    if (val2) doc.text(sanitize(val2), margin + contentW / 2, y + 5, { maxWidth: contentW / 2 - 4 })
     y += 13
   }
 
@@ -242,7 +267,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(6)
       doc.setTextColor(...COR_CINZA)
-      doc.text('—', bx + badgeW / 2, by - 0.5, { align: 'center' })
+      doc.text('-', bx + badgeW / 2, by - 0.5, { align: 'center' })
     }
   }
 
@@ -254,7 +279,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
     doc.setTextColor(...COR_PRIMARIA)
-    doc.text(grupo.titulo, margin + 2, y)
+    doc.text(sanitize(grupo.titulo), margin + 2, y)
     y += 6
 
     for (let idx = 0; idx < grupo.itens.length; idx++) {
@@ -275,9 +300,9 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
       // Imperativo badge
       if (item.imperativo) {
         doc.setFont('helvetica', 'bold')
-        doc.setFontSize(6)
+        doc.setFontSize(6.5)
         doc.setTextColor(...COR_VERMELHO)
-        doc.text('🚫', margin + 2, y - 1)
+        doc.text('(!)', margin + 2, y - 1)
       }
 
       // Label do item
@@ -285,7 +310,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
       doc.setFontSize(8)
       doc.setTextColor(status === 'nc' ? 180 : 50, status === 'nc' ? 30 : 50, status === 'nc' ? 30 : 50)
       const labelX = item.imperativo ? margin + 6 : margin + 2
-      doc.text(item.label, labelX, y - 1, { maxWidth: contentW - badgeW - 10 })
+      doc.text(sanitize(item.label), labelX, y - 1, { maxWidth: contentW - badgeW - 10 })
 
       // Badge de status
       drawBadge(status, pageW - margin - badgeW - 2, y)
@@ -296,7 +321,7 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
         doc.setFont('helvetica', 'italic')
         doc.setFontSize(7)
         doc.setTextColor(...COR_AMARELO)
-        const obsText = doc.splitTextToSize(`Obs: ${obs}`, contentW - 8)
+        const obsText = doc.splitTextToSize(`Obs: ${sanitize(obs)}`, contentW - 8)
         doc.text(obsText, margin + 4, y)
         y += obsText.length * 4
       } else {
@@ -330,13 +355,13 @@ export async function generateChecklistPublicoPdf(raw: ChecklistPublicoPdfData):
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(8)
       doc.setTextColor(...COR_VERMELHO)
-      doc.text(`${item.imperativo ? '🚫 ' : '⚠ '}${item.label}`, margin + 3, y - 1)
+      doc.text(`${item.imperativo ? '[!] ' : '[NC] '}${sanitize(item.label)}`, margin + 3, y - 1)
 
       if (item.obs) {
         doc.setFont('helvetica', 'italic')
         doc.setFontSize(7.5)
         doc.setTextColor(100, 40, 40)
-        const obsLines = doc.splitTextToSize(item.obs, contentW - 8)
+        const obsLines = doc.splitTextToSize(sanitize(item.obs), contentW - 8)
         doc.text(obsLines, margin + 3, y + 5)
         y += 5 + obsLines.length * 4 + 4
       } else {
