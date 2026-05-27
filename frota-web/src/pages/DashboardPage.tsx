@@ -486,15 +486,21 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // Aderência segue o período selecionado:
-    // - Hoje (1 dia): checklists realizados / operacionais ativos
-    // - Período (N dias): checklists realizados / (operacionais × N dias)
+    // Aderência: apenas veículos OPERACIONAIS no numerador e denominador
+    // (exclui ADM para alinhar com o critério do Detalhar checklists)
+    const checklistsOpNoPeriodo = countUniqueCompletionsInPeriod(
+      new Set([...checklistCompletions].filter((k) => {
+        const placa = k.slice(0, k.lastIndexOf('|'))
+        return operacionalPlacasSet.has(placa)
+      })),
+      periodDays,
+    )
     const esperados = ativosOperacionaisFiltrado * periodDays.length
-    const pctAderencia = esperados > 0 ? Math.min(100, Math.round((checklistsNoPeriodo / esperados) * 100)) : 0
+    const pctAderencia = esperados > 0 ? Math.min(100, Math.round((checklistsOpNoPeriodo / esperados) * 100)) : 0
     const aderencia = esperados > 0 ? `${pctAderencia}%` : '—'
     const aderenciaSub = periodDays.length === 1
-      ? `${checklistsNoPeriodo} de ${esperados} checklists realizados`
-      : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias)`
+      ? `${checklistsOpNoPeriodo} de ${esperados} checklists realizados`
+      : `${checklistsOpNoPeriodo} de ${esperados} esperados (${periodDays.length} dias)`
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
     const pendentesUnicas = new Set(
