@@ -1,5 +1,3 @@
-import { TOTAL_VEHICLE_ROWS } from './totalVehiclesFleet.gen'
-
 export type SupervisorFilterSelectOption = { value: string; label: string }
 
 function normSup(s: string): string {
@@ -16,20 +14,87 @@ export function matchesSupervisorFilter(rowSupervisor: string, filterValue: stri
   return normSup(rowSupervisor).includes(normSup(filterValue))
 }
 
-// Gera lista de supervisores únicos a partir da coluna RESPONSÁVEL do catálogo
-function buildSupervisorOptions(): SupervisorFilterSelectOption[] {
-  const skip = new Set(['', 'FROTA', 'AVARIADO', 'DESMOBILIZADA', 'RESERVA', 'ITALO', 'PAULO'])
-  const seen = new Set<string>()
-  const opts: SupervisorFilterSelectOption[] = []
+// Lista estática de 72 supervisores autorizados (fonte: SUPERVISORES.txt)
+const AUTHORIZED_SUPERVISORS = [
+  'LEONARDO ESTRELA',
+  'PABLO LOURA',
+  'EVERALDO NOGUEIRA',
+  'ARLISSON ROGERIO',
+  'DEILTON RIBEIRO',
+  'LUIS FILIPE',
+  'ANTONIO MARCOS SALAZAR DOS REIS',
+  'MIKEIAS VELOSO',
+  'RAIMUNDO HERMERSON',
+  'GUILHERME FONSECA',
+  'WERBETH RODRIGUES',
+  'LUIZ CARLOS',
+  'CRISTOPHE DANIEL',
+  'JACKSON SOUZA',
+  'ANDERSON',
+  'JOAO CLIMACO',
+  'RAIMUNDO ALMEIDA',
+  'JOADSON CARLOS DA SILVA FERREIRA',
+  'WALLYSON DA SILVA ALMEIDA',
+  'MARCOS ALENCAR',
+  'JOSIEL MENESES',
+  'LEONARDO BRUNO',
+  'MESSIAS ABREU',
+  'WASHINGTON SOARES',
+  'NONATO',
+  'ADAILTON LIMA FERREIRA',
+  'GLEYSON',
+  'LUCAS ALVES',
+  'BRUNO',
+  'FISCAL',
+  'ANTONIO SAMUEL',
+  'SANTANA DE LIMA',
+  'HITALO',
+  'MATEUS',
+  'JORDEN CLEYSON',
+  'RENATO RAMOS CARVALHO',
+  'GABRIEL DO CARMO',
+  'JOISE MARQUES',
+  'RICARDO MALTA',
+  'AFONSO',
+  'NORMAM MATHEUS',
+  'JAMERSON MIRANDA',
+  'LEANDRO FRANCISCO',
+  'JULIO CESAR',
+  'PRYSCILLA CRISTYANE',
+  'RAFAELA MELO',
+  'JOÃO ALEF',
+  'FRANCISCO JOSE GUERREIRO',
+  'RUAN VALMIR',
+  'IGOR DIONÍSIO',
+  'DARIO FRANÇA',
+  'LUCAS SOUZA',
+  'EDIVAN DE LIMA',
+  'PAULO',
+  'JOSIELINGTON PAZ DE OLIVEIRA',
+  'EVERTON SIQUEIRA',
+  'ANTONIO SILVA DE ABREU',
+  'WELRISSON OLIVEIRA',
+  'NILO GONCALVES',
+  'MATEUS ANTÔNIO',
+  'LEONARDO MARTINS',
+  'ABRAÃO',
+  'VALVICK SALES',
+  'ROGÉRIO PEIXOTO',
+  'PATRICK',
+  'ACLESSIO',
+  'WALDIR',
+  'EMANUEL',
+  'MARCOS ANDRADE',
+  'IDIALDO COIMBRA',
+  'ROGÉRIO LEANDRO PEIXOTO',
+]
 
-  for (const row of TOTAL_VEHICLE_ROWS) {
-    const v = row.responsavel?.trim().toUpperCase()
-    if (!v || skip.has(v)) continue
-    const key = normSup(v)
-    if (seen.has(key)) continue
-    seen.add(key)
-    opts.push({ value: v, label: v })
-  }
+// Gera lista de supervisores autorizados
+function buildSupervisorOptions(): SupervisorFilterSelectOption[] {
+  const opts: SupervisorFilterSelectOption[] = AUTHORIZED_SUPERVISORS.map(name => ({
+    value: name,
+    label: name,
+  }))
 
   opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   return [{ value: 'todos', label: 'Todos' }, ...opts]

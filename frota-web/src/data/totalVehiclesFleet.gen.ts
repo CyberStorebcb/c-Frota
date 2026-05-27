@@ -2933,7 +2933,7 @@ export const TOTAL_VEHICLE_ROWS: TotalVehicleSourceRow[] = [
     "tipo": "PICAPE LEVE",
     "proprietario": "PRÓPRIO",
     "prefixo": "TECNICO DE PLANEJAMENTO",
-    "responsavel": "ITALO",
+    "responsavel": "HITALO",
     "base": "ITM",
     "setor": "OPERACIONAL",
     "processo": "GOMAN",
