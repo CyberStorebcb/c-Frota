@@ -27,27 +27,21 @@ function fmtTime(d: Date): string {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-/**
- * Converte chars fora do Latin-1 para ASCII.
- * Implementado sem literais Unicode nos padroes para evitar erros de build
- * em ambientes com encoding diferente (ex: Vercel + TypeScript 6).
- */
 function sanitize(text: string): string {
-  // Mapa de code points acima de Latin-1 para equivalentes ASCII
-  const MAP: Record<number, string> = {
-    0x2014: ‘-’,   // em dash
-    0x2013: ‘-’,   // en dash
-    0x2018: “’”,   // left single quote
-    0x2019: “’”,   // right single quote
-    0x201C: ‘”’,   // left double quote
-    0x201D: ‘”’,   // right double quote
-    0x2026: ‘...’, // ellipsis
-  }
+  const H = String.fromCharCode(45)        // hyphen
+  const A = String.fromCharCode(39)        // apostrophe
+  const Q = String.fromCharCode(34)        // double-quote
+  const E = String.fromCharCode(46,46,46)  // three dots
+  const X = String.fromCharCode(63)        // question mark fallback
   return Array.from(text).map((ch) => {
     const code = ch.codePointAt(0) ?? 0
-    if (code <= 0xFF) return ch          // Latin-1: mantem
-    return MAP[code] ?? ‘?’              // fora do Latin-1: converte ou ‘?’
-  }).join(‘’)
+    if (code <= 0xFF) return ch
+    if (code === 0x2014 || code === 0x2013) return H
+    if (code === 0x2018 || code === 0x2019) return A
+    if (code === 0x201C || code === 0x201D) return Q
+    if (code === 0x2026) return E
+    return X
+  }).join(String.fromCharCode())
 }
 
 const CAMPO_LABELS: Record<string, string> = {
