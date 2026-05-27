@@ -532,31 +532,29 @@ function TelaConclusao({
         )}
 
         {/* Resumo do envio: operador, placa, data e hora */}
-        <div className={`w-full divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white dark:divide-slate-700/50 dark:border-slate-700/60 dark:bg-slate-900/60 ${embeddedInFrame ? 'text-xs' : 'text-sm'}`}>
+        <div className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/60 dark:bg-slate-900/60">
           {/* Operador */}
           {operador && (
-            <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">Operador</p>
-              <p className={`font-bold text-slate-700 dark:text-slate-200 ${embeddedInFrame ? 'text-xs' : 'text-sm'}`}>{operador}</p>
+            <div className="border-b border-slate-100 px-4 py-3 text-center dark:border-slate-700/50">
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">Operador</p>
+              <p className={`mt-0.5 font-bold text-slate-800 dark:text-slate-100 ${embeddedInFrame ? 'text-sm' : 'text-base'}`}>{operador}</p>
             </div>
           )}
           {/* Placa */}
           {veiculo && (
-            <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">Placa</p>
-              <p className={`font-black tabular-nums tracking-wider text-slate-700 dark:text-slate-200 ${embeddedInFrame ? 'text-xs' : 'text-sm'}`}>{veiculo}</p>
+            <div className="border-b border-slate-100 px-4 py-3 text-center dark:border-slate-700/50">
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">Placa</p>
+              <p className={`mt-0.5 font-black tracking-widest text-slate-800 dark:text-slate-100 ${embeddedInFrame ? 'text-base' : 'text-lg'}`}>{veiculo}</p>
             </div>
           )}
           {/* Data e hora */}
           <div className="px-4 py-3 text-center">
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+            <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
               {offline ? 'Salvo em' : 'Enviado em'}
             </p>
-            <p className={`mt-1 font-black tabular-nums text-slate-700 dark:text-slate-200 ${embeddedInFrame ? 'text-base' : 'text-lg'}`}>
+            <p className={`mt-0.5 font-black tabular-nums text-slate-800 dark:text-slate-100 ${embeddedInFrame ? 'text-base' : 'text-lg'}`}>
               {submittedAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              {' '}
-              <span className="text-slate-400 dark:text-slate-500">·</span>
-              {' '}
+              <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
               {submittedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
           </div>
