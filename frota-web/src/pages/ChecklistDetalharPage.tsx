@@ -7,6 +7,8 @@ import {
   Calendar,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ClipboardCheck,
   ClipboardX,
@@ -327,6 +329,7 @@ export function ChecklistDetalharPage() {
     return 'list'
   })
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [focusedSide, setFocusedSide] = useState<null | 'nao' | 'sim'>(null)
   const [pdfModalOpen, setPdfModalOpen] = useState(false)
   const [pdfGerando, setPdfGerando] = useState(false)
   const [capturandoFoto, setCapturandoFoto] = useState(false)
@@ -1098,7 +1101,11 @@ export function ChecklistDetalharPage() {
             fullscreen={isFullscreen}
           />
         ) : (
-        <div className={`grid min-h-0 flex-1 gap-4 xl:grid-cols-2 xl:items-stretch ${isFullscreen ? 'min-h-0' : ''}`}>
+        <div className={`grid min-h-0 flex-1 gap-4 xl:items-stretch transition-all duration-300 ${
+          focusedSide === 'nao' ? 'xl:grid-cols-[3fr_1fr]' :
+          focusedSide === 'sim' ? 'xl:grid-cols-[1fr_3fr]' :
+          'xl:grid-cols-2'
+        } ${isFullscreen ? 'min-h-0' : ''}`}>
 
           {/* Coluna: Não realizaram */}
           <div className={`flex flex-col overflow-hidden rounded-[1.5rem] border border-rose-200/80 bg-white shadow-soft dark:border-rose-950/60 dark:bg-slate-900 ${isFullscreen ? 'min-h-0 flex-1' : 'min-h-[420px]'}`}>
@@ -1113,6 +1120,13 @@ export function ChecklistDetalharPage() {
               <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
                 {naoRealizaramFiltrados.length}
               </span>
+              <button
+                onClick={() => setFocusedSide(focusedSide === 'nao' ? null : 'nao')}
+                title={focusedSide === 'nao' ? 'Restaurar visualização' : 'Expandir Não realizaram'}
+                className="ml-1 grid h-7 w-7 place-items-center rounded-lg text-rose-400 transition hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/60 dark:hover:text-rose-300"
+              >
+                {focusedSide === 'nao' ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+              </button>
             </div>
 
             {naoRealizaramFiltrados.length === 0 ? (
@@ -1188,6 +1202,13 @@ export function ChecklistDetalharPage() {
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
                 {realizaramFiltrados.length}
               </span>
+              <button
+                onClick={() => setFocusedSide(focusedSide === 'sim' ? null : 'sim')}
+                title={focusedSide === 'sim' ? 'Restaurar visualização' : 'Expandir Realizaram'}
+                className="ml-1 grid h-7 w-7 place-items-center rounded-lg text-emerald-400 transition hover:bg-emerald-100 hover:text-emerald-600 dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300"
+              >
+                {focusedSide === 'sim' ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+              </button>
             </div>
 
             {realizaramFiltrados.length === 0 ? (
