@@ -1,10 +1,12 @@
+import { OFFICIAL_COORDENADORES } from './officialFilters.gen'
+
 /** Opções fixas do filtro "Gerência" (valor normalizado em minúsculas, sem acento, para comparação). */
 export type CoordenadorFilterSelectOption = { value: string; label: string }
 
 function normCoord(s: string): string {
   return s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ')
@@ -16,18 +18,14 @@ export function matchesCoordenadorFilter(rowCoord: string, filterValue: string):
   return normCoord(rowCoord) === normCoord(filterValue)
 }
 
+function toCoordValue(label: string): string {
+  return normCoord(label)
+}
+
 export const COORDENADOR_FILTER_SELECT_OPTIONS: CoordenadorFilterSelectOption[] = [
-  { value: 'todos',       label: 'Todos' },
-  { value: 'afonso',      label: 'AFONSO' },
-  { value: 'jackson',     label: 'JACKSON' },
-  { value: 'jamerson',    label: 'JAMERSON' },
-  { value: 'julio',       label: 'JÚLIO' },
-  { value: 'leandro',     label: 'LEANDRO' },
-  { value: 'marcos',      label: 'MARCOS' },
-  { value: 'paulo',       label: 'PAULO' },
-  { value: 'pryscilla',   label: 'PRYSCILLA' },
-  { value: 'rafaela',     label: 'RAFAELA' },
-  { value: 'ricardo',     label: 'RICARDO' },
-  { value: 'ruan valmir', label: 'RUAN VALMIR' },
-  { value: 'waldir',      label: 'WALDIR' },
+  { value: 'todos', label: 'Todos' },
+  ...OFFICIAL_COORDENADORES.map((label) => ({
+    value: toCoordValue(label),
+    label,
+  })),
 ]

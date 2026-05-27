@@ -1,5 +1,7 @@
 import { matchesBaseFilter } from '../data/baseFilterOptions'
 import { matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
+import { matchesPrefixoFilter } from '../data/prefixoFilterOptions'
+import { matchesResponsavelFilter } from '../data/responsavelFilterOptions'
 import { matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { matchesTipoFilter } from '../data/tipoFilterOptions'
 import {
@@ -31,9 +33,6 @@ export type ChecklistFleetFilters = {
   prefixo?: string
 }
 
-function normNome(s: string): string {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
-}
 
 export function passesChecklistFleetFilters(
   v: ChecklistFleetVehicle,
@@ -43,15 +42,13 @@ export function passesChecklistFleetFilters(
   if (filters.supervisor !== 'todos' && !matchesSupervisorFilter(v.supervisor, filters.supervisor)) return false
   if (filters.coordenador !== 'todos' && !matchesCoordenadorFilter(v.coordenador, filters.coordenador)) return false
   if (filters.responsavel && filters.responsavel !== 'todos') {
-    if (normNome(v.responsavel) !== normNome(filters.responsavel)) return false
+    if (!matchesResponsavelFilter(v.responsavel, filters.responsavel)) return false
   }
   if (filters.tipo && filters.tipo !== 'todos') {
     if (!matchesTipoFilter(v.tipo, filters.tipo)) return false
   }
   if (filters.prefixo && filters.prefixo !== 'todos' && filters.prefixo.trim()) {
-    const norm = (s: string) =>
-      s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-    if (norm(v.prefixo) !== norm(filters.prefixo)) return false
+    if (!matchesPrefixoFilter(v.prefixo, filters.prefixo)) return false
   }
   return true
 }
@@ -100,7 +97,8 @@ type ChecklistRowInput = {
 }
 
 /** Agrega checklists concluídos: 1 contagem por placa × dia (mesma regra do Detalhar).
- *  Se `operacionalPlacas` for fornecido, calcula `naoRealizados` = operacionais que não fizeram checklist no dia. */
+ *  Se `operacionalPlacas` for fornecido, só entram checklists de veículos operacionais no escopo;
+ *  `naoRealizados` = operacionais ativos que não fizeram checklist no dia. */
 export function aggregateChecklistCompletions(
   rows: ChecklistRowInput[],
   fleetMap: Map<string, ChecklistFleetVehicle>,
@@ -111,12 +109,19 @@ export function aggregateChecklistCompletions(
   const completions = new Set<string>()
   const comNcByKey = new Map<string, boolean>()
 
+  // Placas operacionais dentro do escopo filtrado
+  const opPlacas = operacionalPlacas
+    ? new Set([...scopedPlacas].filter((p) => operacionalPlacas.has(p)))
+    : null
+  const totalOperacionais = opPlacas ? opPlacas.size : 0
+
   for (const row of rows) {
     const dv = row.dados_veiculo && typeof row.dados_veiculo === 'object'
       ? (row.dados_veiculo as Record<string, unknown>)
       : {}
     const placa = normalizePlacaChecklist(String(dv.placa ?? ''))
     if (!placa || !fleetMap.has(placa) || !scopedPlacas.has(placa)) continue
+    if (opPlacas && !opPlacas.has(placa)) continue
 
     const dia = String(row.data_inspecao ?? '').slice(0, 10)
     if (!dia) continue
@@ -126,12 +131,6 @@ export function aggregateChecklistCompletions(
     if ((row.nc_count as number) > 0) comNcByKey.set(key, true)
     else if (!comNcByKey.has(key)) comNcByKey.set(key, false)
   }
-
-  // Placas operacionais dentro do escopo filtrado
-  const opPlacas = operacionalPlacas
-    ? new Set([...scopedPlacas].filter((p) => operacionalPlacas.has(p)))
-    : null
-  const totalOperacionais = opPlacas ? opPlacas.size : 0
 
   const dayMap = new Map<string, { realizados: number; comNc: number }>()
   for (const key of completions) {

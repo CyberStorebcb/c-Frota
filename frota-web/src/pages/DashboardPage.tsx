@@ -21,6 +21,8 @@ import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
 import { normalizePlaca } from '../frota/vehicleRegistry'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
+import { RESPONSAVEL_FILTER_SELECT_OPTIONS, matchesResponsavelFilter } from '../data/responsavelFilterOptions'
+import { PREFIXO_FILTER_SELECT_OPTIONS } from '../data/prefixoFilterOptions'
 import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { Select } from '../components/ui/Select'
 import { FilterPanel, FilterPanelGroup, useFilterPanelVisible } from '../components/ui/FilterPanel'
@@ -254,6 +256,9 @@ export function DashboardPage() {
   const [filtroCoordenador, setFiltroCoordenador] = useState<string>(() => {
     try { return localStorage.getItem('frota.dashboard.filtroCoordenador') ?? 'todos' } catch { return 'todos' }
   })
+  const [filtroResponsavel, setFiltroResponsavel] = useState<string>(() => {
+    try { return localStorage.getItem('frota.dashboard.filtroResponsavel') ?? 'todos' } catch { return 'todos' }
+  })
   const [filtroSupervisor, setFiltroSupervisor] = useState<string>(() => {
     try { return localStorage.getItem('frota.dashboard.filtroSupervisor') ?? 'todos' } catch { return 'todos' }
   })
@@ -277,11 +282,12 @@ export function DashboardPage() {
       localStorage.setItem('frota.dashboard.customAte', customAte)
       localStorage.setItem('frota.dashboard.filtroBase', filtroBase)
       localStorage.setItem('frota.dashboard.filtroCoordenador', filtroCoordenador)
+      localStorage.setItem('frota.dashboard.filtroResponsavel', filtroResponsavel)
       localStorage.setItem('frota.dashboard.filtroSupervisor', filtroSupervisor)
       localStorage.setItem('frota.dashboard.filtroTipo', filtroTipo)
       localStorage.setItem('frota.dashboard.filtroPrefixo', filtroPrefixo)
     } catch { /* ignore */ }
-  }, [periodo, customDesde, customAte, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo])
+  }, [periodo, customDesde, customAte, filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor, filtroTipo, filtroPrefixo])
 
   const navigate = useNavigate()
 
@@ -294,7 +300,8 @@ export function DashboardPage() {
     }
     if (filtroBase !== 'todos') params.set('base', filtroBase)
     if (filtroCoordenador !== 'todos') params.set('gerencia', filtroCoordenador)
-    if (filtroSupervisor !== 'todos') params.set('responsavel', filtroSupervisor)
+    if (filtroResponsavel !== 'todos') params.set('responsavel', filtroResponsavel)
+    if (filtroSupervisor !== 'todos') params.set('supervisor', filtroSupervisor)
     if (filtroTipo !== 'todos') params.set('tipo', filtroTipo)
     if (filtroPrefixo !== 'todos') params.set('prefixo', filtroPrefixo)
     navigate(`/checklists/detalhar?${params.toString()}`)
@@ -308,41 +315,26 @@ export function DashboardPage() {
     () => ({
       base: filtroBase,
       coordenador: filtroCoordenador,
-      supervisor: 'todos',
-      responsavel: filtroSupervisor,
+      supervisor: filtroSupervisor,
+      responsavel: filtroResponsavel,
       tipo: filtroTipo,
       prefixo: filtroPrefixo,
     }),
-    [filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo],
+    [filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor, filtroTipo, filtroPrefixo],
   )
 
-  const prefixoOptions = useMemo(() => {
-    const filtersForPrefixo = {
-      base: filtroBase,
-      coordenador: filtroCoordenador,
-      supervisor: 'todos' as const,
-      responsavel: filtroSupervisor,
-      tipo: filtroTipo,
-      prefixo: 'todos',
-    }
-    const prefixos = new Set<string>()
-    for (const v of filterActiveFleet(activeFleetMap, filtersForPrefixo)) {
-      const p = v.prefixo?.trim()
-      if (p) prefixos.add(p)
-    }
-    const sorted = Array.from(prefixos).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-    return [{ value: 'todos', label: 'Todos' }, ...sorted.map((p) => ({ value: p, label: p }))]
-  }, [activeFleetMap, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo])
+  const prefixoOptions = PREFIXO_FILTER_SELECT_OPTIONS
 
   useEffect(() => {
     if (filtroPrefixo !== 'todos' && !prefixoOptions.some((o) => o.value === filtroPrefixo)) {
       setFiltroPrefixo('todos')
     }
-  }, [prefixoOptions, filtroPrefixo])
+  }, [filtroPrefixo, prefixoOptions])
 
   const limparFiltrosAvancados = useCallback(() => {
     setFiltroBase('todos')
     setFiltroCoordenador('todos')
+    setFiltroResponsavel('todos')
     setFiltroSupervisor('todos')
     setFiltroTipo('todos')
     setFiltroPrefixo('todos')
@@ -352,21 +344,23 @@ export function DashboardPage() {
     let n = 0
     if (filtroBase !== 'todos') n += 1
     if (filtroCoordenador !== 'todos') n += 1
+    if (filtroResponsavel !== 'todos') n += 1
     if (filtroSupervisor !== 'todos') n += 1
     if (filtroTipo !== 'todos') n += 1
     if (filtroPrefixo !== 'todos') n += 1
     return n
-  }, [filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo])
+  }, [filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor, filtroTipo, filtroPrefixo])
 
   const filtrosAvancadosResumo = useMemo(() => {
     const parts: string[] = []
     if (filtroBase !== 'todos') parts.push(`base ${filtroBase}`)
     if (filtroCoordenador !== 'todos') parts.push(`gerência ${filtroCoordenador}`)
+    if (filtroResponsavel !== 'todos') parts.push(`resp. ${filtroResponsavel}`)
     if (filtroSupervisor !== 'todos') parts.push(`supervisor ${filtroSupervisor}`)
     if (filtroTipo !== 'todos') parts.push(`tipo ${filtroTipo}`)
     if (filtroPrefixo !== 'todos') parts.push(`prefixo ${filtroPrefixo}`)
     return parts.join(' · ') || undefined
-  }, [filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo])
+  }, [filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor, filtroTipo, filtroPrefixo])
 
   const scopedFleetPlacas = useMemo(
     () => filterActiveFleet(activeFleetMap, checklistFleetFilters).map((v) => v.placa),
@@ -389,8 +383,8 @@ export function DashboardPage() {
   }, [])
 
   const ativosAdministrativos = useMemo(
-    () => [...scopedFleetPlacasSet].filter((p) => adminPlacasSet.has(p)).length,
-    [scopedFleetPlacasSet, adminPlacasSet],
+    () => scopedFleetPlacas.filter((p) => adminPlacasSet.has(p)).length,
+    [scopedFleetPlacas, adminPlacasSet],
   )
 
   const scopedFleetPlacasOperacionais = useMemo(
@@ -401,6 +395,9 @@ export function DashboardPage() {
   const ativosOperacionaisFiltrado = scopedFleetPlacasOperacionais.length
 
   const [veiculosCardVirado, setVeiculosCardVirado] = useState(false)
+  const dashboardSetorAdm = veiculosCardVirado
+  const ativosSetorFiltrado = dashboardSetorAdm ? ativosAdministrativos : ativosOperacionaisFiltrado
+  const setorChecklistLabel = dashboardSetorAdm ? 'administrativos' : 'operacionais'
   const toggleVeiculosCard = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -415,9 +412,11 @@ export function DashboardPage() {
   const periodoFimIso = periodoLimites.fimIso
   const periodoChartMode = periodoLimites.chartMode
 
-  // Checklists concluídos (progresso 100) por dia — dados reais do Supabase, filtrados pela base via placa.
-  const [checklistsPorDia, setChecklistsPorDia] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
-  const [checklistCompletions, setChecklistCompletions] = useState<Set<string>>(() => new Set())
+  // Checklists concluídos (progresso 100) por dia — separados por setor (operacional / ADM).
+  const [checklistsPorDiaOp, setChecklistsPorDiaOp] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
+  const [checklistCompletionsOp, setChecklistCompletionsOp] = useState<Set<string>>(() => new Set())
+  const [checklistsPorDiaAdm, setChecklistsPorDiaAdm] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
+  const [checklistCompletionsAdm, setChecklistCompletionsAdm] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -425,25 +424,38 @@ export function DashboardPage() {
     void fetchCompletedChecklistsInPeriod(periodoInicioIso, periodoFimIso)
       .then((data) => {
         if (cancelled) return
-        const { completions, porDia } = aggregateChecklistCompletions(
+        const op = aggregateChecklistCompletions(
           data,
           activeFleetMap,
           checklistFleetFilters,
           operacionalPlacasSet,
         )
-        setChecklistCompletions(completions)
-        setChecklistsPorDia(porDia)
+        const adm = aggregateChecklistCompletions(
+          data,
+          activeFleetMap,
+          checklistFleetFilters,
+          adminPlacasSet,
+        )
+        setChecklistCompletionsOp(op.completions)
+        setChecklistsPorDiaOp(op.porDia)
+        setChecklistCompletionsAdm(adm.completions)
+        setChecklistsPorDiaAdm(adm.porDia)
       })
       .catch(() => {
         if (cancelled) return
-        setChecklistsPorDia([])
-        setChecklistCompletions(new Set())
+        setChecklistsPorDiaOp([])
+        setChecklistCompletionsOp(new Set())
+        setChecklistsPorDiaAdm([])
+        setChecklistCompletionsAdm(new Set())
       })
 
     return () => {
       cancelled = true
     }
-  }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters, operacionalPlacasSet])
+  }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters, operacionalPlacasSet, adminPlacasSet])
+
+  const checklistCompletions = dashboardSetorAdm ? checklistCompletionsAdm : checklistCompletionsOp
+  const checklistsPorDia = dashboardSetorAdm ? checklistsPorDiaAdm : checklistsPorDiaOp
 
   const { rows } = useApontamentos()
 
@@ -453,10 +465,11 @@ export function DashboardPage() {
       if (r.resolvido) return false
       if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoordenador !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoordenador)) return false
-      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.responsavel, filtroSupervisor)) return false
+      if (filtroResponsavel !== 'todos' && !matchesResponsavelFilter(r.responsavel, filtroResponsavel)) return false
+      if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
       return true
     })
-  }, [rows, filtroBase, filtroCoordenador, filtroSupervisor])
+  }, [rows, filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor])
 
   const gruposRecorrentes = useMemo(() => {
     // Pega todos os rows como ManageTableRows e extrai os grupos
@@ -524,15 +537,13 @@ export function DashboardPage() {
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
 
-    // Aderência segue o período selecionado:
-    // - Hoje (1 dia): checklists realizados / operacionais ativos
-    // - Período (N dias): checklists realizados / (operacionais × N dias)
-    const esperados = ativosOperacionaisFiltrado * periodDays.length
+    // Aderência segue o período e o setor do card (operacional ou ADM):
+    const esperados = ativosSetorFiltrado * periodDays.length
     const pctAderencia = esperados > 0 ? Math.min(100, Math.round((checklistsNoPeriodo / esperados) * 100)) : 0
     const aderencia = esperados > 0 ? `${pctAderencia}%` : '—'
     const aderenciaSub = periodDays.length === 1
-      ? `${checklistsNoPeriodo} de ${esperados} checklists realizados`
-      : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias)`
+      ? `${checklistsNoPeriodo} de ${esperados} checklists ${setorChecklistLabel} realizados`
+      : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias · ${setorChecklistLabel})`
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
     const pendentesUnicas = new Set(
@@ -554,7 +565,7 @@ export function DashboardPage() {
         Icon: ClipboardCheck,
         iconWrap: 'bg-blue-50 text-blue-600 group-hover:scale-110 dark:bg-blue-950/50 dark:text-blue-400',
         cardHover: 'hover:border-blue-400 dark:hover:border-blue-500',
-        href: '/gerenciar/checklists',
+        href: dashboardSetorAdm ? '/checklists/detalhar/adm' : '/gerenciar/checklists',
       },
       {
         label: 'Conformidade',
@@ -580,7 +591,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacas, scopedFleetPlacasSet, scopedFleetPlacasOperacionais, ativosOperacionaisFiltrado, checklistCompletions, periodDays])
+  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacasSet, ativosSetorFiltrado, checklistCompletions, periodDays, dashboardSetorAdm, setorChecklistLabel])
 
   const chartUi = useMemo(
     () => ({
@@ -773,10 +784,11 @@ export function DashboardPage() {
         beforeToggleExtra={showRecorrentesIcon && !recorrentesIconFloating ? recorrentesIconButton : null}
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-3">
-            <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={BASE_FILTER_SELECT_OPTIONS} tone="dark" />
+          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-2 lg:grid-cols-4">
             <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} options={RESPONSAVEL_FILTER_SELECT_OPTIONS} tone="dark" />
             <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={BASE_FILTER_SELECT_OPTIONS} tone="dark" />
           </FilterPanelGroup>
           <FilterPanelGroup title="Veículo" columns="sm:grid-cols-2">
             <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} tone="dark" />

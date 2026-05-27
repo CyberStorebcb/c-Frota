@@ -1,5 +1,6 @@
 import { isAccessArea, type AccessArea } from '../access/accessAreas'
 import { TOTAL_VEHICLE_ROWS, type TotalVehicleSourceRow } from '../data/totalVehiclesFleet.gen'
+import { isFleetTrashPlaca, getRestoredTrashCatalogRows } from './fleetTrash'
 import { FLEET_CATALOG_ATIVO_PLACAS } from './fleetCatalogAtivoPlacas'
 import { FLEET_CATALOG_DESMOBILIZADO_PLACAS } from './fleetCatalogDesmobilizadoPlacas'
 
@@ -364,7 +365,13 @@ export function getDisplayedFleetVehicles(): FleetVehicle[] {
 
   for (const row of TOTAL_VEHICLE_ROWS) {
     const p = normalizePlaca(row.placa)
-    if (!p) continue
+    if (!p || isFleetTrashPlaca(p)) continue
+    map.set(p, totalRowToFleetVehicle(row))
+  }
+
+  for (const row of getRestoredTrashCatalogRows()) {
+    const p = normalizePlaca(row.placa)
+    if (!p || map.has(p)) continue
     map.set(p, totalRowToFleetVehicle(row))
   }
 

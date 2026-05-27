@@ -38,6 +38,7 @@ function mk(
     base: id % 2 === 0 ? 'Base 01' : 'Base 02',
     coordenador: ['Jackson', 'Jamerson', 'JOÃO FELIPE', 'DESMOBILIZADO', 'FROTA', 'JÚLIO'][id % 6]!,
     responsavel: 'Resp. Mock',
+    supervisor: 'Sup. Mock',
     placa:       '',
     modelo:      '',
     checklistId: `mock-cl-${sid}`,

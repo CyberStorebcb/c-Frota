@@ -31,6 +31,7 @@ function R(p: Partial<Apontamento> & Pick<Apontamento, 'id'>): Apontamento {
     base: 'Base 01',
     coordenador: 'Carlos',
     responsavel: 'João',
+    supervisor: 'Sup 1',
     ncFotos: [],
     problemasAdicionais: '',
     descricaoProblema: '',
@@ -51,6 +52,7 @@ describe('filterResolvidosParaEvolucao', () => {
       base: 'todos',
       coordenador: 'todos',
       responsavel: 'todos',
+      supervisor: 'todos',
       prefixo: 'todos',
       data: 'todos',
     })

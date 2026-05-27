@@ -46,6 +46,7 @@ export type Apontamento = {
   base: string
   coordenador: string
   responsavel: string
+  supervisor: string
   ncFotos: string[]
   problemasAdicionais: string
   descricaoProblema: string
@@ -104,12 +105,18 @@ function rowToResolucao(r: any): Resolucao {
 // ---------------------------------------------------------------------------
 // Mapa placa → veículo (lazy, reconstruído quando necessário)
 // ---------------------------------------------------------------------------
-function buildVehicleMap(): Map<string, { coordenador: string; responsavel: string; processo: string; base: string }> {
-  const map = new Map<string, { coordenador: string; responsavel: string; processo: string; base: string }>()
+function buildVehicleMap(): Map<string, { coordenador: string; responsavel: string; supervisor: string; processo: string; base: string }> {
+  const map = new Map<string, { coordenador: string; responsavel: string; supervisor: string; processo: string; base: string }>()
   for (const v of getDisplayedFleetVehicles()) {
     const p = normalizePlaca(v.placa)
     if (!p) continue
-    map.set(p, { coordenador: v.coordenador, responsavel: v.supervisor, processo: v.tipo, base: v.base })
+    map.set(p, {
+      coordenador: v.coordenador,
+      responsavel: v.responsavel,
+      supervisor: v.supervisor,
+      processo: v.tipo,
+      base: v.base,
+    })
   }
   return map
 }
@@ -118,7 +125,7 @@ function buildVehicleMap(): Map<string, { coordenador: string; responsavel: stri
 // Converte checklist + item NC → Apontamento
 // ---------------------------------------------------------------------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<string, Resolucao>, vehicleMap: Map<string, { coordenador: string; responsavel: string; processo: string; base: string }>): Apontamento {
+function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<string, Resolucao>, vehicleMap: Map<string, { coordenador: string; responsavel: string; supervisor: string; processo: string; base: string }>): Apontamento {
   const id = `${cl.id}__${itemId}`
   const dv = cl.dados_veiculo ?? {}
   const placa   = resolveFleetPlacaFromDadosVeiculo(dv)
@@ -171,6 +178,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     base:                 vehicleMap.get(placa)?.base || (dv.localidade ?? ''),
     coordenador:          vehicleMap.get(placa)?.coordenador ?? cl.nome_supervisor ?? '',
     responsavel:          vehicleMap.get(placa)?.responsavel ?? cl.nome_operador,
+    supervisor:           vehicleMap.get(placa)?.supervisor ?? cl.nome_supervisor ?? '',
     ncFotos,
     problemasAdicionais:  cl.problemas ?? '',
     descricaoProblema:    cl.descricao_problema ?? '',

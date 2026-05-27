@@ -47,6 +47,7 @@ import { useAuth } from '../auth/AuthContext'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
+import { RESPONSAVEL_FILTER_SELECT_OPTIONS, matchesResponsavelFilter } from '../data/responsavelFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 import { FilterPanel, FilterPanelGroup, FilterSearchField } from '../components/ui/FilterPanel'
 import { Portal } from '../components/ui/Portal'
@@ -369,8 +370,8 @@ export function ManagePage() {
     if (vehicleId !== 'todos') list = list.filter((r) => apontamentoMatchesVehicleFilter(r, vehicleFilter))
     if (base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, base))
     if (coordenador !== 'todos') list = list.filter((r) => matchesCoordenadorFilter(r.coordenador, coordenador))
-    if (responsavel !== 'todos') list = list.filter((r) => r.responsavel === responsavel)
-    if (supervisor !== 'todos') list = list.filter((r) => matchesSupervisorFilter(r.responsavel, supervisor))
+    if (responsavel !== 'todos') list = list.filter((r) => matchesResponsavelFilter(r.responsavel, responsavel))
+    if (supervisor !== 'todos') list = list.filter((r) => matchesSupervisorFilter(r.supervisor, supervisor))
     if (prefixo !== 'todos') list = list.filter((r) => r.prefixo === prefixo)
 
     if (data !== 'todos') {
@@ -500,11 +501,12 @@ export function ManagePage() {
     if (vehicleId !== 'todos') n += 1
     if (base !== 'todos') n += 1
     if (coordenador !== 'todos') n += 1
+    if (responsavel !== 'todos') n += 1
     if (supervisor !== 'todos') n += 1
     if (data !== 'todos') n += 1
     if (query.trim().length > 0) n += 1
     return n
-  }, [vehicleId, base, coordenador, supervisor, data, query])
+  }, [vehicleId, base, coordenador, responsavel, supervisor, data, query])
 
   const filtrosResumo = useMemo(() => {
     const parts: string[] = []
@@ -581,7 +583,7 @@ export function ManagePage() {
           processo: r.processo,
           base: r.base,
           responsavel: r.responsavel,
-          supervisor: r.responsavel,
+          supervisor: r.supervisor,
           coordenador: r.coordenador,
           veiculoLabel: r.veiculoLabel,
           defeito: r.defeito,
@@ -606,6 +608,7 @@ export function ManagePage() {
       const filtros: { label: string; valor: string }[] = []
       if (base !== 'todos') filtros.push({ label: 'Base', valor: base })
       if (coordenador !== 'todos') filtros.push({ label: 'Gerência', valor: coordenador })
+      if (responsavel !== 'todos') filtros.push({ label: 'Responsável', valor: responsavel })
       if (supervisor !== 'todos') filtros.push({ label: 'Supervisor', valor: supervisor })
       if (prefixo !== 'todos') filtros.push({ label: 'Prefixo', valor: prefixo })
       if (data !== 'todos') filtros.push({ label: 'Período', valor: data })
@@ -969,8 +972,9 @@ export function ManagePage() {
           ) : null}
         </FilterPanelGroup>
 
-        <FilterPanelGroup title="Gestão e veículo" columns="sm:grid-cols-2 lg:grid-cols-4">
+        <FilterPanelGroup title="Gestão e veículo" columns="sm:grid-cols-2 lg:grid-cols-5">
           <Select label="Gerência" value={coordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setCoordenador(v); setPagina(1) }} tone="dark" />
+          <Select label="Responsável" value={responsavel} options={RESPONSAVEL_FILTER_SELECT_OPTIONS} onChange={(v) => { setResponsavel(v); setPagina(1) }} tone="dark" />
           <Select label="Supervisor" value={supervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={(v) => { setSupervisor(v); setPagina(1) }} tone="dark" />
           <Select label="Base" value={base} options={BASE_FILTER_SELECT_OPTIONS} onChange={(v) => { setBase(v); setPagina(1) }} tone="dark" />
           <Select label="Veículo" value={vehicleId} options={vehicleOptions} onChange={(v) => { setVehicleId(v); setPagina(1) }} tone="dark" />

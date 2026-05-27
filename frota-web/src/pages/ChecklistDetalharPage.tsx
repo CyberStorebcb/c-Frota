@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   List,
   Maximize2,
+  MessageSquareWarning,
   Minimize2,
   RefreshCw,
   Trophy,
@@ -37,6 +38,8 @@ import { Select } from '../components/ui/Select'
 import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
+import { RESPONSAVEL_FILTER_SELECT_OPTIONS } from '../data/responsavelFilterOptions'
+import { PREFIXO_FILTER_SELECT_OPTIONS } from '../data/prefixoFilterOptions'
 import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
 import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
@@ -45,6 +48,15 @@ import { fetchCompletedChecklistsInPeriod } from '../checklists/fetchChecklistCo
 import { downloadDataUrl, generateRankingScreenshot } from '../checklists/generateRankingScreenshot'
 import { useFleet } from '../frota/FleetContext'
 import { useAuth } from '../auth/AuthContext'
+import { ChecklistAusenciaJustificar } from '../components/checklist/ChecklistAusenciaJustificar'
+import {
+  loadChecklistAusenciaJustificativas,
+  removeChecklistAusenciaJustificativa,
+  saveChecklistAusenciaJustificativa,
+  type ChecklistAusenciaJustificativaEntry,
+  type ChecklistAusenciaMotivo,
+} from '../checklists/checklistAusenciaJustificativa'
+import { formatPlaca } from '../frota/vehicleRegistry'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -115,8 +127,27 @@ const FILTROS_STORAGE_KEY_OP = 'frota.filtros.checklist-detalhar.v1'
 const FILTROS_STORAGE_KEY_ADM = 'frota.filtros.checklist-detalhar.adm.v1'
 const FILTROS_VISIBLE_LEGACY_KEY = 'frota.filtros.checklist-detalhar'
 
-type ViewMode = 'cards' | 'list' | 'ranking'
+type ViewMode = 'cards' | 'list' | 'ranking' | 'justificados'
+type DisplayMode = 'cards' | 'list'
+type SectionView = 'resultados' | 'ranking' | 'justificados'
 type SetorVeiculoPagina = 'operacional' | 'adm'
+
+function parseSavedSectionView(saved?: ViewMode, isAdmin?: boolean): SectionView {
+  if (saved === 'ranking' && isAdmin) return 'ranking'
+  if (saved === 'justificados') return 'justificados'
+  return 'resultados'
+}
+
+function parseSavedDisplayMode(saved?: ViewMode): DisplayMode {
+  if (saved === 'cards') return 'cards'
+  return 'list'
+}
+
+function toSavedViewMode(display: DisplayMode, section: SectionView): ViewMode {
+  if (section === 'ranking') return 'ranking'
+  if (section === 'justificados') return 'justificados'
+  return display
+}
 
 type ChecklistDetalharFiltersState = {
   periodo: string
@@ -124,6 +155,7 @@ type ChecklistDetalharFiltersState = {
   customAte: string
   base: string
   gerencia: string
+  responsavel: string
   supervisor: string
   tipo: string
   prefixo: string
@@ -203,7 +235,283 @@ type ChecklistRow = {
   diasNoPeriodo: number
 }
 
-function ListaNaoRealizaram({ items, multiDia }: { items: VeiculoRow[]; multiDia: boolean }) {
+function buildVeiculoRowSearchBlob(v: VeiculoRow): string {
+  return [
+    v.placa,
+    v.base,
+    v.modelo,
+    v.prefixo,
+    v.supervisor,
+    v.coordenador,
+    v.responsavel,
+    v.processo,
+    v.tipo,
+    v.diasRealizados != null ? String(v.diasRealizados) : '',
+    v.diasNoPeriodo != null ? String(v.diasNoPeriodo) : '',
+    v.diasNoPeriodo != null ? `${v.diasRealizados ?? 0}/${v.diasNoPeriodo}` : '',
+  ]
+    .join(' ')
+    .toUpperCase()
+}
+
+function buildChecklistRowSearchBlob(v: ChecklistRow): string {
+  return [
+    v.placa,
+    v.base,
+    v.modelo,
+    v.prefixo,
+    v.data,
+    v.dataFormatada,
+    v.hora,
+    v.supervisor,
+    v.coordenador,
+    v.responsavel,
+    v.processo,
+    v.tipo,
+    v.temNc ? 'NC NÃO CONFORMIDADE' : 'OK',
+    String(v.diasRealizados),
+    String(v.diasNoPeriodo),
+    `${v.diasRealizados}/${v.diasNoPeriodo}`,
+  ]
+    .join(' ')
+    .toUpperCase()
+}
+
+function matchesDetalharBusca(blob: string, query: string): boolean {
+  if (!query) return true
+  return blob.includes(query)
+}
+
+type JustificadoRow = VeiculoRow & { motivo: ChecklistAusenciaMotivo; placaReserva?: string }
+
+function JustificadoMotivoBadge({ motivo, placaReserva }: { motivo: ChecklistAusenciaMotivo; placaReserva?: string }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+      {motivo}
+      {motivo === 'RESERVA' && placaReserva ? (
+        <span className="font-bold normal-case tracking-normal text-amber-900/90 dark:text-amber-100">
+          · {formatPlaca(placaReserva)}
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+function ListaJustificados({
+  items,
+  isAdmin,
+  savingPlaca,
+  onAlterarMotivo,
+  onRemover,
+}: {
+  items: JustificadoRow[]
+  isAdmin?: boolean
+  savingPlaca?: string | null
+  onAlterarMotivo?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string) => void
+  onRemover?: (placa: string) => void
+}) {
+  return (
+    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+      <table className="w-full min-w-[680px] border-collapse text-left">
+        <thead className="sticky top-0 z-[1] bg-amber-50/95 text-[9px] font-black uppercase tracking-wider text-amber-800 backdrop-blur dark:bg-amber-950/90 dark:text-amber-200">
+          <tr className="border-b border-amber-100 dark:border-amber-950/50">
+            <th className="px-3 py-2.5">Placa</th>
+            <th className="px-3 py-2.5">Motivo</th>
+            <th className="px-3 py-2.5">Reserva</th>
+            <th className="px-3 py-2.5">Base</th>
+            <th className="px-3 py-2.5">Modelo</th>
+            <th className="px-3 py-2.5">Prefixo</th>
+            <th className="px-3 py-2.5">Supervisor</th>
+            <th className="px-3 py-2.5">Gerência</th>
+            {isAdmin ? <th className="px-3 py-2.5 text-right">Ações</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((v) => (
+            <tr
+              key={v.placa}
+              className="border-b border-slate-100 transition hover:bg-amber-50/40 dark:border-slate-800 dark:hover:bg-amber-950/10"
+            >
+              <td className="px-3 py-2 text-xs font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</td>
+              <td className="px-3 py-2">
+                <JustificadoMotivoBadge motivo={v.motivo} placaReserva={v.placaReserva} />
+              </td>
+              <td className="px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                {v.motivo === 'RESERVA' && v.placaReserva ? formatPlaca(v.placaReserva) : '—'}
+              </td>
+              <td className="px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">{v.base || '—'}</td>
+              <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
+              <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{v.prefixo || '—'}</td>
+              <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor || '—'}</td>
+              <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador || '—'}</td>
+              {isAdmin ? (
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <ChecklistAusenciaJustificar
+                      placa={v.placa}
+                      motivoAtual={v.motivo}
+                      placaReservaAtual={v.placaReserva}
+                      saving={savingPlaca === v.placa}
+                      onSelect={(motivo, placaReserva) => onAlterarMotivo?.(v.placa, motivo, placaReserva)}
+                    />
+                    <button
+                      type="button"
+                      disabled={savingPlaca === v.placa}
+                      onClick={() => onRemover?.(v.placa)}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-rose-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
+                      title="Remover justificativa e voltar para Não realizaram"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </td>
+              ) : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function JustificadosPanel({
+  items,
+  countLabel,
+  subtitle,
+  displayMode,
+  isAdmin,
+  isFullscreen,
+  savingPlaca,
+  onAlterarMotivo,
+  onRemover,
+  emptyMessage,
+  expanded,
+}: {
+  items: JustificadoRow[]
+  countLabel: number
+  subtitle: string
+  displayMode: DisplayMode
+  isAdmin?: boolean
+  isFullscreen?: boolean
+  savingPlaca?: string | null
+  onAlterarMotivo?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string) => void
+  onRemover?: (placa: string) => void
+  emptyMessage: string
+  expanded?: boolean
+}) {
+  return (
+    <div
+      id="justificados-section"
+      className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200/80 bg-white shadow-soft dark:border-amber-950/60 dark:bg-slate-900 ${
+        expanded
+          ? isFullscreen
+            ? 'min-h-0 flex-1'
+            : 'min-h-[320px] flex-1 xl:min-h-0'
+          : isFullscreen
+            ? 'max-h-[40vh]'
+            : 'min-h-[200px]'
+      }`}
+    >
+      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-amber-100 bg-amber-50/85 px-4 py-3 backdrop-blur dark:border-amber-950/50 dark:bg-amber-950/25">
+        <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-amber-600 shadow-sm dark:bg-slate-950">
+          <MessageSquareWarning size={15} />
+        </span>
+        <div>
+          <span className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-200">Justificados</span>
+          <p className="text-[10px] font-semibold text-amber-700/70 dark:text-amber-300/60">{subtitle}</p>
+        </div>
+        <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+          {countLabel}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-14 text-slate-400">
+          <MessageSquareWarning size={28} className="text-amber-400/80" />
+          <p className="text-xs font-semibold">{emptyMessage}</p>
+        </div>
+      ) : displayMode === 'list' ? (
+        <ListaJustificados
+          items={items}
+          isAdmin={isAdmin}
+          savingPlaca={savingPlaca}
+          onAlterarMotivo={onAlterarMotivo}
+          onRemover={onRemover}
+        />
+      ) : (
+        <div className="custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+          {items.map((v) => (
+            <div
+              key={v.placa}
+              className="relative overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/40 p-3.5 shadow-sm dark:border-amber-950/40 dark:from-slate-950 dark:to-amber-950/10"
+            >
+              <div className="absolute inset-y-0 left-0 w-1 bg-amber-400/80 dark:bg-amber-500/70" />
+              <div className="flex items-start gap-3 pl-1">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</span>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                      {v.motivo}
+                    </span>
+                    {v.motivo === 'RESERVA' && v.placaReserva ? (
+                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+                        Reserva {formatPlaca(v.placaReserva)}
+                      </span>
+                    ) : null}
+                    {v.base ? (
+                      <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {v.base}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">{v.modelo}</p>
+                  <p className="mt-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                    {v.supervisor || '—'} · {v.coordenador || '—'}
+                  </p>
+                </div>
+                {isAdmin ? (
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <ChecklistAusenciaJustificar
+                      placa={v.placa}
+                      motivoAtual={v.motivo}
+                      placaReservaAtual={v.placaReserva}
+                      saving={savingPlaca === v.placa}
+                      onSelect={(motivo, placaReserva) => onAlterarMotivo?.(v.placa, motivo, placaReserva)}
+                    />
+                    <button
+                      type="button"
+                      disabled={savingPlaca === v.placa}
+                      onClick={() => onRemover?.(v.placa)}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ListaNaoRealizaram({
+  items,
+  multiDia,
+  showJustificar,
+  justificativas,
+  savingPlaca,
+  onJustificar,
+}: {
+  items: VeiculoRow[]
+  multiDia: boolean
+  showJustificar?: boolean
+  justificativas?: Map<string, ChecklistAusenciaJustificativaEntry>
+  savingPlaca?: string | null
+  onJustificar?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string) => void
+}) {
   return (
     <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
       <table className="w-full min-w-[620px] border-collapse text-left">
@@ -216,6 +524,7 @@ function ListaNaoRealizaram({ items, multiDia }: { items: VeiculoRow[]; multiDia
             {multiDia && <th className="px-3 py-2.5">Dias</th>}
             <th className="px-3 py-2.5">Supervisor</th>
             <th className="px-3 py-2.5">Gerência</th>
+            {showJustificar ? <th className="px-3 py-2.5 text-right">Justificativa</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -235,6 +544,17 @@ function ListaNaoRealizaram({ items, multiDia }: { items: VeiculoRow[]; multiDia
               )}
               <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.supervisor || '—'}</td>
               <td className="max-w-[120px] truncate px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.coordenador || '—'}</td>
+              {showJustificar ? (
+                <td className="px-3 py-2 text-right">
+                  <ChecklistAusenciaJustificar
+                    placa={v.placa}
+                    motivoAtual={justificativas?.get(v.placa)?.motivo ?? null}
+                    placaReservaAtual={justificativas?.get(v.placa)?.placaReserva}
+                    saving={savingPlaca === v.placa}
+                    onSelect={(motivo, placaReserva) => onJustificar?.(v.placa, motivo, placaReserva)}
+                  />
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -320,11 +640,11 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const [filtroCoordenador, setFiltroCoordenador] = useState(() =>
     pickFilter(searchParams.get('gerencia'), savedFilters, 'gerencia', 'todos'),
   )
+  const [filtroResponsavel, setFiltroResponsavel] = useState(() =>
+    pickFilter(searchParams.get('responsavel'), savedFilters, 'responsavel', 'todos'),
+  )
   const [filtroSupervisor, setFiltroSupervisor] = useState(() =>
-    pickFilter(
-      searchParams.get('responsavel') ?? searchParams.get('supervisor'),
-      savedFilters, 'supervisor', 'todos',
-    ),
+    pickFilter(searchParams.get('supervisor'), savedFilters, 'supervisor', 'todos'),
   )
   const [filtroTipo, setFiltroTipo] = useState(() =>
     pickFilter(searchParams.get('tipo'), savedFilters, 'tipo', 'todos'),
@@ -335,14 +655,12 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   })
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = savedFilters?.viewMode
-    if (saved === 'ranking' && isAdmin) return 'ranking'
-    if (saved === 'cards' || saved === 'list') return saved
-    return 'list'
-  })
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(() => parseSavedDisplayMode(savedFilters?.viewMode))
+  const [sectionView, setSectionView] = useState<SectionView>(() => parseSavedSectionView(savedFilters?.viewMode, isAdmin))
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [focusedSide, setFocusedSide] = useState<null | 'nao' | 'sim'>(null)
+  const [justificativas, setJustificativas] = useState<Map<string, ChecklistAusenciaJustificativaEntry>>(() => new Map())
+  const [justificativaSavingPlaca, setJustificativaSavingPlaca] = useState<string | null>(null)
   const [pdfModalOpen, setPdfModalOpen] = useState(false)
   const [excelModalOpen, setExcelModalOpen] = useState(false)
   const [pdfGerando, setPdfGerando] = useState(false)
@@ -377,12 +695,13 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       customAte,
       base: filtroBase,
       gerencia: filtroCoordenador,
+      responsavel: filtroResponsavel,
       supervisor: filtroSupervisor,
       tipo: filtroTipo,
       prefixo: filtroPrefixo,
       busca,
       filtrosVisiveis,
-      viewMode,
+      viewMode: toSavedViewMode(displayMode, sectionView),
     })
   }, [
     setorVeiculo,
@@ -391,17 +710,83 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     customAte,
     filtroBase,
     filtroCoordenador,
+    filtroResponsavel,
     filtroSupervisor,
     filtroTipo,
     filtroPrefixo,
     busca,
     filtrosVisiveis,
-    viewMode,
+    displayMode,
+    sectionView,
   ])
 
   const limites = useMemo(
     () => computeLimites(periodo, customDesde, customAte),
     [periodo, customDesde, customAte],
+  )
+
+  const showJustificarNaoRealizaram = isAdmin && focusedSide === 'nao'
+
+  useEffect(() => {
+    let cancelled = false
+    void loadChecklistAusenciaJustificativas({
+      periodoInicio: limites.ini,
+      periodoFim: limites.fim,
+      setor: setorVeiculo,
+    }).then((map) => {
+      if (!cancelled) setJustificativas(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [limites.ini, limites.fim, setorVeiculo])
+
+  const salvarJustificativa = useCallback(
+    async (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string) => {
+      setJustificativaSavingPlaca(placa)
+      const res = await saveChecklistAusenciaJustificativa({
+        placa,
+        motivo,
+        placaReserva,
+        periodoInicio: limites.ini,
+        periodoFim: limites.fim,
+        setor: setorVeiculo,
+      })
+      setJustificativaSavingPlaca(null)
+      if (!res.ok) {
+        window.alert(res.message)
+        return
+      }
+      setJustificativas((prev) => {
+        const next = new Map(prev)
+        next.set(placa, { motivo, placaReserva: motivo === 'RESERVA' ? placaReserva : undefined })
+        return next
+      })
+    },
+    [limites.ini, limites.fim, setorVeiculo],
+  )
+
+  const removerJustificativa = useCallback(
+    async (placa: string) => {
+      setJustificativaSavingPlaca(placa)
+      const res = await removeChecklistAusenciaJustificativa({
+        placa,
+        periodoInicio: limites.ini,
+        periodoFim: limites.fim,
+        setor: setorVeiculo,
+      })
+      setJustificativaSavingPlaca(null)
+      if (!res.ok) {
+        window.alert(res.message)
+        return
+      }
+      setJustificativas((prev) => {
+        const next = new Map(prev)
+        next.delete(placa)
+        return next
+      })
+    },
+    [limites.ini, limites.fim, setorVeiculo],
   )
 
   // ── frota ATIVA — mesmo critério do Dashboard (ATIVOS + TRANSPORTE) ──
@@ -535,13 +920,13 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     (r: { placa?: string; base: string; supervisor: string; coordenador: string; responsavel: string; tipo?: string; prefixo?: string }) =>
       passesChecklistFleetFilters({ tipo: '', prefixo: '', placa: r.placa ?? '', ...r }, {
         base: filtroBase,
-        supervisor: 'todos',
+        supervisor: filtroSupervisor,
         coordenador: filtroCoordenador,
-        responsavel: filtroSupervisor,
+        responsavel: filtroResponsavel,
         tipo: filtroTipo,
         prefixo: filtroPrefixo,
       }),
-    [filtroBase, filtroSupervisor, filtroCoordenador, filtroTipo, filtroPrefixo],
+    [filtroBase, filtroResponsavel, filtroSupervisor, filtroCoordenador, filtroTipo, filtroPrefixo],
   )
 
   const diasRealizadosPorPlaca = useMemo(() => {
@@ -580,13 +965,19 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
   const placasNaoRealizaramLista = useMemo(
     () => Array.from(frotaMap.values())
-      .filter((v) => !placasRealizaramSet.has(v.placa) && passaFiltros(v) && setorPlacasSet.has(v.placa))
+      .filter(
+        (v) =>
+          !placasRealizaramSet.has(v.placa) &&
+          !justificativas.has(v.placa) &&
+          passaFiltros(v) &&
+          setorPlacasSet.has(v.placa),
+      )
       .map((v) => ({
         ...v,
         diasRealizados: 0,
         diasNoPeriodo: diasNoPeriodo,
       })),
-    [frotaMap, placasRealizaramSet, passaFiltros, diasNoPeriodo, setorPlacasSet],
+    [frotaMap, placasRealizaramSet, justificativas, passaFiltros, diasNoPeriodo, setorPlacasSet],
   )
 
   const frotaFiltrada = useMemo(
@@ -604,17 +995,46 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
   const realizaramFiltrados = useMemo(() => {
     if (!q) return placasRealizaramLista
-    return placasRealizaramLista.filter(
-      (r) => r.placa.includes(q) || r.modelo.toUpperCase().includes(q) || r.base.toUpperCase().includes(q),
-    )
+    return placasRealizaramLista.filter((r) => matchesDetalharBusca(buildChecklistRowSearchBlob(r), q))
   }, [placasRealizaramLista, q])
 
   const naoRealizaramFiltrados = useMemo(() => {
     if (!q) return placasNaoRealizaramLista
-    return placasNaoRealizaramLista.filter(
-      (r) => r.placa.includes(q) || r.modelo.toUpperCase().includes(q) || r.base.toUpperCase().includes(q),
-    )
+    return placasNaoRealizaramLista.filter((r) => matchesDetalharBusca(buildVeiculoRowSearchBlob(r), q))
   }, [placasNaoRealizaramLista, q])
+
+  const placasJustificadasLista = useMemo(
+    () =>
+      Array.from(frotaMap.values())
+        .filter(
+          (v) =>
+            !placasRealizaramSet.has(v.placa) &&
+            justificativas.has(v.placa) &&
+            passaFiltros(v) &&
+            setorPlacasSet.has(v.placa),
+        )
+        .map((v) => {
+          const entry = justificativas.get(v.placa)!
+          return {
+            ...v,
+            motivo: entry.motivo,
+            placaReserva: entry.placaReserva,
+            diasRealizados: 0,
+            diasNoPeriodo: diasNoPeriodo,
+          }
+        }),
+    [frotaMap, placasRealizaramSet, justificativas, passaFiltros, diasNoPeriodo, setorPlacasSet],
+  )
+
+  const justificadosFiltrados = useMemo(() => {
+    if (!q) return placasJustificadasLista
+    return placasJustificadasLista.filter(
+      (r) =>
+        matchesDetalharBusca(buildVeiculoRowSearchBlob(r), q) ||
+        r.motivo.toUpperCase().includes(q) ||
+        (r.placaReserva ? formatPlaca(r.placaReserva).toUpperCase().includes(q) : false),
+    )
+  }, [placasJustificadasLista, q])
 
   const operacionaisAtivos = useMemo(
     () => frotaFiltrada.filter((v) => operacionalPlacasSet.has(v.placa)).length,
@@ -633,7 +1053,15 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     [placasRealizaram, setorPlacasSet],
   )
 
-  const naoRealizaramCardCount = Math.max(0, ativosSetor - realizaramSetorCount)
+  const naoRealizaramCardCount = placasNaoRealizaramLista.length
+
+  const justificadosSetorCount = useMemo(() => {
+    let n = 0
+    for (const placa of justificativas.keys()) {
+      if (setorPlacasSet.has(placa)) n += 1
+    }
+    return n
+  }, [justificativas, setorPlacasSet])
 
   const total = ativosSetor
 
@@ -643,10 +1071,11 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       if (!setorPlacasSet.has(placa)) continue
       realizados += count
     }
-    const esperados = ativosSetor * periodDays.length
+    const veiculosContabilizados = Math.max(0, ativosSetor - justificadosSetorCount)
+    const esperados = veiculosContabilizados * periodDays.length
     const pct = esperados > 0 ? Math.min(100, Math.round((realizados / esperados) * 100)) : 0
     return { realizados, esperados, pct }
-  }, [diasRealizadosPorPlaca, ativosSetor, periodDays, setorPlacasSet])
+  }, [diasRealizadosPorPlaca, ativosSetor, justificadosSetorCount, periodDays, setorPlacasSet])
 
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
@@ -660,6 +1089,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const subtitleSim = multiDia
     ? `Último envio entre ${periodoResumo} · dias realizados no período`
     : `Checklist em ${periodoResumo}`
+  const subtitleJustificados = `Ausência justificada · ${periodoResumo}`
   // ── opções em cascata ────────────────────────────────────────────────────
   const responsaveisDaGerencia = useMemo(
     () => getResponsaveisByGerencia(filtroCoordenador),
@@ -667,9 +1097,17 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   )
 
   const basesDaCascata = useMemo(
-    () => getBasesByGerenciaAndResponsavel(filtroCoordenador, filtroSupervisor),
-    [filtroCoordenador, filtroSupervisor],
+    () => getBasesByGerenciaAndResponsavel(filtroCoordenador, filtroResponsavel),
+    [filtroCoordenador, filtroResponsavel],
   )
+
+  const responsavelOptions = useMemo(() => {
+    if (!responsaveisDaGerencia) return RESPONSAVEL_FILTER_SELECT_OPTIONS
+    const allowed = new Set(responsaveisDaGerencia.map((r) => normNome(r)))
+    return RESPONSAVEL_FILTER_SELECT_OPTIONS.filter(
+      (o) => o.value === 'todos' || allowed.has(normNome(o.value)),
+    )
+  }, [responsaveisDaGerencia])
 
   const baseOptions = useMemo(() => {
     if (!basesDaCascata) return BASE_FILTER_SELECT_OPTIONS
@@ -679,49 +1117,38 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
   // reset de filtros dependentes quando a gerência muda
   useEffect(() => {
-    if (responsaveisDaGerencia && filtroSupervisor !== 'todos') {
-      if (!responsaveisDaGerencia.some((r) => normNome(r) === normNome(filtroSupervisor))) setFiltroSupervisor('todos')
+    if (responsaveisDaGerencia && filtroResponsavel !== 'todos') {
+      if (!responsaveisDaGerencia.some((r) => normNome(r) === normNome(filtroResponsavel))) setFiltroResponsavel('todos')
     }
-  }, [filtroCoordenador, responsaveisDaGerencia, filtroSupervisor])
+  }, [filtroCoordenador, responsaveisDaGerencia, filtroResponsavel])
 
   useEffect(() => {
     if (basesDaCascata && filtroBase !== 'todos') {
       const allowed = basesDaCascata.map((b) => b.toLowerCase())
       if (!allowed.includes(filtroBase.toLowerCase())) setFiltroBase('todos')
     }
-  }, [filtroCoordenador, filtroSupervisor, basesDaCascata, filtroBase])
+  }, [filtroCoordenador, filtroResponsavel, basesDaCascata, filtroBase])
 
-  const prefixoOptions = useMemo(() => {
-    const prefixos = new Set<string>()
-    for (const v of frotaMap.values()) {
-      if (!passesChecklistFleetFilters(
-        { placa: v.placa, base: v.base, supervisor: v.supervisor, coordenador: v.coordenador, responsavel: v.responsavel, tipo: v.tipo, prefixo: v.prefixo },
-        { base: filtroBase, coordenador: filtroCoordenador, supervisor: 'todos', responsavel: filtroSupervisor, tipo: filtroTipo, prefixo: 'todos' },
-      )) continue
-      const p = v.prefixo?.trim()
-      if (p) prefixos.add(p)
-    }
-    const sorted = Array.from(prefixos).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-    return [{ value: 'todos', label: 'Todos' }, ...sorted.map((p) => ({ value: p, label: p }))]
-  }, [frotaMap, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo])
+  const prefixoOptions = PREFIXO_FILTER_SELECT_OPTIONS
 
   useEffect(() => {
     if (filtroPrefixo !== 'todos' && !prefixoOptions.some((o) => o.value === filtroPrefixo)) {
       setFiltroPrefixo('todos')
     }
-  }, [prefixoOptions, filtroPrefixo])
+  }, [filtroPrefixo, prefixoOptions])
 
   const filtrosAtivosCount = useMemo(() => {
     let n = 0
     if (periodo !== 'hoje') n += 1
     if (filtroCoordenador !== 'todos') n += 1
+    if (filtroResponsavel !== 'todos') n += 1
     if (filtroSupervisor !== 'todos') n += 1
     if (filtroBase !== 'todos') n += 1
     if (filtroTipo !== 'todos') n += 1
     if (filtroPrefixo !== 'todos') n += 1
     if (busca.trim().length > 0) n += 1
     return n
-  }, [periodo, filtroBase, filtroCoordenador, filtroSupervisor, filtroTipo, filtroPrefixo, busca])
+  }, [periodo, filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor, filtroTipo, filtroPrefixo, busca])
 
   const limparFiltros = useCallback(() => {
     setPeriodo('hoje')
@@ -729,6 +1156,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     setCustomAte(hojeLocalIso())
     setFiltroBase('todos')
     setFiltroCoordenador('todos')
+    setFiltroResponsavel('todos')
     setFiltroSupervisor('todos')
     setFiltroTipo('todos')
     setFiltroPrefixo('todos')
@@ -981,6 +1409,12 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                 <p className="mt-2 text-3xl font-black text-rose-700 dark:text-rose-300">{naoRealizaramCardCount}</p>
                 <p className="mt-1 text-[11px] font-semibold text-rose-700/60 dark:text-rose-300/60">pendentes no período</p>
               </div>
+              <div className="group relative overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm backdrop-blur dark:border-amber-900/60 dark:bg-amber-950/25">
+                <div className="absolute inset-y-0 left-0 w-1 bg-amber-500" />
+                <p className="text-[10px] font-black uppercase tracking-wider text-amber-800/70 dark:text-amber-200/80">Justificados</p>
+                <p className="mt-2 text-3xl font-black text-amber-800 dark:text-amber-200">{justificadosSetorCount}</p>
+                <p className="mt-1 text-[11px] font-semibold text-amber-800/60 dark:text-amber-200/60">RESERVA ou NÃO RODOU</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1011,7 +1445,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
           <FilterSearchField
             value={busca}
             onChange={setBusca}
-            placeholder="Buscar por placa, modelo ou base..."
+            placeholder="Buscar em todas as colunas da tabela…"
           />
           {periodo === 'custom' ? (
             <div className="col-span-full mt-1 flex flex-col gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center">
@@ -1034,8 +1468,9 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         </FilterPanelGroup>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-3">
+          <FilterPanelGroup title="Gestão" columns="sm:grid-cols-2 lg:grid-cols-4">
             <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} tone="dark" />
+            <Select label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} options={responsavelOptions} tone="dark" />
             <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} tone="dark" />
             <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} tone="dark" />
           </FilterPanelGroup>
@@ -1059,18 +1494,23 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {viewMode === 'ranking'
+              {sectionView === 'ranking'
                 ? `Rankings do período · ${setorVeiculoLabel}`
+                : sectionView === 'justificados'
+                  ? `Justificados · ${setorVeiculoLabel}`
                 : `Resultados por veículo · ${setorVeiculoLabel}`}
             </p>
             <div className="flex items-center gap-2">
               <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <button
                   type="button"
-                  onClick={() => setViewMode('cards')}
+                  onClick={() => {
+                    setDisplayMode('cards')
+                    if (sectionView !== 'justificados') setSectionView('resultados')
+                  }}
                   title="Visão em cards"
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
-                    viewMode === 'cards'
+                    displayMode === 'cards' && sectionView !== 'ranking'
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                       : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
@@ -1080,10 +1520,13 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode('list')}
+                  onClick={() => {
+                    setDisplayMode('list')
+                    if (sectionView !== 'justificados') setSectionView('resultados')
+                  }}
                   title="Visão em lista"
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
-                    viewMode === 'list'
+                    displayMode === 'list' && sectionView !== 'ranking'
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                       : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
@@ -1094,10 +1537,10 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                 {isAdmin && (
                   <button
                     type="button"
-                    onClick={() => setViewMode('ranking')}
+                    onClick={() => setSectionView('ranking')}
                     title="Visão em ranking"
                     className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
-                      viewMode === 'ranking'
+                      sectionView === 'ranking'
                         ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                         : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                     }`}
@@ -1107,7 +1550,27 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                   </button>
                 )}
               </div>
-              {viewMode === 'ranking' ? (
+              {(justificadosSetorCount > 0 || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={() => setSectionView('justificados')}
+                  title="Ver veículos com ausência justificada"
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-wide shadow-sm transition ${
+                    sectionView === 'justificados'
+                      ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100'
+                      : 'border-amber-200/80 bg-white text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-950/30'
+                  }`}
+                >
+                  <MessageSquareWarning size={14} />
+                  Justificados
+                  {justificadosSetorCount > 0 ? (
+                    <span className="rounded-full bg-amber-200/80 px-1.5 py-0.5 text-[9px] font-black leading-none text-amber-900 dark:bg-amber-900/70 dark:text-amber-100">
+                      {justificadosSetorCount}
+                    </span>
+                  ) : null}
+                </button>
+              )}
+              {sectionView === 'ranking' ? (
                 <button
                   type="button"
                   onClick={() => void capturarRanking()}
@@ -1118,7 +1581,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                   <Camera size={14} className={capturandoFoto ? 'animate-pulse' : ''} />
                   {capturandoFoto ? 'Gerando…' : 'Foto'}
                 </button>
-              ) : (
+              ) : sectionView === 'resultados' ? (
                 <>
                 <button
                   type="button"
@@ -1139,7 +1602,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                   PDF
                 </button>
                 </>
-              )}
+              ) : null}
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
@@ -1152,7 +1615,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             </div>
           </div>
 
-        {viewMode === 'ranking' && isAdmin ? (
+        {sectionView === 'ranking' && isAdmin ? (
           <ChecklistTop10Section
             frota={frotaFiltradaSetor}
             completions={checklistCompletionsByDay}
@@ -1164,7 +1627,22 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             onGroupByChange={setRankingGroupBy}
             fullscreen={isFullscreen}
           />
+        ) : sectionView === 'justificados' ? (
+          <JustificadosPanel
+            items={justificadosFiltrados}
+            countLabel={justificadosFiltrados.length}
+            subtitle={subtitleJustificados}
+            displayMode={displayMode}
+            isAdmin={isAdmin}
+            isFullscreen={isFullscreen}
+            savingPlaca={justificativaSavingPlaca}
+            onAlterarMotivo={(placa, motivo, placaReserva) => void salvarJustificativa(placa, motivo, placaReserva)}
+            onRemover={(placa) => void removerJustificativa(placa)}
+            emptyMessage={q ? 'Nenhum justificado corresponde à busca.' : 'Nenhum veículo justificado neste período.'}
+            expanded
+          />
         ) : (
+        <>
         <div className={`grid min-h-0 flex-1 gap-3 xl:items-stretch transition-all duration-300 ${
           focusedSide === 'nao' ? 'xl:grid-cols-[3fr_1fr]' :
           focusedSide === 'sim' ? 'xl:grid-cols-[1fr_3fr]' :
@@ -1180,6 +1658,11 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-300">Não realizaram</span>
                 <p className="text-[10px] font-semibold text-rose-500/70 dark:text-rose-300/60">{subtitleNao}</p>
+                {showJustificarNaoRealizaram ? (
+                  <p className="mt-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                    Modo justificativa — escolha RESERVA ou NÃO RODOU em cada veículo
+                  </p>
+                ) : null}
               </div>
               <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
                 {naoRealizaramFiltrados.length}
@@ -1197,11 +1680,22 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
               <div className="flex flex-col items-center gap-2 py-14 text-slate-400">
                 <CheckCircle2 size={28} className="text-emerald-400" />
                 <p className="text-xs font-semibold">
-                  {q ? 'Sem resultados.' : 'Todos realizaram o checklist!'}
+                  {q
+                    ? 'Sem resultados.'
+                    : justificadosSetorCount > 0
+                      ? 'Nenhum pendente — veja a seção Justificados abaixo.'
+                      : 'Todos realizaram o checklist!'}
                 </p>
               </div>
-            ) : viewMode === 'list' ? (
-              <ListaNaoRealizaram items={naoRealizaramFiltrados} multiDia={multiDia} />
+            ) : displayMode === 'list' ? (
+              <ListaNaoRealizaram
+                items={naoRealizaramFiltrados}
+                multiDia={multiDia}
+                showJustificar={showJustificarNaoRealizaram}
+                justificativas={justificativas}
+                savingPlaca={justificativaSavingPlaca}
+                onJustificar={(placa, motivo, placaReserva) => void salvarJustificativa(placa, motivo, placaReserva)}
+              />
             ) : (
               <div className={`custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3`}>
                 {naoRealizaramFiltrados.map((v) => (
@@ -1230,6 +1724,15 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                           </p>
                         )}
                       </div>
+                      {showJustificarNaoRealizaram ? (
+                        <ChecklistAusenciaJustificar
+                          placa={v.placa}
+                          motivoAtual={justificativas.get(v.placa)?.motivo ?? null}
+                          placaReservaAtual={justificativas.get(v.placa)?.placaReserva}
+                          saving={justificativaSavingPlaca === v.placa}
+                          onSelect={(motivo, placaReserva) => void salvarJustificativa(v.placa, motivo, placaReserva)}
+                        />
+                      ) : null}
                     </div>
                     {(v.supervisor || v.coordenador) && (
                       <div className="mt-3 grid gap-2 pl-1 sm:grid-cols-2">
@@ -1279,7 +1782,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
               <div className="py-14 text-center text-xs font-semibold text-slate-400">
                 {q ? 'Sem resultados.' : 'Nenhum checklist realizado no período.'}
               </div>
-            ) : viewMode === 'list' ? (
+            ) : displayMode === 'list' ? (
               <ListaRealizaram items={realizaramFiltrados} multiDia={multiDia} />
             ) : (
               <div className={`custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3`}>
@@ -1343,6 +1846,24 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
           </div>
 
         </div>
+
+        {justificadosSetorCount > 0 ? (
+          <div className="mt-3">
+            <JustificadosPanel
+            items={justificadosFiltrados}
+            countLabel={justificadosFiltrados.length}
+            subtitle={subtitleJustificados}
+            displayMode={displayMode}
+            isAdmin={isAdmin}
+            isFullscreen={isFullscreen}
+            savingPlaca={justificativaSavingPlaca}
+            onAlterarMotivo={(placa, motivo, placaReserva) => void salvarJustificativa(placa, motivo, placaReserva)}
+            onRemover={(placa) => void removerJustificativa(placa)}
+            emptyMessage={q ? 'Nenhum justificado corresponde à busca.' : 'Nenhum veículo justificado.'}
+          />
+          </div>
+        ) : null}
+        </>
         )}
 
         {excelModalOpen &&

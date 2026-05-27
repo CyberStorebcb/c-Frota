@@ -7,7 +7,6 @@
  * as bases que ele cobre. Um responsável pode cobrir N bases (1:N).
  * bases: [] significa responsável geral/sem base específica definida (exibe todas).
  *
- * Atualizado em 2026-05-26 com base nos dados do Supabase (vehicles ativos).
  */
 
 export type GerenciaEntry = {

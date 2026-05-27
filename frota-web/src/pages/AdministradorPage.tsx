@@ -20,6 +20,7 @@ import {
   resetUserPassword,
   type CreateUserMode,
 } from '../services/adminUsersService'
+import { VehicleTrashSection } from '../components/admin/VehicleTrashSection'
 
 type ProfileRow = {
   id: string
@@ -252,7 +253,7 @@ export function UsuariosPage() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start" data-tour="usuarios-acoes">
           <button
             type="button"
             onClick={abrirCreateModal}
@@ -458,6 +459,8 @@ export function UsuariosPage() {
           <span>Fonte: Supabase Auth + perfis</span>
         </div>
       </div>
+
+      <VehicleTrashSection />
 
       {createModalOpen ? (
         <div

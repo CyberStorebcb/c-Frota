@@ -99,6 +99,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       })
   }, [tick])
 
+  useEffect(() => {
+    const onChange = () => setTick((t) => t + 1)
+    window.addEventListener('frota-catalog-trash-changed', onChange)
+    return () => window.removeEventListener('frota-catalog-trash-changed', onChange)
+  }, [])
+
   const reload = () => setTick((t) => t + 1)
 
   // Supabase prevalece; catálogo embebido preenche placas ausentes no Supabase

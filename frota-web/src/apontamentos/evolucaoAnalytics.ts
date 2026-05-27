@@ -1,5 +1,7 @@
 import { matchesBaseFilter } from '../data/baseFilterOptions'
 import { matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
+import { matchesResponsavelFilter } from '../data/responsavelFilterOptions'
+import { matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import type { Apontamento } from './ApontamentosContext'
 import { formatDefeitoParaExibicao } from './defeitoExibicao'
 
@@ -7,6 +9,7 @@ export type EvolucaoFiltros = {
   base: string
   coordenador: string
   responsavel: string
+  supervisor: string
   prefixo: string
   data: 'todos' | '30' | '90' | '365' | 'ano'
 }
@@ -36,7 +39,8 @@ export function filterResolvidosParaEvolucao(rows: Apontamento[], f: EvolucaoFil
   let list = rows.filter((r) => r.resolvido && r.dataResolvido)
   if (f.base !== 'todos') list = list.filter((r) => matchesBaseFilter(r.base, f.base))
   if (f.coordenador !== 'todos') list = list.filter((r) => matchesCoordenadorFilter(r.coordenador, f.coordenador))
-  if (f.responsavel !== 'todos') list = list.filter((r) => r.responsavel === f.responsavel)
+  if (f.responsavel !== 'todos') list = list.filter((r) => matchesResponsavelFilter(r.responsavel, f.responsavel))
+  if (f.supervisor !== 'todos') list = list.filter((r) => matchesSupervisorFilter(r.supervisor, f.supervisor))
   if (f.prefixo !== 'todos') list = list.filter((r) => r.prefixo === f.prefixo)
 
   if (f.data !== 'todos') {

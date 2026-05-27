@@ -32,6 +32,7 @@ function R(p: Partial<Apontamento> & Pick<Apontamento, 'id'>): Apontamento {
     base: 'Base 01',
     coordenador: 'Carlos',
     responsavel: 'João',
+    supervisor: 'Sup 1',
     ncFotos: [],
     problemasAdicionais: '',
     descricaoProblema: '',

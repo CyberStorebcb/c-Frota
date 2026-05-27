@@ -43,7 +43,24 @@ describe('aggregateChecklistCompletions', () => {
     )
 
     expect(completions.size).toBe(1)
-    expect(porDia).toEqual([{ data: '2026-05-20', realizados: 1, comNc: 0 }])
+    expect(porDia).toEqual([{ data: '2026-05-20', realizados: 1, comNc: 0, naoRealizados: 0 }])
+  })
+
+  it('exclui checklists ADM quando operacionalPlacas é informado', () => {
+    const opPlacas = new Set(['ABC1D23'])
+    const { completions, porDia } = aggregateChecklistCompletions(
+      [
+        { data_inspecao: '2026-05-20', nc_count: 0, dados_veiculo: { placa: 'ABC1D23' } },
+        { data_inspecao: '2026-05-20', nc_count: 0, dados_veiculo: { placa: 'DEF4G56' } },
+      ],
+      fleetMap,
+      { base: 'todos', coordenador: 'todos', supervisor: 'todos' },
+      opPlacas,
+    )
+
+    expect(completions.size).toBe(1)
+    expect(completions.has('ABC1D23|2026-05-20')).toBe(true)
+    expect(porDia).toEqual([{ data: '2026-05-20', realizados: 1, comNc: 0, naoRealizados: 0 }])
   })
 
   it('respeita filtro de base como no Detalhar', () => {
@@ -58,6 +75,7 @@ describe('aggregateChecklistCompletions', () => {
 
     expect(completions.size).toBe(1)
     expect(porDia[0]?.realizados).toBe(1)
+    expect(porDia[0]?.naoRealizados).toBe(0)
   })
 })
 
