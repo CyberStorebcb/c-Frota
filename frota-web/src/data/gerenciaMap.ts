@@ -28,17 +28,9 @@ export const GERENCIA_MAP: GerenciaEntry[] = [
     gerencia: 'afonso',
     gerenciaLabel: 'AFONSO',
     responsaveis: [
-      { nome: 'ADAILTON LIMA FERREIRA', bases: ['BCB'] },
-      { nome: 'ARLISSON ROGERIO',      bases: ['STI'] },
-      { nome: 'DEILTON RIBEIRO',       bases: ['BCB'] },
-      { nome: 'EMANUEL',               bases: ['STI'] },
-      { nome: 'GLEYSON',               bases: ['BCB'] },
-      { nome: 'JORDEN CLEYSON',        bases: ['STI'] },
-      { nome: 'LEONARDO ESTRELA',      bases: ['ITM'] },
-      { nome: 'LUCAS ALVES',           bases: ['BCB'] },
-      { nome: 'NONATO',                bases: ['ITM'] },
-      { nome: 'RENATO RAMOS CARVALHO', bases: ['STI'] },
-      { nome: 'WASHINGTON SOARES',     bases: ['ITM'] },
+      { nome: 'ARLISSON ROGERIO',  bases: ['STI'] },
+      { nome: 'DEILTON RIBEIRO',   bases: ['BCB'] },
+      { nome: 'LEONARDO ESTRELA',  bases: ['ITM'] },
     ],
   },
   {
@@ -101,10 +93,10 @@ export const GERENCIA_MAP: GerenciaEntry[] = [
     gerencia: 'julio',
     gerenciaLabel: 'JÚLIO',
     responsaveis: [
-      { nome: 'ANTONIO MARCOS SALAZAR DOS REIS', bases: [] },
+      { nome: 'ANTONIO MARCOS SALAZAR DOS REIS', bases: ['PDT', 'BDC', 'PDS'] },
       { nome: 'ERBERTH PEREIRA',                 bases: ['BCB'] },
       { nome: 'JULIO CESAR',                     bases: ['BCB'] },
-      { nome: 'LUIS FILIPE',                     bases: [] },
+      { nome: 'LUIS FILIPE',                     bases: ['BCB', 'ITM', 'STI', 'PDT'] },
     ],
   },
   {

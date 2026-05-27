@@ -21,5 +21,7 @@ export const TIPO_FILTER_SELECT_OPTIONS: TipoFilterSelectOption[] = [
   { value: 'picape 4x4',    label: 'PICAPE 4X4' },
   { value: 'picape leve',   label: 'PICAPE LEVE' },
   { value: 'sky',           label: 'SKY' },
+  { value: 'sky cd',        label: 'SKY CD' },
+  { value: 'sky cs',        label: 'SKY CS' },
   { value: 'veiculos leves', label: 'VEÍCULOS LEVES' },
 ]
