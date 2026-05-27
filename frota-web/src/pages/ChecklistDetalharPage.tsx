@@ -596,8 +596,7 @@ export function ChecklistDetalharPage() {
 
   const aderenciaStats = useMemo(() => {
     let realizados = 0
-    for (const [placa, count] of diasRealizadosPorPlaca) {
-      if (!operacionalPlacasSet.has(placa)) continue
+    for (const [, count] of diasRealizadosPorPlaca) {
       realizados += count
     }
     const esperados = operacionaisAtivos * periodDays.length
