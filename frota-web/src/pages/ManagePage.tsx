@@ -227,6 +227,7 @@ export function ManagePage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
+  const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* noop */ } }
   const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes'>(
     () => (lsGet('frota.manage.visao', 'apontamentos') as 'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes')
   )
@@ -246,6 +247,8 @@ export function ManagePage() {
   const [supervisor, setSupervisor] = useState(() => lsGet('frota.manage.supervisor', 'todos'))
   const [prefixo, setPrefixo] = useState(() => lsGet('frota.manage.prefixo', 'todos'))
   const [data, setData] = useState(() => lsGet('frota.manage.data', 'todos'))
+  const [dataCustomDe, setDataCustomDe] = useState(() => lsGet('frota.manage.dataCustomDe', ''))
+  const [dataCustomAte, setDataCustomAte] = useState(() => lsGet('frota.manage.dataCustomAte', ''))
   const [pagina, setPagina] = useState(1)
   const [dataOrdem, setDataOrdem] = useState<'asc' | 'desc'>(
     () => (lsGet('frota.manage.dataOrdem', 'asc') as 'asc' | 'desc')
@@ -354,6 +357,7 @@ export function ManagePage() {
       { value: '7d', label: 'Últimos 7 dias' },
       { value: '30d', label: 'Últimos 30 dias' },
       { value: 'ano', label: `Ano atual (${anoAtual})` },
+      { value: 'custom', label: 'Intervalo personalizado' },
       ...anos.map((a) => ({ value: a, label: a })),
     ]
   }, [rows])
@@ -383,6 +387,11 @@ export function ManagePage() {
         const inicioHoje = new Date()
         inicioHoje.setHours(0, 0, 0, 0)
         list = list.filter((r) => new Date(r.dataApontamento + 'T00:00:00').getTime() >= inicioHoje.getTime())
+      } else if (data === 'custom') {
+        const de = dataCustomDe.trim()
+        const ate = dataCustomAte.trim()
+        if (de) list = list.filter((r) => r.dataApontamento >= de)
+        if (ate) list = list.filter((r) => r.dataApontamento <= ate)
       } else {
         const dias = data === '7d' ? 7 : 30
         const min = nowMs - dias * 86_400_000
@@ -493,6 +502,8 @@ export function ManagePage() {
     setSupervisor('todos')
     setPrefixo('todos')
     setData('todos')
+    setDataCustomDe('')
+    setDataCustomAte('')
     setPagina(1)
     if (searchParams.get('veiculo') || searchParams.get('placa') || searchParams.get('prefixo')) {
       const next = new URLSearchParams(searchParams)
@@ -928,7 +939,31 @@ export function ManagePage() {
                   options={SUPERVISOR_FILTER_SELECT_OPTIONS}
                   onChange={(v) => { setSupervisor(v); setPagina(1) }}
                 />
-                <Select label="Data" value={data} options={dataOpts} onChange={(v) => { setData(v); setPagina(1) }} />
+                <div className="flex flex-col gap-2">
+                  <Select label="Data" value={data} options={dataOpts} onChange={(v) => { setData(v); setPagina(1) }} />
+                  {data === 'custom' && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">De</label>
+                        <input
+                          type="date"
+                          value={dataCustomDe}
+                          onChange={(e) => { setDataCustomDe(e.target.value); lsSet('frota.manage.dataCustomDe', e.target.value); setPagina(1) }}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Até</label>
+                        <input
+                          type="date"
+                          value={dataCustomAte}
+                          onChange={(e) => { setDataCustomAte(e.target.value); lsSet('frota.manage.dataCustomAte', e.target.value); setPagina(1) }}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <Select
                   label="Período carregado"
                   value={periodoCarregado}
