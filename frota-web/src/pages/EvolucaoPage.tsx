@@ -30,6 +30,7 @@ import {
 } from '../apontamentos/evolucaoAnalytics'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
+import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
 import { Select, type SelectOption } from '../components/ui/Select'
 
 const TOOLTIP_EXEMPLOS_MAX = 5
@@ -531,11 +532,6 @@ export function EvolucaoPage() {
     return () => ro.disconnect()
   }, [])
 
-  const optResp = useMemo(() => {
-    const opts = uniqSorted(rows.map((r) => r.responsavel))
-    return [{ value: 'todos', label: 'Todos' }, ...opts]
-  }, [rows])
-
   const optPrefixo = useMemo(() => {
     const opts = uniqSorted(rows.map((r) => r.prefixo))
     return [{ value: 'todos', label: 'Todos' }, ...opts]
@@ -751,7 +747,7 @@ export function EvolucaoPage() {
             <div className="grid grid-cols-1 gap-3 border-t border-slate-100 px-4 pb-4 pt-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 dark:border-slate-800">
               <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} />
               <Select label="Coordenador" value={filtroCoord} options={COORDENADOR_FILTER_SELECT_OPTIONS} onChange={setFiltroCoord} />
-              <Select label="Responsável" value={filtroResp} options={optResp} onChange={setFiltroResp} />
+              <Select label="Responsável" value={filtroResp} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={setFiltroResp} />
               <Select label="Prefixo" value={filtroPrefixo} options={optPrefixo} onChange={setFiltroPrefixo} />
               <Select label="Data" value={filtroData} options={DATA_OPTS} onChange={(v) => setFiltroData(v as EvolucaoFiltros['data'])} />
             </div>

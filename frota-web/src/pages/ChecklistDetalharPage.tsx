@@ -33,7 +33,7 @@ import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
 import { Select } from '../components/ui/Select'
 import { BASE_FILTER_SELECT_OPTIONS } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS } from '../data/coordenadorFilterOptions'
-
+import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOptions'
 import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
 import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
@@ -625,19 +625,6 @@ export function ChecklistDetalharPage() {
     [filtroCoordenador, filtroSupervisor],
   )
 
-  const responsavelOptions = useMemo(() => {
-    const nomes = new Set<string>()
-    for (const v of allVehicles) {
-      const nome = v.responsavel?.trim()
-      if (!nome || nome === 'NÃO ATRIBUÍDO') continue
-      // se a gerência tem mapeamento, exibe só os responsáveis dela (comparação sem acento)
-      if (responsaveisDaGerencia && !responsaveisDaGerencia.some((r) => normNome(r) === normNome(nome))) continue
-      nomes.add(nome)
-    }
-    const sorted = Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-    return [{ value: 'todos', label: 'Todos' }, ...sorted.map((n) => ({ value: n, label: n }))]
-  }, [allVehicles, responsaveisDaGerencia])
-
   const baseOptions = useMemo(() => {
     if (!basesDaCascata) return BASE_FILTER_SELECT_OPTIONS
     const allowed = new Set(basesDaCascata.map((b) => b.toLowerCase()))
@@ -996,7 +983,7 @@ export function ChecklistDetalharPage() {
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <Select label="Gerência" value={filtroCoordenador} onChange={setFiltroCoordenador} options={COORDENADOR_FILTER_SELECT_OPTIONS} />
-                <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={responsavelOptions} />
+                <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} />
                 <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} />
                 <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} />
                 <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} />
