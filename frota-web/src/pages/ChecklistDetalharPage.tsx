@@ -1506,11 +1506,11 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                   type="button"
                   onClick={() => {
                     setDisplayMode('cards')
-                    if (sectionView !== 'justificados') setSectionView('resultados')
+                    setSectionView('resultados')
                   }}
                   title="Visão em cards"
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
-                    displayMode === 'cards' && sectionView !== 'ranking'
+                    sectionView === 'resultados' && displayMode === 'cards'
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                       : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
@@ -1522,11 +1522,11 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                   type="button"
                   onClick={() => {
                     setDisplayMode('list')
-                    if (sectionView !== 'justificados') setSectionView('resultados')
+                    setSectionView('resultados')
                   }}
                   title="Visão em lista"
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
-                    displayMode === 'list' && sectionView !== 'ranking'
+                    sectionView === 'resultados' && displayMode === 'list'
                       ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                       : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
@@ -1553,8 +1553,14 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
               {(justificadosSetorCount > 0 || isAdmin) && (
                 <button
                   type="button"
-                  onClick={() => setSectionView('justificados')}
-                  title="Ver veículos com ausência justificada"
+                  onClick={() =>
+                    setSectionView((current) => (current === 'justificados' ? 'resultados' : 'justificados'))
+                  }
+                  title={
+                    sectionView === 'justificados'
+                      ? 'Voltar aos resultados por veículo'
+                      : 'Ver veículos com ausência justificada'
+                  }
                   className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-wide shadow-sm transition ${
                     sectionView === 'justificados'
                       ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100'

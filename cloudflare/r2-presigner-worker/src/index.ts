@@ -44,6 +44,23 @@ function publicObjectUrl(base: string, key: string): string {
   return `${root}/${path}`
 }
 
+function makeS3Client(env: Env): S3Client {
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${env.R2_ACCOUNT_ID.trim()}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: env.R2_ACCESS_KEY_ID,
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    },
+  })
+}
+
+function checkAuth(request: Request, env: Env): boolean {
+  const apiKey = env.PRESIGN_API_KEY?.trim()
+  if (!apiKey) return true
+  return request.headers.get('Authorization') === `Bearer ${apiKey}`
+}
+
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const origin = request.headers.get('Origin')
@@ -56,14 +73,63 @@ export default {
       return json({ error: 'method_not_allowed' }, 405, origin)
     }
 
-    const apiKey = env.PRESIGN_API_KEY?.trim()
-    if (apiKey) {
-      const auth = request.headers.get('Authorization')
-      if (auth !== `Bearer ${apiKey}`) {
-        return json({ error: 'unauthorized' }, 401, origin)
-      }
+    if (!checkAuth(request, env)) {
+      return json({ error: 'unauthorized' }, 401, origin)
     }
 
+    const accountId = env.R2_ACCOUNT_ID?.trim()
+    const bucket = env.R2_BUCKET_NAME?.trim()
+    const publicBase = env.R2_PUBLIC_BASE_URL?.trim()
+    if (!accountId || !bucket || !publicBase) {
+      return json({ error: 'server_misconfigured' }, 500, origin)
+    }
+
+    const url = new URL(request.url)
+    const pathname = url.pathname.replace(/\/$/, '')
+
+    // ── Rota /upload — recebe arquivo via multipart/form-data e faz PUT no R2 server-side ──
+    // Elimina a necessidade de CORS no bucket R2 para uploads do browser.
+    if (pathname === '/upload' || pathname.endsWith('/upload')) {
+      let formData: FormData
+      try {
+        formData = await request.formData()
+      } catch {
+        return json({ error: 'invalid_form_data' }, 400, origin)
+      }
+
+      const key = typeof formData.get('key') === 'string' ? (formData.get('key') as string).trim() : ''
+      const fileEntry = formData.get('file')
+
+      if (!isSafeObjectKey(key)) {
+        return json({ error: 'invalid_key' }, 400, origin)
+      }
+      if (!fileEntry || !(fileEntry instanceof File)) {
+        return json({ error: 'missing_file' }, 400, origin)
+      }
+
+      const contentType = fileEntry.type || 'application/octet-stream'
+      const fileBuffer = await fileEntry.arrayBuffer()
+
+      const client = makeS3Client(env)
+      const command = new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: contentType,
+        Body: new Uint8Array(fileBuffer),
+      })
+
+      try {
+        await client.send(command)
+      } catch (err) {
+        console.error('R2 upload error:', err)
+        return json({ error: 'upload_failed' }, 502, origin)
+      }
+
+      const publicUrl = publicObjectUrl(publicBase, key)
+      return json({ publicUrl }, 200, origin)
+    }
+
+    // ── Rota padrão / — gera URL pré-assinada (mantida para compatibilidade) ──
     let body: PresignBody
     try {
       body = (await request.json()) as PresignBody
@@ -81,22 +147,7 @@ export default {
       return json({ error: 'invalid_key' }, 400, origin)
     }
 
-    const accountId = env.R2_ACCOUNT_ID?.trim()
-    const bucket = env.R2_BUCKET_NAME?.trim()
-    const publicBase = env.R2_PUBLIC_BASE_URL?.trim()
-    if (!accountId || !bucket || !publicBase) {
-      return json({ error: 'server_misconfigured' }, 500, origin)
-    }
-
-    const client = new S3Client({
-      region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: env.R2_ACCESS_KEY_ID,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-      },
-    })
-
+    const client = makeS3Client(env)
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
