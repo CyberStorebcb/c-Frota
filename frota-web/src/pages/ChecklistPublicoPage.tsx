@@ -1120,7 +1120,8 @@ function FormularioChecklist({
     return {
       placa:       [...new Set(filtrados.map((v) => formatPlaca(v.placa)).filter(Boolean))].sort(),
       marca_modelo:[...new Set(filtrados.map((v) => v.modelo).filter(Boolean))].sort(),
-      prefixo:     [...new Set(filtrados.map((v) => v.prefixo).filter((p) => p && p !== 'N/A'))].sort(),
+      // Prefixos: lista completa da frota (sem filtro de tipo) para o usuario escolher qualquer prefixo
+      prefixo:     [...new Set(todos.map((v) => v.prefixo).filter((p) => p && p !== 'N/A'))].sort(),
     }
   }, [schema.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
