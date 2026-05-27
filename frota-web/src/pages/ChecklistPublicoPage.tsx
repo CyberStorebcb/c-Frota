@@ -328,6 +328,12 @@ function TelaConclusao({
   autoOpenWhatsapp,
   embeddedInFrame,
   submittedAt,
+  schemaNome,
+  dadosVeiculo,
+  grupos,
+  respostas,
+  observacoes,
+  matricula,
 }: {
   ncImperativos: number
   ncCount: number
@@ -344,12 +350,19 @@ function TelaConclusao({
   autoOpenWhatsapp?: boolean
   embeddedInFrame?: boolean
   submittedAt: Date
+  schemaNome: string
+  dadosVeiculo: Record<string, string>
+  grupos: import('../data/checklistSchemas').ChecklistGrupo[]
+  respostas: Record<string, string | null>
+  observacoes: Record<string, string>
+  matricula: string
 }) {
   const { theme } = useTheme()
   const footerTone = theme === 'dark' ? 'on-dark' : 'on-light'
   const bloqueado = ncImperativos > 0
   const comNc = ncCount > 0
   const [demoWhatsappOpen, setDemoWhatsappOpen] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
     scrollChecklistViewportToTop()
@@ -358,6 +371,29 @@ function TelaConclusao({
   useEffect(() => {
     if (autoOpenWhatsapp) setDemoWhatsappOpen(true)
   }, [autoOpenWhatsapp])
+
+  const handleGerarPdf = async () => {
+    if (pdfLoading) return
+    setPdfLoading(true)
+    try {
+      const { generateChecklistPublicoPdf } = await import('../checklists/generateChecklistPublicoPdf')
+      await generateChecklistPublicoPdf({
+        schemaNome,
+        operador,
+        matricula,
+        nomeSupervisor,
+        veiculo,
+        dadosVeiculo,
+        grupos,
+        respostas,
+        observacoes,
+        submittedAt,
+        offline: !!offline,
+      })
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   const whatsappLink = comNc
     ? buildWhatsappLink({
@@ -559,6 +595,28 @@ function TelaConclusao({
             </p>
           </div>
         </div>
+
+        {/* Botão gerar PDF */}
+        {!isDemo && (
+          <button
+            type="button"
+            onClick={handleGerarPdf}
+            disabled={pdfLoading}
+            className={`flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[.98] dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-800/60 ${pdfLoading ? 'cursor-wait opacity-60' : ''}`}
+          >
+            {pdfLoading ? (
+              <svg className="h-4 w-4 animate-spin text-slate-400" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3M3 7V4a1 1 0 011-1h5l2 3h8a1 1 0 011 1v3" />
+              </svg>
+            )}
+            {pdfLoading ? 'Gerando PDF…' : 'Baixar relatório PDF'}
+          </button>
+        )}
 
         <p className="text-xs font-semibold text-slate-400">Você já pode fechar esta página.</p>
       </div>
@@ -1105,6 +1163,13 @@ function FormularioChecklist({
     problemas: string
     descricaoProblema: string
     submittedAt: Date
+    // dados para geração de PDF
+    schemaNome: string
+    dadosVeiculo: Record<string, string>
+    grupos: import('../data/checklistSchemas').ChecklistGrupo[]
+    respostas: Record<string, string | null>
+    observacoes: Record<string, string>
+    matricula: string
   } | null>(null)
   // highlight do item atual após scroll
   const [itemDestacado, setItemDestacado] = useState<string | null>(null)
@@ -1479,6 +1544,12 @@ function FormularioChecklist({
         problemas: 'Pneu dianteiro esquerdo com desgaste irregular',
         descricaoProblema: '',
         submittedAt: new Date(),
+        schemaNome: schema.nome,
+        dadosVeiculo: dadosVeiculo,
+        grupos: schema.grupos,
+        respostas: respostas as Record<string, string | null>,
+        observacoes: observacoes,
+        matricula,
       })
       clearFormDraft()
       setConcluido(true)
@@ -1867,7 +1938,7 @@ function FormularioChecklist({
           .filter((it) => respostas[it.id] === 'nc')
           .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
         const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-        setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema, submittedAt: new Date() })
+        setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema, submittedAt: new Date(), schemaNome: schema.nome, dadosVeiculo, grupos: schema.grupos, respostas: respostas as Record<string, string | null>, observacoes, matricula })
         clearFormDraft()
         onConcluido?.()
         setConcluido(true)
@@ -1923,7 +1994,7 @@ function FormularioChecklist({
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
       const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: false, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema, submittedAt: new Date() })
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: false, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema, submittedAt: new Date(), schemaNome: schema.nome, dadosVeiculo, grupos: schema.grupos, respostas: respostas as Record<string, string | null>, observacoes, matricula })
       clearFormDraft()
       onConcluido?.()
       setConcluido(true)
@@ -1952,6 +2023,12 @@ function FormularioChecklist({
         autoOpenWhatsapp={demoAutoWhatsapp}
         embeddedInFrame={embeddedInFrame}
         submittedAt={resultadoFinal.submittedAt}
+        schemaNome={resultadoFinal.schemaNome}
+        dadosVeiculo={resultadoFinal.dadosVeiculo}
+        grupos={resultadoFinal.grupos}
+        respostas={resultadoFinal.respostas}
+        observacoes={resultadoFinal.observacoes}
+        matricula={resultadoFinal.matricula}
       />
     )
   }
