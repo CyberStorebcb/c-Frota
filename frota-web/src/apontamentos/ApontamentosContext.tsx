@@ -617,9 +617,24 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>
 }
 
+// Fallback seguro para uso fora do ApontamentosProvider (ex: /registro sem auth)
+const EMPTY_CTX: Ctx = {
+  rows: [],
+  checklistsRealizadosTotal: 0,
+  carregando: false,
+  periodoCarregado: '180d',
+  setPeriodoCarregado: () => {},
+  marcarResolvido: async () => {},
+  marcarJustificado: async () => {},
+  buscarHistorico: async () => [],
+  fetchApontamentoDetalhes: async () => ({ reparoImagens: [], osArquivo: null, justificativaImagem: null }),
+  hasByChecklist: () => false,
+  persistError: null,
+  clearPersistError: () => {},
+  recarregar: async () => {},
+}
+
 // eslint-disable-next-line react-refresh/only-export-components -- hook exposto junto ao provider
 export function useApontamentos() {
-  const ctx = useContext(ApontamentosContext)
-  if (!ctx) throw new Error('useApontamentos deve ser usado dentro de ApontamentosProvider')
-  return ctx
+  return useContext(ApontamentosContext) ?? EMPTY_CTX
 }
