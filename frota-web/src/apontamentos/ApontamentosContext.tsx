@@ -272,9 +272,6 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const clearPersistError = useCallback(() => setPersistError(null), [])
   const [periodoCarregado, setPeriodoCarregadoState] = useState<PeriodoCarregado>('180d')
   const periodoCarregadoRef = useRef<PeriodoCarregado>('180d')
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Cache do count global de checklists — evita query a cada reload (TTL: 5 min)
   const countCacheRef = useRef<{ value: number; at: number } | null>(null)
   const COUNT_TTL_MS = 5 * 60 * 1000
@@ -399,12 +396,6 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
 
     return () => {
       clearInterval(pollTimer)
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
     }
   }, [recarregarInternal])
 
