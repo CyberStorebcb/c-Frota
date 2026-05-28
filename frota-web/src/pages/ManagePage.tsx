@@ -753,15 +753,28 @@ export function ManagePage() {
 
   const addOsFile = async (files: FileList | null) => {
     if (!files || files.length === 0) return
-    const file = files[0]
-    const reader = new FileReader()
-    const data = await new Promise<string>((resolve, reject) => {
-      reader.onload = () => resolve(String(reader.result ?? ''))
-      reader.onerror = () => reject(new Error('Falha ao ler arquivo'))
-      reader.readAsDataURL(file)
-    })
-    setResolveOsFile({ name: file.name, data })
-    if (osFileRef.current) osFileRef.current.value = ''
+    const file = files[0]!
+    setUploadingImgs(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'pdf'
+      const key = `os/${crypto.randomUUID()}.${ext}`
+      const url = await uploadChecklistEvidenceFile(file, key)
+      if (url) {
+        setResolveOsFile({ name: file.name, data: url })
+      } else {
+        // fallback base64 se upload falhar
+        const reader = new FileReader()
+        const data = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(String(reader.result ?? ''))
+          reader.onerror = () => reject(new Error('Falha ao ler arquivo'))
+          reader.readAsDataURL(file)
+        })
+        setResolveOsFile({ name: file.name, data })
+      }
+    } finally {
+      setUploadingImgs(false)
+      if (osFileRef.current) osFileRef.current.value = ''
+    }
   }
 
   const addImages = async (files: FileList | null) => {
