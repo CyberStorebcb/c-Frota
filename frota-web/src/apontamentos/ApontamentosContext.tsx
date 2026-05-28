@@ -285,18 +285,15 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
           .select('id', { count: 'exact', head: true })
           .eq('progresso', 100),
 
-        // 2. Checklists concluídos no período selecionado com itens NC
-        // Nota: filtro JSONB por valor 'nc' não é suportado via PostgREST diretamente;
-        // o filtro client-side (ncItems.length === 0) descarta checklists sem NC após fetch.
-        // O índice GIN em respostas e B-tree em (progresso, data_inspecao) aceleram a query.
-        fetchAllSupabasePages((from, to) => {
-          let q = supabase
-            .from('checklists')
-            .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
-            .eq('progresso', 100)
-          if (dataCorteIso) q = q.gte('data_inspecao', dataCorteIso)
-          return q.order('data_inspecao', { ascending: true }).order('id', { ascending: true }).range(from, to)
-        }),
+        // 2. Checklists com NC via função SQL — filtra server-side usando EXISTS(jsonb_each_text)
+        // Muito mais eficiente: só retorna checklists que têm pelo menos um item 'nc'
+        fetchAllSupabasePages((from, to) =>
+          supabase.rpc('checklists_com_nc', {
+            corte_data: dataCorteIso ?? '',
+            p_from: from,
+            p_to: to,
+          }),
+        ),
 
         // 3. Resoluções no período selecionado (sem campos pesados: reparo_imagens, os_arquivo, justificativa_imagem)
         // Esses campos são buscados sob demanda via fetchApontamentoDetalhes() ao abrir o modal
