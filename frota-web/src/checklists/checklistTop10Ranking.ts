@@ -30,8 +30,6 @@ function groupLabel(row: ChecklistTop10Row, groupBy: ChecklistTop10GroupBy): str
       return row.base.trim() || 'Sem base'
     case 'gerencia':
       return row.coordenador.trim() || 'Não informado'
-    case 'responsavel':
-      return row.responsavel.trim() || 'Não informado'
   }
 }
 

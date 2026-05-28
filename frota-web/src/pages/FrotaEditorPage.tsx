@@ -121,7 +121,7 @@ export function FrotaEditorPage() {
   const [saved, setSaved]             = useState<Set<string>>(new Set())
   const [q, setQ]                     = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
-  const [newPlacas, setNewPlacas]     = useState<Set<string>>(new Set())
+  const [, setNewPlacas]              = useState<Set<string>>(new Set())
 
   // original snapshot — used to detect dirty rows
   const originalRef = useRef<Map<string, VehicleRow>>(new Map())
