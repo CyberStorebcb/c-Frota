@@ -400,17 +400,21 @@ function JustificadosPanel({
   emptyMessage: string
   expanded?: boolean
 }) {
+  const [collapsed, setCollapsed] = useState(false)
+
   return (
     <div
       id="justificados-section"
       className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-amber-200/80 bg-white shadow-soft dark:border-amber-950/60 dark:bg-slate-900 ${
-        expanded
-          ? isFullscreen
-            ? 'min-h-0 flex-1'
-            : 'min-h-[320px] flex-1 xl:min-h-0'
-          : isFullscreen
-            ? 'max-h-[40vh]'
-            : 'min-h-[200px]'
+        collapsed
+          ? ''
+          : expanded
+            ? isFullscreen
+              ? 'min-h-0 flex-1'
+              : 'min-h-[320px] flex-1 xl:min-h-0'
+            : isFullscreen
+              ? 'max-h-[40vh]'
+              : 'min-h-[200px]'
       }`}
     >
       <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-amber-100 bg-amber-50/85 px-4 py-3 backdrop-blur dark:border-amber-950/50 dark:bg-amber-950/25">
@@ -424,8 +428,23 @@ function JustificadosPanel({
         <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
           {countLabel}
         </span>
+        {!expanded && (
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? 'Mostrar justificados' : 'Ocultar justificados'}
+            className="ml-1 grid h-7 w-7 place-items-center rounded-lg text-amber-500 transition hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-950/60 dark:hover:text-amber-300"
+          >
+            <ChevronDown
+              size={15}
+              className={`transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`}
+            />
+          </button>
+        )}
       </div>
 
+      {!collapsed && (
+      <>
       {items.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 py-14 text-slate-400">
           <MessageSquareWarning size={28} className="text-amber-400/80" />
@@ -493,6 +512,8 @@ function JustificadosPanel({
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   )
