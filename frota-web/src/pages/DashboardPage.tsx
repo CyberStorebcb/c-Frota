@@ -41,6 +41,7 @@ import {
 import {
   countUniqueCompletionsInPeriod,
   fetchCompletedChecklistsInPeriod,
+  getCachedChecklistCompletions,
 } from '../checklists/fetchChecklistCompletions'
 import type { DashboardAdesaoChartRow } from './DashboardAdesaoCharts'
 
@@ -420,6 +421,18 @@ export function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false
+
+    // Aplica cache imediatamente — evita tela em branco ao voltar para o dashboard
+    const cached = getCachedChecklistCompletions(periodoInicioIso, periodoFimIso)
+    if (cached) {
+      const op = aggregateChecklistCompletions(cached, activeFleetMap, checklistFleetFilters, operacionalPlacasSet)
+      const adm = aggregateChecklistCompletions(cached, activeFleetMap, checklistFleetFilters, adminPlacasSet)
+      setChecklistCompletionsOp(op.completions)
+      setChecklistsPorDiaOp(op.porDia)
+      setChecklistCompletionsAdm(adm.completions)
+      setChecklistsPorDiaAdm(adm.porDia)
+      return () => { cancelled = true }
+    }
 
     void fetchCompletedChecklistsInPeriod(periodoInicioIso, periodoFimIso)
       .then((data) => {

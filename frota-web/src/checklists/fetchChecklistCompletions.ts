@@ -9,6 +9,31 @@ export type ChecklistCompletionRow = {
   created_at?: unknown
 }
 
+// ---------------------------------------------------------------------------
+// Cache de módulo — persiste entre remounts do componente na mesma sessão
+// ---------------------------------------------------------------------------
+const COMPLETIONS_CACHE_TTL_MS = 5 * 60 * 1000 // 5 min
+
+type CompletionsCache = {
+  inicioIso: string
+  fimIso: string
+  data: ChecklistCompletionRow[]
+  at: number
+}
+
+let _completionsCache: CompletionsCache | null = null
+
+/** Retorna dados em cache se ainda válidos para o mesmo período; caso contrário null. */
+export function getCachedChecklistCompletions(
+  inicioIso: string,
+  fimIso: string,
+): ChecklistCompletionRow[] | null {
+  if (!_completionsCache) return null
+  if (_completionsCache.inicioIso !== inicioIso || _completionsCache.fimIso !== fimIso) return null
+  if (Date.now() - _completionsCache.at > COMPLETIONS_CACHE_TTL_MS) return null
+  return _completionsCache.data
+}
+
 /** Busca todos os checklists concluídos no intervalo (pagina além do limite padrão de 1000 do Supabase). */
 export async function fetchCompletedChecklistsInPeriod(
   inicioIso: string,
@@ -27,6 +52,9 @@ export async function fetchCompletedChecklistsInPeriod(
   )
 
   if (error) throw error
+
+  // Armazena no cache de módulo para uso imediato no próximo remount
+  _completionsCache = { inicioIso, fimIso, data, at: Date.now() }
   return data
 }
 
