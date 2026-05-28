@@ -122,6 +122,7 @@ export function buildChecklistAdherenceRanking(
   groupBy: ChecklistTop10GroupBy,
   sort: 'best' | 'worst',
   limit = 10,
+  minVeiculos = 1,
 ): ChecklistAdherenceEntry[] {
   const groups = new Map<string, GroupStats>()
 
@@ -134,13 +135,15 @@ export function buildChecklistAdherenceRanking(
     groups.set(label, stats)
   }
 
-  const entries = [...groups.entries()].map(([label, stats]) => ({
-    label,
-    veiculos: stats.veiculos,
-    realizados: stats.realizados,
-    esperados: stats.esperados,
-    pct: stats.esperados > 0 ? Math.round((stats.realizados / stats.esperados) * 100) : 0,
-  }))
+  const entries = [...groups.entries()]
+    .filter(([, stats]) => stats.veiculos >= minVeiculos)
+    .map(([label, stats]) => ({
+      label,
+      veiculos: stats.veiculos,
+      realizados: stats.realizados,
+      esperados: stats.esperados,
+      pct: stats.esperados > 0 ? Math.round((stats.realizados / stats.esperados) * 100) : 0,
+    }))
 
   entries.sort((a, b) => {
     if (sort === 'best') {

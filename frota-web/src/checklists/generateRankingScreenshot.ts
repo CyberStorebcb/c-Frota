@@ -5,6 +5,7 @@ export type RankingScreenshotInput = {
   periodoResumo: string
   diasNoPeriodo: number
   groupLabel: string
+  minVeiculos?: number
   pior: ChecklistAdherenceEntry[]
   melhor: ChecklistAdherenceEntry[]
 }
@@ -177,8 +178,9 @@ function drawArenaHeader(ctx: Ctx, x: number, y: number, w: number, h: number, i
 
   setFont(ctx, 18, 600)
   ctx.fillStyle = '#94a3b8'
+  const minLabel = input.minVeiculos && input.minVeiculos > 1 ? ` · mín. ${input.minVeiculos} veíc./grupo` : ''
   ctx.fillText(
-    `${input.diasNoPeriodo} dia(s) · agrupado por ${input.groupLabel.toLowerCase()}`,
+    `${input.diasNoPeriodo} dia(s) · agrupado por ${input.groupLabel.toLowerCase()}${minLabel}`,
     tx,
     y + 96,
   )

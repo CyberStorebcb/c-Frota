@@ -697,6 +697,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const [fotoGerando, setFotoGerando] = useState(false)
   const [capturandoFoto, setCapturandoFoto] = useState(false)
   const [rankingGroupBy, setRankingGroupBy] = useState<ChecklistTop10GroupBy>('responsavel')
+  const [rankingMinVeiculos, setRankingMinVeiculos] = useState(1)
   const columnsRef = useRef<HTMLDivElement>(null)
 
   const { vehicles: allVehicles } = useFleet()
@@ -1302,12 +1303,15 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         periodoResumo,
         diasNoPeriodo,
         groupLabel,
+        minVeiculos: rankingMinVeiculos > 1 ? rankingMinVeiculos : undefined,
         pior: buildChecklistAdherenceRanking(
           frotaFiltradaSetor,
           checklistCompletionsByDay,
           periodDays,
           rankingGroupBy,
           'worst',
+          10,
+          rankingMinVeiculos,
         ),
         melhor: buildChecklistAdherenceRanking(
           frotaFiltradaSetor,
@@ -1315,6 +1319,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
           periodDays,
           rankingGroupBy,
           'best',
+          10,
+          rankingMinVeiculos,
         ),
       })
       downloadDataUrl(dataUrl, `ranking-checklist-${limites.ini}-${limites.fim}.png`)
@@ -1328,6 +1334,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     periodoResumo,
     diasNoPeriodo,
     rankingGroupBy,
+    rankingMinVeiculos,
     frotaFiltradaSetor,
     checklistCompletionsByDay,
     periodDays,
@@ -1717,6 +1724,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             periodoResumo={periodoResumo}
             groupBy={rankingGroupBy}
             onGroupByChange={setRankingGroupBy}
+            minVeiculos={rankingMinVeiculos}
+            onMinVeiculosChange={setRankingMinVeiculos}
             fullscreen={isFullscreen}
           />
         ) : sectionView === 'justificados' ? (

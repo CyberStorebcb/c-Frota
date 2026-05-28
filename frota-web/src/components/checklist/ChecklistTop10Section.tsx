@@ -158,12 +158,14 @@ function CompetitionBoard({
   entries,
   groupLabel,
   diasNoPeriodo,
+  minVeiculos,
   fullscreen,
 }: {
   variant: Variant
   entries: ChecklistAdherenceEntry[]
   groupLabel: string
   diasNoPeriodo: number
+  minVeiculos?: number
   fullscreen?: boolean
 }) {
   const isNao = variant === 'nao'
@@ -209,6 +211,11 @@ function CompetitionBoard({
           </p>
           <p className="text-[10px] font-semibold text-slate-400">
             Top 10 · {groupLabel.toLowerCase()} · {diasNoPeriodo} dia(s)
+            {minVeiculos && minVeiculos > 1 ? (
+              <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-300 ring-1 ring-amber-400/30">
+                ≥ {minVeiculos} veíc.
+              </span>
+            ) : null}
           </p>
         </div>
         {!isNao ? (
@@ -289,6 +296,14 @@ function CompetitionBoard({
   )
 }
 
+const MIN_VEICULOS_OPTIONS = [
+  { value: 1, label: 'Todos' },
+  { value: 2, label: '≥ 2 veíc.' },
+  { value: 3, label: '≥ 3 veíc.' },
+  { value: 5, label: '≥ 5 veíc.' },
+  { value: 10, label: '≥ 10 veíc.' },
+]
+
 export function ChecklistTop10Section({
   frota,
   completions,
@@ -298,6 +313,8 @@ export function ChecklistTop10Section({
   periodoResumo,
   groupBy,
   onGroupByChange,
+  minVeiculos = 1,
+  onMinVeiculosChange,
   fullscreen,
 }: {
   frota: ChecklistTop10Row[]
@@ -308,18 +325,20 @@ export function ChecklistTop10Section({
   periodoResumo?: string
   groupBy: ChecklistTop10GroupBy
   onGroupByChange: (value: ChecklistTop10GroupBy) => void
+  minVeiculos?: number
+  onMinVeiculosChange?: (value: number) => void
   fullscreen?: boolean
 }) {
   const groupLabel = CHECKLIST_TOP10_GROUP_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Responsável'
 
   const melhorAderencia = useMemo(
-    () => buildChecklistAdherenceRanking(frota, completions, periodDays, groupBy, 'best'),
-    [frota, completions, periodDays, groupBy],
+    () => buildChecklistAdherenceRanking(frota, completions, periodDays, groupBy, 'best', 10, minVeiculos),
+    [frota, completions, periodDays, groupBy, minVeiculos],
   )
 
   const piorAderencia = useMemo(
-    () => buildChecklistAdherenceRanking(frota, completions, periodDays, groupBy, 'worst'),
-    [frota, completions, periodDays, groupBy],
+    () => buildChecklistAdherenceRanking(frota, completions, periodDays, groupBy, 'worst', 10, minVeiculos),
+    [frota, completions, periodDays, groupBy, minVeiculos],
   )
 
   return (
@@ -344,19 +363,42 @@ export function ChecklistTop10Section({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Agrupar por</span>
-            <select
-              value={groupBy}
-              onChange={(e) => onGroupByChange(e.target.value as ChecklistTop10GroupBy)}
-              className="h-10 rounded-xl border border-white/10 bg-slate-900/80 px-3 text-xs font-extrabold text-slate-100 outline-none transition focus:border-amber-400/50 focus:ring-4 focus:ring-amber-500/10"
-            >
-              {CHECKLIST_TOP10_GROUP_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Agrupar por</span>
+              <select
+                value={groupBy}
+                onChange={(e) => onGroupByChange(e.target.value as ChecklistTop10GroupBy)}
+                className="h-10 rounded-xl border border-white/10 bg-slate-900/80 px-3 text-xs font-extrabold text-slate-100 outline-none transition focus:border-amber-400/50 focus:ring-4 focus:ring-amber-500/10"
+              >
+                {CHECKLIST_TOP10_GROUP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {onMinVeiculosChange ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Mín. veículos</span>
+                <select
+                  value={minVeiculos}
+                  onChange={(e) => onMinVeiculosChange(Number(e.target.value))}
+                  className={`h-10 rounded-xl border bg-slate-900/80 px-3 text-xs font-extrabold text-slate-100 outline-none transition focus:ring-4 ${
+                    minVeiculos > 1
+                      ? 'border-amber-400/50 text-amber-300 focus:border-amber-400/70 focus:ring-amber-500/10'
+                      : 'border-white/10 focus:border-amber-400/50 focus:ring-amber-500/10'
+                  }`}
+                  title="Filtra grupos com frota menor que o mínimo — deixa a competição mais justa"
+                >
+                  {MIN_VEICULOS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -369,6 +411,7 @@ export function ChecklistTop10Section({
           entries={piorAderencia}
           groupLabel={groupLabel}
           diasNoPeriodo={diasNoPeriodo}
+          minVeiculos={minVeiculos}
           fullscreen={fullscreen}
         />
         <CompetitionBoard
@@ -376,6 +419,7 @@ export function ChecklistTop10Section({
           entries={melhorAderencia}
           groupLabel={groupLabel}
           diasNoPeriodo={diasNoPeriodo}
+          minVeiculos={minVeiculos}
           fullscreen={fullscreen}
         />
       </div>
