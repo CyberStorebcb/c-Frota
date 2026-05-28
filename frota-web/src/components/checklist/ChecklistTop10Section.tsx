@@ -329,7 +329,7 @@ export function ChecklistTop10Section({
   onMinVeiculosChange?: (value: number) => void
   fullscreen?: boolean
 }) {
-  const groupLabel = CHECKLIST_TOP10_GROUP_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Responsável'
+  const groupLabel = CHECKLIST_TOP10_GROUP_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Base'
 
   const melhorAderencia = useMemo(
     () => buildChecklistAdherenceRanking(frota, completions, periodDays, groupBy, 'best', 10, minVeiculos),

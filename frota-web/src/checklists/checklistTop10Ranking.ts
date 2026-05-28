@@ -1,4 +1,4 @@
-export type ChecklistTop10GroupBy = 'supervisor' | 'base' | 'gerencia' | 'responsavel'
+export type ChecklistTop10GroupBy = 'supervisor' | 'base' | 'gerencia'
 
 export type ChecklistTop10Row = {
   placa: string
@@ -17,10 +17,9 @@ export type ChecklistAdherenceEntry = {
 }
 
 export const CHECKLIST_TOP10_GROUP_OPTIONS: { value: ChecklistTop10GroupBy; label: string }[] = [
-  { value: 'responsavel', label: 'Responsável' },
-  { value: 'supervisor', label: 'Supervisor' },
   { value: 'base', label: 'Base' },
-  { value: 'gerencia', label: 'Gerência' },
+  { value: 'gerencia', label: 'Gerente' },
+  { value: 'supervisor', label: 'Supervisor' },
 ]
 
 function groupLabel(row: ChecklistTop10Row, groupBy: ChecklistTop10GroupBy): string {

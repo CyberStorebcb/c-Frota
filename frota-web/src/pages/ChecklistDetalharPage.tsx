@@ -696,7 +696,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const [excelGerando, setExcelGerando] = useState(false)
   const [fotoGerando, setFotoGerando] = useState(false)
   const [capturandoFoto, setCapturandoFoto] = useState(false)
-  const [rankingGroupBy, setRankingGroupBy] = useState<ChecklistTop10GroupBy>('responsavel')
+  const [rankingGroupBy, setRankingGroupBy] = useState<ChecklistTop10GroupBy>('base')
   const [rankingMinVeiculos, setRankingMinVeiculos] = useState(1)
   const columnsRef = useRef<HTMLDivElement>(null)
 
