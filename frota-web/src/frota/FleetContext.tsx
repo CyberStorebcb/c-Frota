@@ -82,7 +82,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     void fetchAllSupabasePages((from, to) =>
       supabase
         .from('vehicles')
-        .select('*')
+        .select('id, placa, modelo, tipo, prefixo, responsavel, supervisor, coordenador, base, ano, status, created_at, deleted_at, proprietario, setor, processo')
         .is('deleted_at', null)
         .order('placa', { ascending: true })
         .order('id', { ascending: true })

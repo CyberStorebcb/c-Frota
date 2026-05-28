@@ -245,6 +245,9 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cache do count global de checklists — evita query a cada reload (TTL: 5 min)
+  const countCacheRef = useRef<{ value: number; at: number } | null>(null)
+  const COUNT_TTL_MS = 5 * 60 * 1000
 
   const setPeriodoCarregado = useCallback((p: PeriodoCarregado) => {
     periodoCarregadoRef.current = p
@@ -278,11 +281,10 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         { data: clData, error: clError },
         { data: resData },
       ] = await Promise.all([
-        // 1. Total de checklists concluídos (sem corte de data — métrica global)
-        supabase
-          .from('checklists')
-          .select('id', { count: 'exact', head: true })
-          .eq('progresso', 100),
+        // 1. Total de checklists concluídos — cacheado por 5 min para evitar query a cada poll
+        countCacheRef.current && Date.now() - countCacheRef.current.at < COUNT_TTL_MS
+          ? Promise.resolve({ count: countCacheRef.current.value, error: null })
+          : supabase.from('checklists').select('id', { count: 'exact', head: true }).eq('progresso', 100),
 
         // 2. Checklists com NC via função SQL — filtra server-side usando EXISTS(jsonb_each_text)
         // Muito mais eficiente: só retorna checklists que têm pelo menos um item 'nc'
@@ -310,7 +312,11 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    setChecklistsRealizadosTotal(countError ? 0 : (totalRealizados ?? 0))
+    const countFinal = countError ? 0 : (totalRealizados ?? 0)
+    if (!countError && totalRealizados != null) {
+      countCacheRef.current = { value: countFinal, at: Date.now() }
+    }
+    setChecklistsRealizadosTotal(countFinal)
 
     if (clError) {
       setPersistError('Erro ao carregar checklists: ' + clError.message)
