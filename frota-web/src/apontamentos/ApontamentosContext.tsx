@@ -365,7 +365,9 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       const channelName = `apontamentos-changes-${Date.now()}`
       const scheduleRecarregar = () => {
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-        debounceTimerRef.current = setTimeout(() => { void recarregar() }, 500)
+        // 2500ms de debounce: evita recargas em rajada quando vários apontamentos
+        // sao criados/atualizados em sequencia (ex: envio de checklist com muitos NCs)
+        debounceTimerRef.current = setTimeout(() => { void recarregar() }, 2500)
       }
 
       // Escuta apenas apontamentos — checklists geram apontamentos ao serem finalizados,
@@ -570,8 +572,16 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     if (!data) return { reparoImagens: [], osArquivo: null, justificativaImagem: null }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const d = data as any
+    // reparo_imagens pode chegar como: array de URLs, string única (URL), objeto {base64:...}
+    // ou null — normaliza sempre para string[]
+    let reparoImagens: string[] = []
+    if (Array.isArray(d.reparo_imagens)) {
+      reparoImagens = d.reparo_imagens.filter((v: unknown) => typeof v === 'string')
+    } else if (typeof d.reparo_imagens === 'string' && d.reparo_imagens) {
+      reparoImagens = [d.reparo_imagens]
+    }
     return {
-      reparoImagens:      Array.isArray(d.reparo_imagens) ? d.reparo_imagens : [],
+      reparoImagens,
       osArquivo:          d.os_arquivo          ?? null,
       justificativaImagem: d.justificativa_imagem ?? null,
     }
