@@ -510,16 +510,17 @@ export function DashboardPage() {
   }, [recarregar])
 
   // Tela de carregamento inicial — exibida apenas no verdadeiro primeiro load da sessão.
-  // _dashboardEverLoaded impede que reapareça ao voltar de outra página
-  // mesmo que carregando seja true (ex: Gerenciar acionou recarregar()).
+  // _dashboardEverLoaded impede que reapareça ao voltar de outra página.
+  // Aguarda apenas checklistsCarregando (dados principais do KPI).
+  // Apontamentos (checklists_com_nc 180d) carregam em segundo plano sem bloquear a UI.
   const loadCompletedRef = useRef(false)
   const [loadDone, setLoadDone] = useState(false)
   const [showLoadingScreen, setShowLoadingScreen] = useState(
-    () => !_dashboardEverLoaded && apontamentosCarregando,
+    () => !_dashboardEverLoaded,
   )
 
   useEffect(() => {
-    if (!checklistsCarregando && !apontamentosCarregando && !loadCompletedRef.current) {
+    if (!checklistsCarregando && !loadCompletedRef.current) {
       loadCompletedRef.current = true
       _dashboardEverLoaded = true          // nunca mais mostra nesta sessão
       if (showLoadingScreen) {
@@ -529,7 +530,7 @@ export function DashboardPage() {
         return () => clearTimeout(t)
       }
     }
-  }, [checklistsCarregando, apontamentosCarregando, showLoadingScreen])
+  }, [checklistsCarregando, showLoadingScreen])
 
   // Apontamentos filtrados (pendentes = não resolvidos)
   const pendenciasFiltradas = useMemo(() => {
