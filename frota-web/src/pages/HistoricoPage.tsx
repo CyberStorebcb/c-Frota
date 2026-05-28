@@ -93,7 +93,7 @@ async function urlToPngData(url: string): Promise<{ data: string; w: number; h: 
   // Fetch first so the canvas doesn't get tainted by cross-origin img elements
   let dataUrl: string
   try {
-    const resp = await fetch(url)
+    const resp = await fetch(url, { cache: 'force-cache' })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const blob = await resp.blob()
     dataUrl = await new Promise<string>((resolve, reject) => {

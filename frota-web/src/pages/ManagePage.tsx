@@ -57,6 +57,7 @@ import {
   normalizePlaca,
   placaFromApontamentoVeiculoId,
 } from '../frota/vehicleRegistry'
+import { uploadChecklistEvidenceFile } from '../lib/checklistEvidenceUpload'
 
 const LOADING_MESSAGES = [
   'Acessando os dados, aguarde...',
@@ -221,7 +222,7 @@ function StatPill({
 }
 
 export function ManagePage() {
-  const { rows, carregando, marcarResolvido, marcarJustificado, checklistsRealizadosTotal, periodoCarregado, setPeriodoCarregado, recarregar } = useApontamentos()
+  const { rows, carregando, marcarResolvido, marcarJustificado, fetchApontamentoDetalhes, checklistsRealizadosTotal, periodoCarregado, setPeriodoCarregado, recarregar } = useApontamentos()
   const { user } = useAuth()
   const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
   const [searchParams, setSearchParams] = useSearchParams()
@@ -555,6 +556,7 @@ export function ManagePage() {
   const [resolveImgs, setResolveImgs] = useState<string[]>([])
   const [resolveOsFile, setResolveOsFile] = useState<{ name: string; data: string } | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [uploadingImgs, setUploadingImgs] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const osFileRef = useRef<HTMLInputElement | null>(null)
 
@@ -649,6 +651,7 @@ export function ManagePage() {
   const [justImagem, setJustImagem] = useState<string | null>(null)
   const [justAgendamento, setJustAgendamento] = useState<string>('')
   const [salvandoJust, setSalvandoJust] = useState(false)
+  const [uploadingJust, setUploadingJust] = useState(false)
   const justImgRef = useRef<HTMLInputElement | null>(null)
 
   const openJustModal = (r: Apontamento) => {
@@ -656,9 +659,13 @@ export function ManagePage() {
     setJustId(r.id)
     setJustData(r.justificativaData ?? new Date().toISOString().slice(0, 10))
     setJustTexto(r.justificativa ?? '')
-    setJustImagem(r.justificativaImagem ?? null)
+    setJustImagem(null)
     setJustAgendamento(r.agendamentoData ?? '')
     setJustOpen(true)
+    // Busca imagem de justificativa sob demanda
+    void fetchApontamentoDetalhes(r.id).then((detalhes) => {
+      setJustImagem(detalhes.justificativaImagem)
+    })
   }
 
   const closeJustModal = () => {
@@ -672,13 +679,26 @@ export function ManagePage() {
     if (justImgRef.current) justImgRef.current.value = ''
   }
 
-  const addJustImagem = (files: FileList | null) => {
+  const addJustImagem = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     const file = files[0]!
-    const reader = new FileReader()
-    reader.onload = () => setJustImagem(String(reader.result ?? ''))
-    reader.readAsDataURL(file)
-    if (justImgRef.current) justImgRef.current.value = ''
+    setUploadingJust(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const key = `justificativa/${crypto.randomUUID()}.${ext}`
+      const url = await uploadChecklistEvidenceFile(file, key)
+      if (url) {
+        setJustImagem(url)
+      } else {
+        // fallback base64 se upload falhar
+        const reader = new FileReader()
+        reader.onload = () => setJustImagem(String(reader.result ?? ''))
+        reader.readAsDataURL(file)
+      }
+    } finally {
+      setUploadingJust(false)
+      if (justImgRef.current) justImgRef.current.value = ''
+    }
   }
 
   const confirmJust = async () => {
@@ -707,9 +727,14 @@ export function ManagePage() {
     setResolveValor(digits ? formatCurrency(digits) : '')
     setResolveData(r.dataResolvido ?? new Date().toISOString().slice(0, 10))
     setResolveDescricao(r.reparoDescricao ?? '')
-    setResolveImgs(r.reparoImagens ?? [])
-    setResolveOsFile(r.osArquivo ? { name: 'OS Anexada', data: r.osArquivo } : null)
+    setResolveImgs([])
+    setResolveOsFile(null)
     setResolveOpen(true)
+    // Busca imagens e OS sob demanda (não ficam na query principal para evitar egress)
+    void fetchApontamentoDetalhes(r.id).then((detalhes) => {
+      setResolveImgs(detalhes.reparoImagens)
+      setResolveOsFile(detalhes.osArquivo ? { name: 'OS Anexada', data: detalhes.osArquivo } : null)
+    })
   }
 
   const closeResolveModal = () => {
@@ -743,17 +768,27 @@ export function ManagePage() {
     if (!files) return
     const remaining = Math.max(0, 3 - resolveImgs.length)
     const picked = Array.from(files).slice(0, remaining)
-    const toDataUrl = (f: File) =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result ?? ''))
-        reader.onerror = () => reject(new Error('Falha ao ler imagem'))
-        reader.readAsDataURL(f)
-      })
+    if (picked.length === 0) return
+    setUploadingImgs(true)
     try {
-      const urls = (await Promise.all(picked.map(toDataUrl))).filter(Boolean)
-      setResolveImgs((prev) => [...prev, ...urls].slice(0, 3))
+      const urls = await Promise.all(
+        picked.map(async (file) => {
+          const ext = file.name.split('.').pop() ?? 'jpg'
+          const key = `reparo/${crypto.randomUUID()}.${ext}`
+          const url = await uploadChecklistEvidenceFile(file, key)
+          if (url) return url
+          // fallback base64 se upload falhar
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result ?? ''))
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+          })
+        })
+      )
+      setResolveImgs((prev) => [...prev, ...urls.filter(Boolean)].slice(0, 3))
     } finally {
+      setUploadingImgs(false)
       if (fileRef.current) fileRef.current.value = ''
     }
   }
@@ -1814,13 +1849,13 @@ export function ManagePage() {
                 <button
                   type="button"
                   onClick={() => void confirmResolve()}
-                  disabled={salvando}
+                  disabled={salvando || uploadingImgs}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-soft hover:bg-emerald-700 disabled:opacity-60"
                 >
-                  {salvando
+                  {(salvando || uploadingImgs)
                     ? <Loader2 size={18} className="animate-spin" />
                     : <Check size={18} strokeWidth={3} />}
-                  {salvando ? 'Salvando...' : 'Confirmar resolvido'}
+                  {uploadingImgs ? 'Enviando fotos...' : salvando ? 'Salvando...' : 'Confirmar resolvido'}
                 </button>
               </div>
             </div>
@@ -2189,13 +2224,13 @@ export function ManagePage() {
                 <button
                   type="button"
                   onClick={() => void confirmJust()}
-                  disabled={salvandoJust || !justTexto.trim()}
+                  disabled={salvandoJust || uploadingJust || !justTexto.trim()}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-extrabold text-white shadow-soft hover:bg-amber-600 disabled:opacity-60"
                 >
-                  {salvandoJust
+                  {(salvandoJust || uploadingJust)
                     ? <Loader2 size={18} className="animate-spin" />
                     : <MessageSquareWarning size={18} />}
-                  {salvandoJust ? 'Salvando...' : 'Salvar justificativa'}
+                  {uploadingJust ? 'Enviando foto...' : salvandoJust ? 'Salvando...' : 'Salvar justificativa'}
                 </button>
               </div>
             </div>

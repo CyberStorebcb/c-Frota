@@ -225,6 +225,7 @@ type Ctx = {
     usuarioEmail?: string,
   ) => Promise<void>
   buscarHistorico: (apontamentoId: string) => Promise<HistoricoRow[]>
+  fetchApontamentoDetalhes: (id: string) => Promise<{ reparoImagens: string[]; osArquivo: string | null; justificativaImagem: string | null }>
   hasByChecklist: (checklistId: string, ncItemId: string) => boolean
   persistError: string | null
   clearPersistError: () => void
@@ -294,11 +295,12 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
           return q.order('data_inspecao', { ascending: true }).order('id', { ascending: true }).range(from, to)
         }),
 
-        // 3. Resoluções no período selecionado
+        // 3. Resoluções no período selecionado (sem campos pesados: reparo_imagens, os_arquivo, justificativa_imagem)
+        // Esses campos são buscados sob demanda via fetchApontamentoDetalhes() ao abrir o modal
         fetchAllSupabasePages((from, to) => {
           let q = supabase
             .from('apontamentos')
-            .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, reparo_imagens, os_arquivo, justificado, justificativa, justificativa_data, justificativa_imagem, agendamento_data')
+            .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, justificado, justificativa, justificativa_data, agendamento_data')
           if (dataCorteIso) q = q.gte('data_apontamento', dataCorteIso)
           return q.order('id', { ascending: true }).range(from, to)
         }),
@@ -550,6 +552,28 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     return (data ?? []) as HistoricoRow[]
   }, [])
 
+  /** Busca sob demanda os campos pesados (imagens base64) de um apontamento.
+   *  Chamado apenas ao abrir o modal de resolução/justificativa. */
+  const fetchApontamentoDetalhes = useCallback(async (id: string): Promise<{
+    reparoImagens: string[]
+    osArquivo: string | null
+    justificativaImagem: string | null
+  }> => {
+    const { data } = await supabase
+      .from('apontamentos')
+      .select('reparo_imagens, os_arquivo, justificativa_imagem')
+      .eq('id', id)
+      .single()
+    if (!data) return { reparoImagens: [], osArquivo: null, justificativaImagem: null }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const d = data as any
+    return {
+      reparoImagens:      Array.isArray(d.reparo_imagens) ? d.reparo_imagens : [],
+      osArquivo:          d.os_arquivo          ?? null,
+      justificativaImagem: d.justificativa_imagem ?? null,
+    }
+  }, [])
+
   const hasByChecklist = useCallback((checklistId: string, ncItemId: string): boolean => {
     return rows.some((r) => r.checklistId === checklistId && r.ncItemId === ncItemId && r.resolvido)
   }, [rows])
@@ -564,12 +588,13 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       marcarResolvido,
       marcarJustificado,
       buscarHistorico,
+      fetchApontamentoDetalhes,
       hasByChecklist,
       persistError,
       clearPersistError,
       recarregar,
     }),
-    [rows, checklistsRealizadosTotal, carregando, periodoCarregado, setPeriodoCarregado, marcarResolvido, marcarJustificado, buscarHistorico, hasByChecklist, persistError, clearPersistError, recarregar],
+    [rows, checklistsRealizadosTotal, carregando, periodoCarregado, setPeriodoCarregado, marcarResolvido, marcarJustificado, buscarHistorico, fetchApontamentoDetalhes, hasByChecklist, persistError, clearPersistError, recarregar],
   )
 
   return <ApontamentosContext.Provider value={value}>{children}</ApontamentosContext.Provider>
