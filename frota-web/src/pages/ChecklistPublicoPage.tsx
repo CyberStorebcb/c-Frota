@@ -20,7 +20,6 @@ import {
   Paperclip,
   X,
 } from 'lucide-react'
-import { uploadChecklistEvidenceFile } from '../lib/checklistEvidenceUpload'
 import { useTheme } from '../theme/ThemeProvider'
 import { enqueueChecklist, type OfflineChecklistFile } from '../checklists/offlineQueue'
 import { syncOfflineChecklists } from '../checklists/syncOfflineChecklists'
@@ -1897,9 +1896,6 @@ function FormularioChecklist({
 
   const removerArquivo = (idx: number) =>
     setArquivos((prev) => prev.filter((_, i) => i !== idx))
-
-  const uploadFile = async (file: File, path: string): Promise<string | null> =>
-    uploadChecklistEvidenceFile(file, path)
 
   const buildChecklistPayload = (observacoesFinais: Record<string, string>, evidenciaUrls: string[]) => {
     const respostasLimpas = Object.fromEntries(
