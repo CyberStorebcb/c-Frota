@@ -2003,11 +2003,22 @@ function FormularioChecklist({
       }
 
       const payload = buildChecklistPayload(observacoesFinais, evidenciaUrls)
-      const { error } = await supabase.from('checklists').insert(payload)
 
-      if (error) {
-        console.error('[checklist] Erro ao inserir no Supabase:', error.code, error.message, error.details)
-        setErroEnvio(`Erro ao enviar checklist: ${error.message || error.code || 'erro desconhecido'}. Verifique a conexão e tente novamente.`)
+      // Retry automático: até 3 tentativas com espera crescente (2s, 4s)
+      // Cobre timeouts de banco durante pico de envios simultâneos.
+      let lastError: { message?: string; code?: string } | null = null
+      let inserido = false
+      for (let tentativa = 1; tentativa <= 3; tentativa++) {
+        const { error } = await supabase.from('checklists').insert(payload)
+        if (!error) { inserido = true; break }
+        lastError = error
+        console.warn(`[checklist] Tentativa ${tentativa}/3 falhou:`, error.code, error.message)
+        if (tentativa < 3) await new Promise((r) => setTimeout(r, tentativa * 2000))
+      }
+
+      if (!inserido) {
+        console.error('[checklist] Erro ao inserir no Supabase após 3 tentativas:', lastError)
+        setErroEnvio(`Erro ao enviar checklist: ${lastError?.message || lastError?.code || 'erro desconhecido'}. Verifique a conexão e tente novamente.`)
         setEnviando(false)
         return
       }
