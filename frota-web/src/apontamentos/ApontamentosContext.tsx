@@ -203,6 +203,35 @@ function localTimeHHmm(d: Date) {
 }
 
 // ---------------------------------------------------------------------------
+// Cache sessionStorage — persiste entre page reloads na mesma aba
+// ---------------------------------------------------------------------------
+const ROWS_CACHE_KEY  = 'frota-rows-cache-v1'
+const ROWS_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutos
+
+type RowsCache = {
+  rows: Apontamento[]
+  checklistsRealizadosTotal: number
+  at: number
+}
+
+function saveRowsToCache(rows: Apontamento[], total: number) {
+  try {
+    const entry: RowsCache = { rows, checklistsRealizadosTotal: total, at: Date.now() }
+    sessionStorage.setItem(ROWS_CACHE_KEY, JSON.stringify(entry))
+  } catch { /* quota exceeded — silencia */ }
+}
+
+function loadRowsFromCache(): RowsCache | null {
+  try {
+    const raw = sessionStorage.getItem(ROWS_CACHE_KEY)
+    if (!raw) return null
+    const entry = JSON.parse(raw) as RowsCache
+    if (Date.now() - entry.at > ROWS_CACHE_TTL_MS) return null
+    return entry
+  } catch { return null }
+}
+
+// ---------------------------------------------------------------------------
 // Contexto
 // ---------------------------------------------------------------------------
 export type PeriodoCarregado = '180d' | '1a' | '2a' | 'tudo'
@@ -235,9 +264,10 @@ type Ctx = {
 const ApontamentosContext = createContext<Ctx | null>(null)
 
 export function ApontamentosProvider({ children }: { children: ReactNode }) {
-  const [rows, setRows]               = useState<Apontamento[]>([])
-  const [checklistsRealizadosTotal, setChecklistsRealizadosTotal] = useState(0)
-  const [carregando, setCarregando]   = useState(true)
+  // Inicializa a partir do cache sessionStorage se disponível — evita tela em branco no reload
+  const [rows, setRows]               = useState<Apontamento[]>(() => loadRowsFromCache()?.rows ?? [])
+  const [checklistsRealizadosTotal, setChecklistsRealizadosTotal] = useState(() => loadRowsFromCache()?.checklistsRealizadosTotal ?? 0)
+  const [carregando, setCarregando]   = useState(() => loadRowsFromCache() === null)
   const [persistError, setPersistError] = useState<string | null>(null)
   const clearPersistError = useCallback(() => setPersistError(null), [])
   const [periodoCarregado, setPeriodoCarregadoState] = useState<PeriodoCarregado>('180d')
@@ -347,6 +377,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     }
 
     setRows(apontamentos)
+    saveRowsToCache(apontamentos, countFinal)   // persiste para o próximo reload
     setPersistError(null)
     setCarregando(false)
   }, [])
@@ -357,8 +388,9 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   }, [recarregarInternal])
 
   useEffect(() => {
-    // Carga inicial — exibe spinner
-    queueMicrotask(() => { void recarregarInternal(false) })
+    // Se há cache válido → refresh silencioso; caso contrário → exibe spinner (primeiro load)
+    const hasCachedData = loadRowsFromCache() !== null
+    queueMicrotask(() => { void recarregarInternal(hasCachedData) })
 
     // Polling a cada 60s silencioso — substitui Realtime para eliminar drenagem contínua do WAL.
     // Os dados são atualizados em background sem piscar o spinner na tela.

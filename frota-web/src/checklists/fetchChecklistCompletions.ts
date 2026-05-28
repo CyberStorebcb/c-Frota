@@ -10,9 +10,10 @@ export type ChecklistCompletionRow = {
 }
 
 // ---------------------------------------------------------------------------
-// Cache de módulo — persiste entre remounts do componente na mesma sessão
+// Cache duplo: módulo (remounts) + sessionStorage (page reload)
 // ---------------------------------------------------------------------------
-const COMPLETIONS_CACHE_TTL_MS = 5 * 60 * 1000 // 5 min
+const COMPLETIONS_CACHE_TTL_MS  = 5 * 60 * 1000   // 5 min
+const COMPLETIONS_SESSION_KEY   = 'frota-completions-cache-v1'
 
 type CompletionsCache = {
   inicioIso: string
@@ -23,15 +24,37 @@ type CompletionsCache = {
 
 let _completionsCache: CompletionsCache | null = null
 
-/** Retorna dados em cache se ainda válidos para o mesmo período; caso contrário null. */
+/** Retorna dados em cache (módulo ou sessionStorage) se válidos para o período. */
 export function getCachedChecklistCompletions(
   inicioIso: string,
   fimIso: string,
 ): ChecklistCompletionRow[] | null {
-  if (!_completionsCache) return null
-  if (_completionsCache.inicioIso !== inicioIso || _completionsCache.fimIso !== fimIso) return null
-  if (Date.now() - _completionsCache.at > COMPLETIONS_CACHE_TTL_MS) return null
-  return _completionsCache.data
+  // 1. Cache de módulo — mais rápido
+  if (
+    _completionsCache &&
+    _completionsCache.inicioIso === inicioIso &&
+    _completionsCache.fimIso   === fimIso &&
+    Date.now() - _completionsCache.at <= COMPLETIONS_CACHE_TTL_MS
+  ) {
+    return _completionsCache.data
+  }
+
+  // 2. sessionStorage — sobrevive ao page reload dentro da mesma aba
+  try {
+    const raw = sessionStorage.getItem(COMPLETIONS_SESSION_KEY)
+    if (!raw) return null
+    const entry = JSON.parse(raw) as CompletionsCache
+    if (entry.inicioIso !== inicioIso || entry.fimIso !== fimIso) return null
+    if (Date.now() - entry.at > COMPLETIONS_CACHE_TTL_MS) return null
+    _completionsCache = entry   // popula cache de módulo para próximas leituras
+    return entry.data
+  } catch { return null }
+}
+
+/** Invalida ambas as camadas de cache (usado pelo botão Atualizar). */
+export function invalidateCompletionsCache() {
+  _completionsCache = null
+  try { sessionStorage.removeItem(COMPLETIONS_SESSION_KEY) } catch { /* ignore */ }
 }
 
 /** Busca todos os checklists concluídos no intervalo (pagina além do limite padrão de 1000 do Supabase). */
@@ -53,8 +76,10 @@ export async function fetchCompletedChecklistsInPeriod(
 
   if (error) throw error
 
-  // Armazena no cache de módulo para uso imediato no próximo remount
-  _completionsCache = { inicioIso, fimIso, data, at: Date.now() }
+  // Persiste em ambas as camadas
+  const entry: CompletionsCache = { inicioIso, fimIso, data, at: Date.now() }
+  _completionsCache = entry
+  try { sessionStorage.setItem(COMPLETIONS_SESSION_KEY, JSON.stringify(entry)) } catch { /* quota */ }
   return data
 }
 

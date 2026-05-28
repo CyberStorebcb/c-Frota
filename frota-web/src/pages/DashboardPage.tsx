@@ -42,6 +42,7 @@ import {
   countUniqueCompletionsInPeriod,
   fetchCompletedChecklistsInPeriod,
   getCachedChecklistCompletions,
+  invalidateCompletionsCache,
 } from '../checklists/fetchChecklistCompletions'
 import type { DashboardAdesaoChartRow } from './DashboardAdesaoCharts'
 import { DashboardLoadingScreen } from './DashboardLoadingScreen'
@@ -441,6 +442,8 @@ export function DashboardPage() {
   const [checklistCompletionsAdm, setChecklistCompletionsAdm] = useState<Set<string>>(() => new Set())
   // true enquanto o primeiro fetch de checklists não terminou (sem cache disponível)
   const [checklistsCarregando, setChecklistsCarregando] = useState(true)
+  // Incrementado pelo botão Atualizar para forçar re-fetch das completions
+  const [completionsRefetchTick, setCompletionsRefetchTick] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -492,12 +495,19 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters, operacionalPlacasSet, adminPlacasSet])
+  }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters, operacionalPlacasSet, adminPlacasSet, completionsRefetchTick])
 
   const checklistCompletions = dashboardSetorAdm ? checklistCompletionsAdm : checklistCompletionsOp
   const checklistsPorDia = dashboardSetorAdm ? checklistsPorDiaAdm : checklistsPorDiaOp
 
-  const { rows, carregando: apontamentosCarregando } = useApontamentos()
+  const { rows, carregando: apontamentosCarregando, recarregar } = useApontamentos()
+
+  /** Atualiza dados e limpa ambos os caches — acionado pelo botão Atualizar do dashboard. */
+  const handleRefresh = useCallback(async () => {
+    invalidateCompletionsCache()
+    setCompletionsRefetchTick((t) => t + 1)
+    await recarregar()
+  }, [recarregar])
 
   // Tela de carregamento inicial — exibida apenas no verdadeiro primeiro load da sessão.
   // _dashboardEverLoaded impede que reapareça ao voltar de outra página
@@ -822,6 +832,22 @@ export function DashboardPage() {
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+            {/* Botão Atualizar */}
+            <button
+              type="button"
+              onClick={() => { void handleRefresh() }}
+              disabled={apontamentosCarregando || checklistsCarregando}
+              title="Atualizar dados do dashboard"
+              aria-label="Atualizar dados"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 transition hover:bg-slate-100/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 dark:border-slate-600/60 dark:bg-transparent dark:text-slate-200 dark:hover:bg-white/5 sm:gap-2 sm:px-3.5 sm:text-[11px]"
+            >
+              <RefreshCw
+                size={15}
+                className={`shrink-0 transition-transform${apontamentosCarregando || checklistsCarregando ? ' animate-spin' : ''}`}
+                aria-hidden
+              />
+              <span className="hidden sm:inline">Atualizar</span>
+            </button>
             <button
               type="button"
               onClick={exportarImagem}
