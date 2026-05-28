@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Car, ClipboardList, LayoutDashboard, LogOut, Settings2, Shield, X } from 'lucide-react'
+import { Car, ClipboardList, Database, LayoutDashboard, LogOut, Settings2, Shield, X } from 'lucide-react'
 import { InstagramIcon } from '../../branding/InstagramIcon'
 import { SOCIAL_LINKS } from '../../branding/socialLinks'
 import { useAuth } from '../../auth/AuthContext'
@@ -97,7 +97,12 @@ function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => 
   const { user } = useAuth()
   const navItems = [
     ...baseNav,
-    ...(user?.role === 'super_admin' ? ([{ to: '/usuarios', label: 'Usuários', icon: Shield, end: false }] as const) : []),
+    ...(user?.role === 'super_admin'
+      ? ([
+          { to: '/admin/frota', label: 'Banco de Dados', icon: Database, end: false },
+          { to: '/usuarios',    label: 'Usuários',       icon: Shield,   end: false },
+        ] as const)
+      : []),
   ]
 
   return (

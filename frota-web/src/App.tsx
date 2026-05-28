@@ -61,6 +61,9 @@ const ChecklistDetalharPage = lazy(() =>
 const LazyRegistroRoute = lazy(() =>
   import('./routes/RegistroRoute').then((m) => ({ default: m.RegistroRoute })),
 )
+const FrotaEditorPage = lazy(() =>
+  import('./pages/FrotaEditorPage').then((m) => ({ default: m.FrotaEditorPage })),
+)
 const TrocarSenhaPage = lazy(() =>
   import('./pages/TrocarSenhaPage').then((m) => ({ default: m.TrocarSenhaPage })),
 )
@@ -113,6 +116,14 @@ export default function App() {
               element={
                 <RequireSuperAdmin>
                   <UsuariosPage />
+                </RequireSuperAdmin>
+              }
+            />
+            <Route
+              path="/admin/frota"
+              element={
+                <RequireSuperAdmin>
+                  <FrotaEditorPage />
                 </RequireSuperAdmin>
               }
             />
