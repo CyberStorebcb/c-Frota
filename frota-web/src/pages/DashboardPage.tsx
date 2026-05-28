@@ -418,6 +418,8 @@ export function DashboardPage() {
   const [checklistCompletionsOp, setChecklistCompletionsOp] = useState<Set<string>>(() => new Set())
   const [checklistsPorDiaAdm, setChecklistsPorDiaAdm] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
   const [checklistCompletionsAdm, setChecklistCompletionsAdm] = useState<Set<string>>(() => new Set())
+  // true enquanto o primeiro fetch de checklists não terminou (sem cache disponível)
+  const [checklistsCarregando, setChecklistsCarregando] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -431,9 +433,11 @@ export function DashboardPage() {
       setChecklistsPorDiaOp(op.porDia)
       setChecklistCompletionsAdm(adm.completions)
       setChecklistsPorDiaAdm(adm.porDia)
+      setChecklistsCarregando(false)
       return () => { cancelled = true }
     }
 
+    setChecklistsCarregando(true)
     void fetchCompletedChecklistsInPeriod(periodoInicioIso, periodoFimIso)
       .then((data) => {
         if (cancelled) return
@@ -453,6 +457,7 @@ export function DashboardPage() {
         setChecklistsPorDiaOp(op.porDia)
         setChecklistCompletionsAdm(adm.completions)
         setChecklistsPorDiaAdm(adm.porDia)
+        setChecklistsCarregando(false)
       })
       .catch(() => {
         if (cancelled) return
@@ -460,6 +465,7 @@ export function DashboardPage() {
         setChecklistCompletionsOp(new Set())
         setChecklistsPorDiaAdm([])
         setChecklistCompletionsAdm(new Set())
+        setChecklistsCarregando(false)
       })
 
     return () => {
@@ -470,7 +476,7 @@ export function DashboardPage() {
   const checklistCompletions = dashboardSetorAdm ? checklistCompletionsAdm : checklistCompletionsOp
   const checklistsPorDia = dashboardSetorAdm ? checklistsPorDiaAdm : checklistsPorDiaOp
 
-  const { rows } = useApontamentos()
+  const { rows, carregando: apontamentosCarregando } = useApontamentos()
 
   // Apontamentos filtrados (pendentes = não resolvidos)
   const pendenciasFiltradas = useMemo(() => {
@@ -543,9 +549,15 @@ export function DashboardPage() {
       checklistsPorDiaNoPeriodo,
       checklistsNoPeriodo,
     )
-    const conformidade = checklistsNoPeriodo > 0
-      ? `${Math.round(((checklistsNoPeriodo - comNcNoPeriodo) / checklistsNoPeriodo) * 100)}%`
-      : '—'
+
+    // Enquanto o fetch não terminou, mostra '—' em vez de zeros enganosos
+    const LOADING = '—'
+
+    const conformidade = checklistsCarregando
+      ? LOADING
+      : checklistsNoPeriodo > 0
+        ? `${Math.round(((checklistsNoPeriodo - comNcNoPeriodo) / checklistsNoPeriodo) * 100)}%`
+        : '—'
 
     /** Mesmo critério do Status da frota: planilha total + categorias operacionais; ATIVOS no KPI = caixa ATIVOS + TRANSPORTE. */
     const ativosOperacionais = scopedFleetPlacasSet.size
@@ -553,10 +565,14 @@ export function DashboardPage() {
     // Aderência segue o período e o setor do card (operacional ou ADM):
     const esperados = ativosSetorFiltrado * periodDays.length
     const pctAderencia = esperados > 0 ? Math.min(100, Math.round((checklistsNoPeriodo / esperados) * 100)) : 0
-    const aderencia = esperados > 0 ? `${pctAderencia}%` : '—'
-    const aderenciaSub = periodDays.length === 1
-      ? `${checklistsNoPeriodo} de ${esperados} checklists ${setorChecklistLabel} realizados`
-      : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias · ${setorChecklistLabel})`
+    const aderencia = checklistsCarregando
+      ? LOADING
+      : esperados > 0 ? `${pctAderencia}%` : '—'
+    const aderenciaSub = checklistsCarregando
+      ? 'Carregando…'
+      : periodDays.length === 1
+        ? `${checklistsNoPeriodo} de ${esperados} checklists ${setorChecklistLabel} realizados`
+        : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias · ${setorChecklistLabel})`
 
     // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
     const pendentesUnicas = new Set(
@@ -574,7 +590,7 @@ export function DashboardPage() {
       },
       {
         label: checklistsRealizadosCard.label,
-        value: String(checklistsRealizadosCard.value),
+        value: checklistsCarregando ? LOADING : String(checklistsRealizadosCard.value),
         Icon: ClipboardCheck,
         iconWrap: 'bg-blue-50 text-blue-600 group-hover:scale-110 dark:bg-blue-950/50 dark:text-blue-400',
         cardHover: 'hover:border-blue-400 dark:hover:border-blue-500',
@@ -589,7 +605,7 @@ export function DashboardPage() {
       },
       {
         label: 'Pendentes',
-        value: String(pendentesUnicas),
+        value: apontamentosCarregando ? LOADING : String(pendentesUnicas),
         Icon: ClipboardX,
         iconWrap: 'bg-orange-50 text-orange-600 group-hover:scale-110 dark:bg-orange-950/50 dark:text-orange-400',
         cardHover: 'hover:border-orange-400 dark:hover:border-orange-500',
@@ -604,7 +620,7 @@ export function DashboardPage() {
         cardHover: 'hover:border-sky-400 dark:hover:border-sky-500',
       },
     ]
-  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacasSet, ativosSetorFiltrado, checklistCompletions, periodDays, dashboardSetorAdm, setorChecklistLabel])
+  }, [checklistsPorDiaNoPeriodo, pendenciasFiltradas, periodoLimites, periodoInicioIso, periodoFimIso, scopedFleetPlacasSet, ativosSetorFiltrado, checklistCompletions, periodDays, dashboardSetorAdm, setorChecklistLabel, checklistsCarregando, apontamentosCarregando])
 
   const chartUi = useMemo(
     () => ({
