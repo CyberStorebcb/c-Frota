@@ -30,7 +30,12 @@ import {
   type ChecklistDetalharPdfScope,
 } from '../checklists/generateChecklistDetalharPdf'
 import { generateChecklistDetalharExcel } from '../checklists/generateChecklistDetalharExcel'
-import { generateChecklistDetalharImage, downloadChecklistImage } from '../checklists/generateChecklistDetalharImage'
+import {
+  generateChecklistDetalharImage,
+  downloadChecklistImage,
+  type ChecklistDetalharImageScope,
+  type ChecklistDetalharJustificadoRow,
+} from '../checklists/generateChecklistDetalharImage'
 
 import { getBasesByGerenciaAndResponsavel, getResponsaveisByGerencia } from '../data/gerenciaMap'
 import { TOTAL_VEHICLE_ROWS } from '../data/totalVehiclesFleet.gen'
@@ -1256,14 +1261,25 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   )
 
   const exportarFoto = useCallback(
-    (scope: ChecklistDetalharPdfScope) => {
+    (scope: ChecklistDetalharImageScope) => {
       setFotoGerando(true)
       try {
+        const justRows: ChecklistDetalharJustificadoRow[] = justificadosFiltrados.map((v) => ({
+          placa: v.placa,
+          modelo: v.modelo,
+          base: v.base,
+          prefixo: v.prefixo,
+          supervisor: v.supervisor,
+          coordenador: v.coordenador,
+          motivo: v.motivo,
+          placaReserva: v.placaReserva,
+        }))
         const dataUrl = generateChecklistDetalharImage(
           scope,
           exportMeta,
           naoRealizaramFiltrados,
           realizaramFiltrados,
+          justRows,
         )
         downloadChecklistImage(scope, dataUrl)
         setFotoModalOpen(false)
@@ -1274,7 +1290,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         setFotoGerando(false)
       }
     },
-    [exportMeta, naoRealizaramFiltrados, realizaramFiltrados],
+    [exportMeta, naoRealizaramFiltrados, realizaramFiltrados, justificadosFiltrados],
   )
 
   const capturarRanking = useCallback(async () => {
@@ -2165,9 +2181,39 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
               >
                 <Camera size={18} className="shrink-0 text-slate-600 dark:text-slate-300" />
                 <div>
-                  <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">Ambos</p>
+                  <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">Não realizados + Realizados</p>
                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                     {naoRealizaramFiltrados.length} não realizados · {realizaramFiltrados.length} realizados
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={fotoGerando || justificadosFiltrados.length === 0}
+                onClick={() => exportarFoto('justificados')}
+                className="flex w-full items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-950/60 dark:bg-amber-950/20 dark:hover:bg-amber-950/30"
+              >
+                <MessageSquareWarning size={18} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <p className="text-sm font-extrabold text-amber-800 dark:text-amber-200">Somente justificados</p>
+                  <p className="text-[11px] font-semibold text-amber-600/80 dark:text-amber-300/70">
+                    {justificadosFiltrados.length} veículo(s)
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={fotoGerando || (naoRealizaramFiltrados.length === 0 && realizaramFiltrados.length === 0 && justificadosFiltrados.length === 0)}
+                onClick={() => exportarFoto('tudo')}
+                className="flex w-full items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-left transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-950/60 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/30"
+              >
+                <Camera size={18} className="shrink-0 text-indigo-600 dark:text-indigo-400" />
+                <div>
+                  <p className="text-sm font-extrabold text-indigo-800 dark:text-indigo-200">Tudo</p>
+                  <p className="text-[11px] font-semibold text-indigo-600/80 dark:text-indigo-300/70">
+                    Não realizados · Realizados · Justificados
                   </p>
                 </div>
               </button>

@@ -5,6 +5,19 @@ import type {
   ChecklistDetalharPdfMeta,
 } from './generateChecklistDetalharPdf'
 
+export type ChecklistDetalharImageScope = ChecklistDetalharPdfScope | 'justificados' | 'tudo'
+
+export type ChecklistDetalharJustificadoRow = {
+  placa: string
+  modelo: string
+  base: string
+  prefixo: string
+  supervisor: string
+  coordenador: string
+  motivo: string
+  placaReserva?: string
+}
+
 // ── constants ──────────────────────────────────────────────────────────────
 
 const FF = '"Segoe UI", Inter, system-ui, -apple-system, sans-serif'
@@ -130,18 +143,19 @@ function drawSection<T>(
   y: number,
   w: number,
   title: string,
-  variant: 'nao' | 'sim',
+  variant: 'nao' | 'sim' | 'justificados',
   cols: ColDef<T>[],
   rows: T[],
 ): void {
   const h = sectionH(rows.length)
   const isNao = variant === 'nao'
-  const accent = isNao ? '#f43f5e' : '#10b981'
-  const titleBg = isNao ? 'rgba(76,5,25,0.75)' : 'rgba(6,78,59,0.65)'
-  const border = isNao ? 'rgba(244,63,94,0.4)' : 'rgba(16,185,129,0.4)'
-  const titleFg = isNao ? '#fda4af' : '#6ee7b7'
-  const rowAccent = isNao ? 'rgba(244,63,94,0.05)' : 'rgba(16,185,129,0.05)'
-  const colHdrFg = isNao ? '#fca5a5' : '#86efac'
+  const isJust = variant === 'justificados'
+  const accent = isNao ? '#f43f5e' : isJust ? '#f59e0b' : '#10b981'
+  const titleBg = isNao ? 'rgba(76,5,25,0.75)' : isJust ? 'rgba(78,52,6,0.75)' : 'rgba(6,78,59,0.65)'
+  const border = isNao ? 'rgba(244,63,94,0.4)' : isJust ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.4)'
+  const titleFg = isNao ? '#fda4af' : isJust ? '#fcd34d' : '#6ee7b7'
+  const rowAccent = isNao ? 'rgba(244,63,94,0.05)' : isJust ? 'rgba(245,158,11,0.05)' : 'rgba(16,185,129,0.05)'
+  const colHdrFg = isNao ? '#fca5a5' : isJust ? '#fde68a' : '#86efac'
   const widths = resolveWidths(cols, w)
 
   // card
@@ -248,20 +262,25 @@ function drawSection<T>(
 // ── public API ─────────────────────────────────────────────────────────────
 
 export function generateChecklistDetalharImage(
-  scope: ChecklistDetalharPdfScope,
+  scope: ChecklistDetalharImageScope,
   meta: ChecklistDetalharPdfMeta,
   naoRows: ChecklistDetalharVeiculoRow[],
   simRows: ChecklistDetalharChecklistRow[],
+  justRows: ChecklistDetalharJustificadoRow[],
 ): string {
   const cw = W - PAD * 2
+  const showNao  = scope === 'nao'  || scope === 'ambos' || scope === 'tudo'
+  const showSim  = scope === 'sim'  || scope === 'ambos' || scope === 'tudo'
+  const showJust = scope === 'justificados' || scope === 'tudo'
 
-  const naoH = sectionH(naoRows.length)
-  const simH = sectionH(simRows.length)
+  const naoH  = showNao  ? sectionH(naoRows.length)  : 0
+  const simH  = showSim  ? sectionH(simRows.length)  : 0
+  const justH = showJust ? sectionH(justRows.length) : 0
 
-  let H = PAD + HEADER_H + GAP
-  if (scope === 'nao') H += naoH + PAD
-  else if (scope === 'sim') H += simH + PAD
-  else H += naoH + GAP + simH + PAD
+  const sections = [showNao && naoH, showSim && simH, showJust && justH].filter(Boolean) as number[]
+  const totalSections = sections.reduce((s, h) => s + h + GAP, 0) - GAP
+
+  const H = PAD + HEADER_H + GAP + totalSections + PAD
 
   const canvas = document.createElement('canvas')
   canvas.width = W
@@ -303,21 +322,39 @@ export function generateChecklistDetalharImage(
     { header: 'Gerência', w: 240, text: r => r.coordenador || '—' },
   ]
 
-  if (scope === 'nao' || scope === 'ambos') {
+  const justCols: ColDef<ChecklistDetalharJustificadoRow>[] = [
+    { header: 'Nº', w: 52, text: (_, i) => String(i + 1), align: 'center' },
+    { header: 'Placa', w: 130, text: r => r.placa },
+    { header: 'Base', w: 110, text: r => r.base || '—' },
+    { header: 'Modelo', w: 200, text: r => r.modelo || '—' },
+    { header: 'Prefixo', w: 190, text: r => r.prefixo || '—' },
+    { header: 'Motivo', w: 200, text: r => r.motivo + (r.placaReserva ? ` · ${r.placaReserva}` : ''), align: 'center' },
+    { header: 'Supervisor', w: 'flex', text: r => r.supervisor || '—' },
+    { header: 'Gerência', w: 240, text: r => r.coordenador || '—' },
+  ]
+
+  if (showNao) {
     drawSection(ctx, PAD, curY, cw, 'NÃO REALIZARAM', 'nao', naoCols, naoRows)
     curY += naoH + GAP
   }
-
-  if (scope === 'sim' || scope === 'ambos') {
+  if (showSim) {
     drawSection(ctx, PAD, curY, cw, 'REALIZARAM', 'sim', simCols, simRows)
+    curY += simH + GAP
+  }
+  if (showJust) {
+    drawSection(ctx, PAD, curY, cw, 'JUSTIFICADOS', 'justificados', justCols, justRows)
   }
 
   return canvas.toDataURL('image/png')
 }
 
-export function downloadChecklistImage(scope: ChecklistDetalharPdfScope, dataUrl: string): void {
+export function downloadChecklistImage(scope: ChecklistDetalharImageScope, dataUrl: string): void {
   const stamp = new Date().toISOString().slice(0, 10)
-  const suffix = scope === 'nao' ? 'nao-realizados' : scope === 'sim' ? 'realizados' : 'completo'
+  const suffix =
+    scope === 'nao'          ? 'nao-realizados'  :
+    scope === 'sim'          ? 'realizados'       :
+    scope === 'justificados' ? 'justificados'     :
+    scope === 'tudo'         ? 'completo'         : 'ambos'
   const link = document.createElement('a')
   link.download = `checklist-detalhar-${suffix}-${stamp}.png`
   link.href = dataUrl
