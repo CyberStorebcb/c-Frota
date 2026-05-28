@@ -5,6 +5,7 @@ export type ChecklistCompletionRow = {
   data_inspecao: unknown
   nc_count: unknown
   dados_veiculo: unknown
+  created_at?: unknown
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +64,7 @@ export async function fetchCompletedChecklistsInPeriod(
   const { data, error } = await fetchAllSupabasePages<ChecklistCompletionRow>((from, to) =>
     supabase
       .from('checklists')
-      .select('data_inspecao, nc_count, dados_veiculo')
+      .select('data_inspecao, nc_count, dados_veiculo, created_at')
       .eq('progresso', 100)
       .gte('data_inspecao', inicioIso)
       .lte('data_inspecao', fimIso)
