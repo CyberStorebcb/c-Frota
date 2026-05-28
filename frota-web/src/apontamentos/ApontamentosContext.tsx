@@ -246,6 +246,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Mantidos para compatibilidade com cleanup do useEffect (podem ser removidos em refactor futuro)
 
   const setPeriodoCarregado = useCallback((p: PeriodoCarregado) => {
     periodoCarregadoRef.current = p
@@ -347,58 +348,22 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    queueMicrotask(() => {
-      void recarregar()
-    })
+    // Carga inicial
+    queueMicrotask(() => { void recarregar() })
 
-    const MAX_BACKOFF_MS = 30_000
-    let destroyed = false
-
-    const subscribe = () => {
-      if (destroyed) return
-      const prev = channelRef.current
-      channelRef.current = null
-      if (prev) void supabase.removeChannel(prev)
-
-      const channelName = `apontamentos-changes-${Date.now()}`
-      const scheduleRecarregar = () => {
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-        // 2500ms de debounce: evita recargas em rajada quando vários apontamentos
-        // sao criados/atualizados em sequencia (ex: envio de checklist com muitos NCs)
-        debounceTimerRef.current = setTimeout(() => { void recarregar() }, 2500)
-      }
-
-      // Escuta apenas apontamentos — checklists geram apontamentos ao serem finalizados,
-      // então a subscription em checklists é redundante e drena WAL/CPU desnecessariamente.
-      const ch = supabase
-        .channel(channelName)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'apontamentos' }, scheduleRecarregar)
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            reconnectAttemptsRef.current = 0
-          }
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            if (destroyed) return
-            const attempts = ++reconnectAttemptsRef.current
-            const delay = Math.min(1_000 * 2 ** attempts, MAX_BACKOFF_MS)
-            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
-            reconnectTimerRef.current = setTimeout(() => {
-              void recarregar()
-              subscribe()
-            }, delay)
-          }
-        })
-
-      channelRef.current = ch
-    }
-
-    subscribe()
+    // Polling a cada 60s — substitui Realtime para eliminar drenagem contínua do WAL.
+    // Usuário pode forçar atualização imediata pelo botão "Atualizar" na tela.
+    const POLL_INTERVAL_MS = 60_000
+    const pollTimer = setInterval(() => { void recarregar() }, POLL_INTERVAL_MS)
 
     return () => {
-      destroyed = true
+      clearInterval(pollTimer)
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
-      if (channelRef.current) void supabase.removeChannel(channelRef.current)
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
   }, [recarregar])
 
