@@ -358,17 +358,17 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
       })
     )
 
-    // 4. Expande cada checklist em um apontamento por item NC
-    //    Só gera apontamentos para checklists que realmente têm respostas 'nc'.
+    // 4. Expande cada checklist em um apontamento por item NC.
+    //    O RPC já retorna nc_item_ids (array de IDs dos itens NC) — evita transferir
+    //    o campo respostas completo (~50 itens) e reduz drasticamente o egress.
     const vehicleMap = buildVehicleMap()
     const apontamentos: Apontamento[] = []
     for (const cl of (clData ?? []) as unknown[]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const checklist = cl as any
-      const respostas: Record<string, string> = checklist.respostas ?? {}
-      const ncItems = Object.entries(respostas).filter(([, v]) => v === 'nc')
+      const ncItems: string[] = checklist.nc_item_ids ?? []
       if (ncItems.length === 0) continue
-      for (const [itemId] of ncItems) {
+      for (const itemId of ncItems) {
         apontamentos.push(checklistItemToApontamento(checklist, itemId, resolucoes, vehicleMap))
       }
     }
@@ -389,13 +389,22 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     const hasCachedData = loadRowsFromCache() !== null
     queueMicrotask(() => { void recarregarInternal(hasCachedData) })
 
-    // Polling a cada 60s silencioso — substitui Realtime para eliminar drenagem contínua do WAL.
-    // Os dados são atualizados em background sem piscar o spinner na tela.
-    const POLL_INTERVAL_MS = 60_000
-    const pollTimer = setInterval(() => { void recarregarInternal(true) }, POLL_INTERVAL_MS)
+    // Polling a cada 5 min, apenas quando a aba está visível — reduz ~97% do egress
+    // em relação ao polling de 60s contínuo anterior.
+    const POLL_INTERVAL_MS = 5 * 60_000
+    const pollTimer = setInterval(() => {
+      if (!document.hidden) void recarregarInternal(true)
+    }, POLL_INTERVAL_MS)
+
+    // Quando a aba volta ao foco após ficar em background, atualiza imediatamente
+    const handleVisibilityChange = () => {
+      if (!document.hidden) void recarregarInternal(true)
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       clearInterval(pollTimer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [recarregarInternal])
 
