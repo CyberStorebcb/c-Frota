@@ -61,19 +61,51 @@ function AdesaoTooltipBody({
   )
 }
 
+// Alturas fixas para as barras do skeleton (evita hidratação não-determinística)
+const SKELETON_BAR_HEIGHTS = [38, 62, 45, 78, 52, 68, 42]
+
+function ChartSkeleton() {
+  return (
+    <div className="flex h-full w-full flex-col gap-3 px-2 pb-2 pt-4">
+      {/* barras animadas */}
+      <div className="flex flex-1 items-end justify-around gap-1.5 sm:gap-2">
+        {SKELETON_BAR_HEIGHTS.map((h, i) => (
+          <div
+            key={i}
+            className="w-full animate-pulse rounded-t-lg bg-slate-200 dark:bg-slate-700/60"
+            style={{ height: `${h}%` }}
+          />
+        ))}
+      </div>
+      {/* eixo X */}
+      <div className="flex justify-around gap-1.5 sm:gap-2">
+        {SKELETON_BAR_HEIGHTS.map((_, i) => (
+          <div key={i} className="h-2 w-full animate-pulse rounded-full bg-slate-200 dark:bg-slate-700/60" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function DashboardAdesaoCharts({
   chartData,
   viewMode,
   chartUi,
   isDark,
   areaGradId,
+  isLoading = false,
 }: {
   chartData: DashboardAdesaoChartRow[]
   viewMode: 'bar' | 'area'
   chartUi: { grid: string; tick: string }
   isDark: boolean
   areaGradId: string
+  isLoading?: boolean
 }) {
+  if (isLoading && chartData.length === 0) {
+    return <ChartSkeleton />
+  }
+
   if (chartData.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm font-semibold text-slate-400 dark:text-slate-600">

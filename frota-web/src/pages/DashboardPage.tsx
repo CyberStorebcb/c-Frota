@@ -174,6 +174,19 @@ function checklistsRealizadosCardMeta(
   return { label: 'Checklists realizados no período', value: totalNoPeriodo }
 }
 
+// Skeleton de KPI card — exibido enquanto dados carregam
+function StatCardSkeleton({ isLast = false }: { isLast?: boolean }) {
+  return (
+    <div
+      className={`flex animate-pulse flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200/70 p-4 dark:border-slate-700/50 sm:rounded-[2rem] sm:p-5${isLast ? ' col-span-2 sm:col-span-1' : ''}`}
+    >
+      <div className="h-[52px] w-[52px] rounded-xl bg-slate-200 dark:bg-slate-700/60 sm:rounded-2xl" />
+      <div className="h-2 w-24 rounded-full bg-slate-200 dark:bg-slate-700/60" />
+      <div className="h-8 w-12 rounded-md bg-slate-200 dark:bg-slate-700/60" />
+    </div>
+  )
+}
+
 function GomanLogo({
   mode = 'full',
   className = '',
@@ -910,34 +923,40 @@ export function DashboardPage() {
               </div>
             </div>
 
-            {/* Demais cards */}
-            {stats.filter((s) => s.label !== 'Total de veículos ativos').map((s) => {
-              const Card = s.href ? Link : 'div'
-              const isLast = stats[stats.length - 1]?.label === s.label
-              return (
-              <Card
-                key={s.label}
-                to={s.href ?? '#'}
-                className={`group flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${isLast ? 'col-span-2 sm:col-span-1' : ''} ${s.cardHover} ${s.href ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40' : ''}`}
-              >
-                <div className={`mb-3 shrink-0 rounded-xl p-3 transition-transform sm:rounded-2xl sm:p-3.5 ${s.iconWrap}`}>
-                  <s.Icon size={26} aria-hidden />
-                </div>
-                <div className="min-w-0">
-                  <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 sm:text-[10px]">
-                    {s.label}
-                  </p>
-                  <h3 className="text-2xl font-black tabular-nums tracking-tighter text-slate-800 dark:text-white sm:text-3xl min-[1100px]:text-4xl">
-                    {s.value}
-                  </h3>
-                  {s.sub && (
-                    <p className="mt-1 text-[9px] font-semibold text-slate-400 dark:text-slate-500 sm:text-[10px]">
-                      {s.sub}
-                    </p>
-                  )}
-                </div>
-              </Card>
-            )})}
+            {/* Demais cards — skeleton durante carga inicial */}
+            {(checklistsCarregando || apontamentosCarregando)
+              ? Array.from({ length: 4 }, (_, i) => (
+                  <StatCardSkeleton key={i} isLast={i === 3} />
+                ))
+              : stats.filter((s) => s.label !== 'Total de veículos ativos').map((s) => {
+                  const Card = s.href ? Link : 'div'
+                  const isLast = stats[stats.length - 1]?.label === s.label
+                  return (
+                    <Card
+                      key={s.label}
+                      to={s.href ?? '#'}
+                      className={`group flex flex-col items-center text-center rounded-2xl border border-slate-200/70 bg-transparent p-4 transition-all duration-300 dark:border-slate-700/50 dark:bg-transparent sm:rounded-[2rem] sm:p-5 ${isLast ? 'col-span-2 sm:col-span-1' : ''} ${s.cardHover} ${s.href ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400/40' : ''}`}
+                    >
+                      <div className={`mb-3 shrink-0 rounded-xl p-3 transition-transform sm:rounded-2xl sm:p-3.5 ${s.iconWrap}`}>
+                        <s.Icon size={26} aria-hidden />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 sm:text-[10px]">
+                          {s.label}
+                        </p>
+                        <h3 className="text-2xl font-black tabular-nums tracking-tighter text-slate-800 dark:text-white sm:text-3xl min-[1100px]:text-4xl">
+                          {s.value}
+                        </h3>
+                        {s.sub && (
+                          <p className="mt-1 text-[9px] font-semibold text-slate-400 dark:text-slate-500 sm:text-[10px]">
+                            {s.sub}
+                          </p>
+                        )}
+                      </div>
+                    </Card>
+                  )
+                })
+            }
           </div>
 
           {recorrentesExpandido && recorrentesCount > 0 && (
@@ -1069,6 +1088,7 @@ export function DashboardPage() {
                   chartUi={chartUi}
                   isDark={isDark}
                   areaGradId={areaGradId}
+                  isLoading={checklistsCarregando}
                 />
               </Suspense>
             </div>
