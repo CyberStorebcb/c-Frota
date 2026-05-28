@@ -46,6 +46,13 @@ import {
 import type { DashboardAdesaoChartRow } from './DashboardAdesaoCharts'
 import { DashboardLoadingScreen } from './DashboardLoadingScreen'
 
+/**
+ * Persiste entre remounts dentro da mesma sessão do browser.
+ * Impede que a tela de carregamento apareça ao voltar de outra página
+ * (ex: Gerenciar acionou recarregar() e carregando voltou a true).
+ */
+let _dashboardEverLoaded = false
+
 const LazyDashboardAdesaoCharts = lazy(() =>
   import('./DashboardAdesaoCharts').then((m) => ({ default: m.DashboardAdesaoCharts })),
 )
@@ -492,20 +499,25 @@ export function DashboardPage() {
 
   const { rows, carregando: apontamentosCarregando } = useApontamentos()
 
-  // Tela de carregamento inicial — exibida apenas no primeiro load (não em polls silenciosos)
+  // Tela de carregamento inicial — exibida apenas no verdadeiro primeiro load da sessão.
+  // _dashboardEverLoaded impede que reapareça ao voltar de outra página
+  // mesmo que carregando seja true (ex: Gerenciar acionou recarregar()).
   const loadCompletedRef = useRef(false)
   const [loadDone, setLoadDone] = useState(false)
-  // Inicializa como true apenas se o contexto ainda está carregando (fresh login/page load).
-  // Quando a navegação mantém o contexto vivo, apontamentosCarregando já é false → pula a tela.
-  const [showLoadingScreen, setShowLoadingScreen] = useState(() => apontamentosCarregando)
+  const [showLoadingScreen, setShowLoadingScreen] = useState(
+    () => !_dashboardEverLoaded && apontamentosCarregando,
+  )
 
   useEffect(() => {
-    if (!checklistsCarregando && !apontamentosCarregando && showLoadingScreen && !loadCompletedRef.current) {
+    if (!checklistsCarregando && !apontamentosCarregando && !loadCompletedRef.current) {
       loadCompletedRef.current = true
-      setLoadDone(true)
-      // Aguarda a barra chegar a 100 % antes de revelar o dashboard
-      const t = setTimeout(() => setShowLoadingScreen(false), 600)
-      return () => clearTimeout(t)
+      _dashboardEverLoaded = true          // nunca mais mostra nesta sessão
+      if (showLoadingScreen) {
+        setLoadDone(true)
+        // Aguarda a barra chegar a 100 % antes de revelar o dashboard
+        const t = setTimeout(() => setShowLoadingScreen(false), 600)
+        return () => clearTimeout(t)
+      }
     }
   }, [checklistsCarregando, apontamentosCarregando, showLoadingScreen])
 
