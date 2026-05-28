@@ -1116,11 +1116,10 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       if (!setorPlacasSet.has(placa)) continue
       realizados += count
     }
-    const veiculosContabilizados = Math.max(0, ativosSetor - justificadosSetorCount)
-    const esperados = veiculosContabilizados * periodDays.length
+    const esperados = ativosSetor * periodDays.length
     const pct = esperados > 0 ? Math.min(100, Math.round((realizados / esperados) * 100)) : 0
     return { realizados, esperados, pct }
-  }, [diasRealizadosPorPlaca, ativosSetor, justificadosSetorCount, periodDays, setorPlacasSet])
+  }, [diasRealizadosPorPlaca, ativosSetor, periodDays, setorPlacasSet])
 
   const pct = aderenciaStats.pct
   const periodoLabel = PERIODO_OPTIONS.find((o) => o.value === periodo)?.label ?? 'Período'
