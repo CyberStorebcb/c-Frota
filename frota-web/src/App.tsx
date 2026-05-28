@@ -5,6 +5,7 @@ import { RequireSuperAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
 import { RouteFallback } from './components/RouteFallback'
 import { ApontamentosLayout } from './layouts/ApontamentosLayout'
+import { ApontamentosProvider } from './apontamentos/ApontamentosContext'
 import { TourProvider } from './tour/TourContext'
 import { TourOverlay } from './tour/TourOverlay'
 import { TourLauncher } from './tour/TourLauncher'
@@ -94,7 +95,7 @@ export default function App() {
 
         {/* Rotas autenticadas */}
         <Route element={<RequireAuth />}>
-          <Route element={<AuthedShellWithTour />}>
+          <Route element={<ApontamentosProvider><AuthedShellWithTour /></ApontamentosProvider>}>
             <Route index element={<DashboardPage />} />
             <Route path="/gerenciar" element={<ApontamentosLayout />}>
               <Route index element={<ManagePage />} />

@@ -7,7 +7,6 @@ import { AuthProvider } from './auth/AuthContext'
 import { OfflineSyncProvider } from './checklists/OfflineSyncProvider'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { ApontamentosProvider } from './apontamentos/ApontamentosContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -16,11 +15,9 @@ createRoot(document.getElementById('root')!).render(
         <ThemeProvider>
           <AuthProvider>
             <OfflineSyncProvider>
-              <ApontamentosProvider>
-                <ErrorBoundary>
-                  <App />
-                </ErrorBoundary>
-              </ApontamentosProvider>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
             </OfflineSyncProvider>
           </AuthProvider>
         </ThemeProvider>
