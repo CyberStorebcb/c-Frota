@@ -1,7 +1,7 @@
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import { normalizePlaca } from '../frota/vehicleRegistry'
 
-export const CHECKLIST_AUSENCIA_MOTIVOS = ['RESERVA', 'NÃO RODOU', 'OFICINA'] as const
+export const CHECKLIST_AUSENCIA_MOTIVOS = ['RESERVA', 'NÃO RODOU', 'OFICINA', 'DESMOBILIZADO'] as const
 export type ChecklistAusenciaMotivo = (typeof CHECKLIST_AUSENCIA_MOTIVOS)[number]
 
 export type ChecklistAusenciaJustificativaEntry = {

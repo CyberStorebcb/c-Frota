@@ -56,7 +56,8 @@ import {
   type ChecklistAusenciaJustificativaEntry,
   type ChecklistAusenciaMotivo,
 } from '../checklists/checklistAusenciaJustificativa'
-import { formatPlaca } from '../frota/vehicleRegistry'
+import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
+import { supabase } from '../lib/supabase'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -744,6 +745,21 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const salvarJustificativa = useCallback(
     async (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string) => {
       setJustificativaSavingPlaca(placa)
+
+      if (motivo === 'DESMOBILIZADO') {
+        const placaNorm = normalizePlaca(placa)
+        const { error: desmobError } = await supabase
+          .from('vehicles')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('placa', placaNorm)
+          .is('deleted_at', null)
+        if (desmobError) {
+          setJustificativaSavingPlaca(null)
+          window.alert(`Erro ao desmobilizar veículo: ${desmobError.message}`)
+          return
+        }
+      }
+
       const res = await saveChecklistAusenciaJustificativa({
         placa,
         motivo,
