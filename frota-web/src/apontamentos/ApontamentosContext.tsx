@@ -286,13 +286,14 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
           .eq('progresso', 100),
 
         // 2. Checklists concluídos no período selecionado com itens NC
-        // Filtra respostas::text ILIKE '%"nc"%' para evitar carregar JSONB de checklists sem NC
+        // Nota: filtro JSONB por valor 'nc' não é suportado via PostgREST diretamente;
+        // o filtro client-side (ncItems.length === 0) descarta checklists sem NC após fetch.
+        // O índice GIN em respostas e B-tree em (progresso, data_inspecao) aceleram a query.
         fetchAllSupabasePages((from, to) => {
           let q = supabase
             .from('checklists')
             .select('id, tipo, nome_operador, nome_supervisor, data_inspecao, created_at, dados_veiculo, respostas, observacoes')
             .eq('progresso', 100)
-            .filter('respostas::text', 'ilike', '%"nc"%')
           if (dataCorteIso) q = q.gte('data_inspecao', dataCorteIso)
           return q.order('data_inspecao', { ascending: true }).order('id', { ascending: true }).range(from, to)
         }),
