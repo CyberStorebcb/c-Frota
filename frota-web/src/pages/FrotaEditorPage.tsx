@@ -13,6 +13,14 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useFleet } from '../frota/FleetContext'
+
+// ── module-level session cache — carrega UMA vez por sessão ────────────────
+// Evita egress repetido toda vez que o usuário visita a página.
+// "Recarregar" é o único caminho que vai ao banco novamente.
+
+let _sessionCache: VehicleRow[] | null = null
+let _sessionCacheIncludesDeleted = false
 
 // ── types ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +112,8 @@ const STATUS_PILL: Record<string, string> = {
 // ── component ──────────────────────────────────────────────────────────────
 
 export function FrotaEditorPage() {
+  const fleet = useFleet()
+
   const [rows, setRows]               = useState<VehicleRow[]>([])
   const [loading, setLoading]         = useState(true)
   const [saving, setSaving]           = useState<Set<string>>(new Set())
@@ -116,11 +126,24 @@ export function FrotaEditorPage() {
   // original snapshot — used to detect dirty rows
   const originalRef = useRef<Map<string, VehicleRow>>(new Map())
 
-  // ── load ────────────────────────────────────────────────────────────────
+  // ── load — usa cache de sessão para evitar egress ────────────────────────
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const applyRows = useCallback((loaded: VehicleRow[]) => {
+    setRows(loaded)
+    originalRef.current.clear()
+    loaded.forEach((r) => originalRef.current.set(r.placa, { ...r }))
+    setLoading(false)
     setErrors({})
+  }, [])
+
+  const load = useCallback(async (forceRefresh = false) => {
+    // Se o cache da sessão já tem os dados corretos, usa direto — zero egress
+    if (!forceRefresh && _sessionCache !== null && _sessionCacheIncludesDeleted === showDeleted) {
+      applyRows(_sessionCache)
+      return
+    }
+
+    setLoading(true)
     let q2 = supabase
       .from('vehicles')
       .select('id,placa,ano,modelo,tipo,proprietario,prefixo,responsavel,supervisor,coordenador,base,setor,processo,status,deleted_at')
@@ -130,16 +153,52 @@ export function FrotaEditorPage() {
     const { data, error } = await q2
     if (error) {
       setErrors({ _load: error.message })
+      setLoading(false)
     } else {
       const loaded = (data ?? []) as VehicleRow[]
-      setRows(loaded)
-      originalRef.current.clear()
-      loaded.forEach((r) => originalRef.current.set(r.placa, { ...r }))
+      _sessionCache = loaded
+      _sessionCacheIncludesDeleted = showDeleted
+      applyRows(loaded)
     }
-    setLoading(false)
-  }, [showDeleted])
+  }, [showDeleted, applyRows])
 
-  useEffect(() => { void load() }, [load])
+  // Bootstrap: na primeira abertura, usa FleetContext (já em memória) se ainda
+  // não há cache — depois, qualquer visita subsequente usa o cache de módulo.
+  useEffect(() => {
+    if (_sessionCache !== null && _sessionCacheIncludesDeleted === showDeleted) {
+      applyRows(_sessionCache)
+      return
+    }
+    // FleetContext já carregou os veículos ativos: usa como ponto de partida
+    // imediato (evita query + egress) quando ainda não há cache de editor.
+    if (!showDeleted && !fleet.loading && fleet.vehicles.length > 0 && _sessionCache === null) {
+      const fromFleet: VehicleRow[] = fleet.vehicles
+        .filter((v) => v.source !== 'total') // só veículos do Supabase, não catálogo local
+        .map((v) => ({
+          id:           v.id,
+          placa:        v.placa,
+          ano:          v.ano,
+          modelo:       v.modelo,
+          tipo:         v.tipo,
+          proprietario: v.proprietario,
+          prefixo:      v.prefixo === 'N/A' ? '' : v.prefixo,
+          responsavel:  v.responsavel === 'NÃO ATRIBUÍDO' ? '' : v.responsavel,
+          supervisor:   v.supervisor === 'NÃO ATRIBUÍDO' ? '' : v.supervisor,
+          coordenador:  v.coordenador === 'NÃO ATRIBUÍDO' ? '' : v.coordenador,
+          base:         v.base === 'N/A' ? '' : v.base,
+          setor:        v.setor,
+          processo:     v.processo,
+          status:       v.status,
+          deleted_at:   null,
+        }))
+      _sessionCache = fromFleet
+      _sessionCacheIncludesDeleted = false
+      applyRows(fromFleet)
+      return
+    }
+    void load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDeleted, fleet.loading])   // fleet.vehicles é estável após o load inicial
 
   // ── dirty detection ──────────────────────────────────────────────────────
 
@@ -207,13 +266,20 @@ export function FrotaEditorPage() {
       setErrors((prev) => ({ ...prev, [row.placa]: error.message }))
     } else {
       originalRef.current.set(row.placa, { ...row })
+      // atualiza cache de sessão com o valor salvo
+      if (_sessionCache) {
+        const idx = _sessionCache.findIndex((r) => r.placa === row.placa)
+        if (idx >= 0) _sessionCache[idx] = { ...row }
+        else _sessionCache = [{ ...row }, ..._sessionCache]
+      }
+      fleet.reload()  // atualiza o FleetContext para outras páginas refletirem a mudança
       setSaved((prev) => new Set(prev).add(row.placa))
       if (isNew) {
         setNewPlacas((prev) => { const s = new Set(prev); s.delete(row.placa); return s })
       }
       setTimeout(() => setSaved((prev) => { const s = new Set(prev); s.delete(row.placa); return s }), 2500)
     }
-  }, [])
+  }, [fleet])
 
   // ── save all dirty ───────────────────────────────────────────────────────
 
@@ -260,8 +326,10 @@ export function FrotaEditorPage() {
       setErrors((prev) => ({ ...prev, [row.placa]: error.message }))
     } else {
       setRows((prev) => prev.filter((r) => r.placa !== row.placa))
+      if (_sessionCache) _sessionCache = _sessionCache.filter((r) => r.placa !== row.placa)
+      fleet.reload()
     }
-  }, [])
+  }, [fleet])
 
   // ── discard row changes ──────────────────────────────────────────────────
 
@@ -333,8 +401,9 @@ export function FrotaEditorPage() {
 
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => void load()}
+              onClick={() => void load(true)}
               disabled={loading}
+              title="Busca dados frescos do banco (consome egress)"
               className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
