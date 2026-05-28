@@ -244,9 +244,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const periodoCarregadoRef = useRef<PeriodoCarregado>('180d')
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reconnectAttemptsRef = useRef(0)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Mantidos para compatibilidade com cleanup do useEffect (podem ser removidos em refactor futuro)
 
   const setPeriodoCarregado = useCallback((p: PeriodoCarregado) => {
     periodoCarregadoRef.current = p
