@@ -21,9 +21,9 @@ import {
   X,
 } from 'lucide-react'
 import { uploadChecklistEvidenceFile } from '../lib/checklistEvidenceUpload'
-import { supabase } from '../lib/supabase'
 import { useTheme } from '../theme/ThemeProvider'
 import { enqueueChecklist, type OfflineChecklistFile } from '../checklists/offlineQueue'
+import { syncOfflineChecklists } from '../checklists/syncOfflineChecklists'
 import { SyncStatus } from '../checklists/SyncStatus'
 import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
@@ -1949,91 +1949,28 @@ function FormularioChecklist({
     setErroEnvio('')
 
     try {
-      if (!navigator.onLine) {
-        try {
-          await enqueueChecklist(buildChecklistPayload({ ...observacoes }, []), buildOfflineFiles())
-        } catch {
-          setErroEnvio('Sem internet e não foi possível salvar offline. Verifique o armazenamento do dispositivo.')
-          setEnviando(false)
-          return
-        }
-        const itensNc = todosItens
-          .filter((it) => respostas[it.id] === 'nc')
-          .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
-        const fotosPreviewOffline = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-        setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: true, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview: fotosPreviewOffline, fotosUrls: [], problemas, descricaoProblema, submittedAt: new Date(), schemaNome: schema.nome, dadosVeiculo, grupos: schema.grupos, respostas: respostas as Record<string, string | null>, observacoes, matricula })
-        clearFormDraft()
-        onConcluido?.()
-        setConcluido(true)
-        setEnviando(false)
-        return
-      }
-
-      const ts = Date.now()
-
-      const evidenciaUrlsGerais = await Promise.all(
-        arquivos.map((file) =>
-          uploadFile(file, `${schema.id}/${ts}-${file.name.replace(/\s+/g, '_')}`)
-        )
-      )
-      const evidenciaUrls: string[] = evidenciaUrlsGerais.filter(Boolean) as string[]
-
-      const fotasUrls: Record<string, string[]> = {}
-      await Promise.all(
-        Object.entries(fotosItem).map(async ([itemId, fotos]) => {
-          const urls = await Promise.all(
-            fotos.map((file, i) => {
-              const ext = file.name.split('.').pop() ?? 'jpg'
-              return uploadFile(file, `${schema.id}/item-${itemId}-${ts}-${i}.${ext}`)
-            })
-          )
-          fotasUrls[itemId] = urls.filter(Boolean) as string[]
-          evidenciaUrls.push(...(fotasUrls[itemId]))
-        })
+      // Salva na fila local (IndexedDB) — funciona online e offline.
+      // O sync em background faz o upload das fotos + INSERT no banco,
+      // permitindo que o operador veja o resultado imediatamente.
+      await enqueueChecklist(
+        buildChecklistPayload({ ...observacoes }, []),
+        buildOfflineFiles(),
       )
 
-      const observacoesFinais = { ...observacoes }
-      for (const [itemId, urls] of Object.entries(fotasUrls)) {
-        if (urls.length > 0) {
-          const t = observacoesFinais[itemId] ?? ''
-          observacoesFinais[itemId] = t
-            ? `${t}\n__fotos__:${urls.join('|')}`
-            : `__fotos__:${urls.join('|')}`
-        }
-      }
-
-      const payload = buildChecklistPayload(observacoesFinais, evidenciaUrls)
-
-      // Retry automático: até 3 tentativas com espera crescente (2s, 4s)
-      // Cobre timeouts de banco durante pico de envios simultâneos.
-      let lastError: { message?: string; code?: string } | null = null
-      let inserido = false
-      for (let tentativa = 1; tentativa <= 3; tentativa++) {
-        const { error } = await supabase.from('checklists').insert(payload)
-        if (!error) { inserido = true; break }
-        lastError = error
-        console.warn(`[checklist] Tentativa ${tentativa}/3 falhou:`, error.code, error.message)
-        if (tentativa < 3) await new Promise((r) => setTimeout(r, tentativa * 2000))
-      }
-
-      if (!inserido) {
-        console.error('[checklist] Erro ao inserir no Supabase após 3 tentativas:', lastError)
-        setErroEnvio(`Erro ao enviar checklist: ${lastError?.message || lastError?.code || 'erro desconhecido'}. Verifique a conexão e tente novamente.`)
-        setEnviando(false)
-        return
-      }
+      // Dispara sync em background sem bloquear a UI
+      void syncOfflineChecklists()
 
       const itensNc = todosItens
         .filter((it) => respostas[it.id] === 'nc')
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
       const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: false, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: evidenciaUrls, problemas, descricaoProblema, submittedAt: new Date(), schemaNome: schema.nome, dadosVeiculo, grupos: schema.grupos, respostas: respostas as Record<string, string | null>, observacoes, matricula })
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: !navigator.onLine, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: [], problemas, descricaoProblema, submittedAt: new Date(), schemaNome: schema.nome, dadosVeiculo, grupos: schema.grupos, respostas: respostas as Record<string, string | null>, observacoes, matricula })
       clearFormDraft()
       onConcluido?.()
       setConcluido(true)
     } catch {
-      setErroEnvio('Erro inesperado ao enviar. Tente novamente.')
+      setErroEnvio('Não foi possível salvar o checklist. Verifique o armazenamento do dispositivo.')
     } finally {
       setEnviando(false)
     }
@@ -2917,6 +2854,15 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
 
   // Para o áudio apenas quando o componente desmonta de verdade
   useEffect(() => () => stopDemoNarration(), [])
+
+  // Sincroniza checklists pendentes ao montar e quando a aba volta ao foco
+  useEffect(() => {
+    if (isDemo) return
+    void syncOfflineChecklists()
+    const handleVisibility = () => { if (!document.hidden) void syncOfflineChecklists() }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [isDemo])
 
   const handleStartDemo = useCallback(() => {
     void unlockDemoNarrator().then(() => setDemoStarted(true))
