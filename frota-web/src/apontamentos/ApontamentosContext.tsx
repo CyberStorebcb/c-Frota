@@ -254,8 +254,8 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     setPeriodoCarregadoState(p)
   }, [])
 
-  const recarregar = useCallback(async () => {
-    setCarregando(true)
+  const recarregarInternal = useCallback(async (silent = false) => {
+    if (!silent) setCarregando(true)
     localStorage.removeItem('frota-apontamentos-v1')
 
     // Calcula corte de data conforme período selecionado
@@ -307,7 +307,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         }),
       ] as const)
     } catch (err) {
-      setPersistError('Erro de conexão ao carregar dados: ' + String(err))
+      if (!silent) setPersistError('Erro de conexão ao carregar dados: ' + String(err))
       setCarregando(false)
       return
     }
@@ -319,7 +319,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     setChecklistsRealizadosTotal(countFinal)
 
     if (clError) {
-      setPersistError('Erro ao carregar checklists: ' + clError.message)
+      if (!silent) setPersistError('Erro ao carregar checklists: ' + clError.message)
       setCarregando(false)
       return
     }
@@ -351,14 +351,19 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
     setCarregando(false)
   }, [])
 
-  useEffect(() => {
-    // Carga inicial
-    queueMicrotask(() => { void recarregar() })
+  /** Recarga pública — exibe spinner (usada pelo botão "Atualizar" e pela carga inicial). */
+  const recarregar = useCallback(async () => {
+    await recarregarInternal(false)
+  }, [recarregarInternal])
 
-    // Polling a cada 60s — substitui Realtime para eliminar drenagem contínua do WAL.
-    // Usuário pode forçar atualização imediata pelo botão "Atualizar" na tela.
+  useEffect(() => {
+    // Carga inicial — exibe spinner
+    queueMicrotask(() => { void recarregarInternal(false) })
+
+    // Polling a cada 60s silencioso — substitui Realtime para eliminar drenagem contínua do WAL.
+    // Os dados são atualizados em background sem piscar o spinner na tela.
     const POLL_INTERVAL_MS = 60_000
-    const pollTimer = setInterval(() => { void recarregar() }, POLL_INTERVAL_MS)
+    const pollTimer = setInterval(() => { void recarregarInternal(true) }, POLL_INTERVAL_MS)
 
     return () => {
       clearInterval(pollTimer)
@@ -369,7 +374,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         channelRef.current = null
       }
     }
-  }, [recarregar])
+  }, [recarregarInternal])
 
   const marcarResolvido = useCallback(async (
     id: string,
