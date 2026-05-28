@@ -44,6 +44,7 @@ import {
   getCachedChecklistCompletions,
 } from '../checklists/fetchChecklistCompletions'
 import type { DashboardAdesaoChartRow } from './DashboardAdesaoCharts'
+import { DashboardLoadingScreen } from './DashboardLoadingScreen'
 
 const LazyDashboardAdesaoCharts = lazy(() =>
   import('./DashboardAdesaoCharts').then((m) => ({ default: m.DashboardAdesaoCharts })),
@@ -491,6 +492,23 @@ export function DashboardPage() {
 
   const { rows, carregando: apontamentosCarregando } = useApontamentos()
 
+  // Tela de carregamento inicial — exibida apenas no primeiro load (não em polls silenciosos)
+  const loadCompletedRef = useRef(false)
+  const [loadDone, setLoadDone] = useState(false)
+  // Inicializa como true apenas se o contexto ainda está carregando (fresh login/page load).
+  // Quando a navegação mantém o contexto vivo, apontamentosCarregando já é false → pula a tela.
+  const [showLoadingScreen, setShowLoadingScreen] = useState(() => apontamentosCarregando)
+
+  useEffect(() => {
+    if (!checklistsCarregando && !apontamentosCarregando && showLoadingScreen && !loadCompletedRef.current) {
+      loadCompletedRef.current = true
+      setLoadDone(true)
+      // Aguarda a barra chegar a 100 % antes de revelar o dashboard
+      const t = setTimeout(() => setShowLoadingScreen(false), 600)
+      return () => clearTimeout(t)
+    }
+  }, [checklistsCarregando, apontamentosCarregando, showLoadingScreen])
+
   // Apontamentos filtrados (pendentes = não resolvidos)
   const pendenciasFiltradas = useMemo(() => {
     return rows.filter((r) => {
@@ -848,6 +866,9 @@ export function DashboardPage() {
       ) : null}
 
       <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
+      {showLoadingScreen ? (
+        <DashboardLoadingScreen done={loadDone} />
+      ) : (
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:flex-row lg:gap-5 lg:p-5">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden sm:gap-4">
           <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
@@ -1095,6 +1116,7 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
       </div>
 
       <style>{`
