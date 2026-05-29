@@ -241,6 +241,8 @@ type ChecklistRow = {
   temNc: boolean
   diasRealizados: number
   diasNoPeriodo: number
+  /** true quando marcado manualmente como FEITO (checklist feito mas não chegou ao sistema). */
+  feitoManual?: boolean
 }
 
 function buildVeiculoRowSearchBlob(v: VeiculoRow): string {
@@ -621,7 +623,15 @@ function ListaRealizaram({ items, multiDia }: { items: ChecklistRow[]; multiDia:
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{v.modelo}</td>
               <td className="max-w-[140px] truncate px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{v.prefixo || '—'}</td>
               <td className="px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">{v.dataFormatada}</td>
-              <td className="px-3 py-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">{v.hora}</td>
+              <td className="px-3 py-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">
+                {v.feitoManual ? (
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" title="Marcado manualmente — checklist feito mas não chegou ao sistema">
+                    Feito (manual)
+                  </span>
+                ) : (
+                  v.hora
+                )}
+              </td>
               {multiDia && (
                 <td className="px-3 py-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">
                   {v.diasRealizados}/{v.diasNoPeriodo}
@@ -978,9 +988,30 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     [filtroBase, filtroResponsavel, filtroSupervisor, filtroCoordenador, filtroTipo, filtroPrefixo],
   )
 
+  // Placas marcadas manualmente como FEITO (checklist feito, mas não chegou ao sistema).
+  // Tratadas como realizadas: contam na aderência, no ranking e vão para Realizados.
+  const feitoPlacas = useMemo(() => {
+    const s = new Set<string>()
+    for (const [placa, entry] of justificativas) {
+      if (entry.motivo === 'FEITO') s.add(placa)
+    }
+    return s
+  }, [justificativas])
+
+  // Completions reais + FEITO injetado em todos os dias do período (fonte única
+  // para aderência, ranking e contagem de dias realizados).
+  const completionsComFeito = useMemo(() => {
+    if (feitoPlacas.size === 0) return checklistCompletionsByDay
+    const s = new Set(checklistCompletionsByDay)
+    for (const placa of feitoPlacas) {
+      for (const day of periodDays) s.add(`${placa}|${day}`)
+    }
+    return s
+  }, [checklistCompletionsByDay, feitoPlacas, periodDays])
+
   const diasRealizadosPorPlaca = useMemo(() => {
     const map = new Map<string, number>()
-    for (const key of checklistCompletionsByDay) {
+    for (const key of completionsComFeito) {
       const pipeIdx = key.lastIndexOf('|')
       const placa = key.slice(0, pipeIdx)
       const v = frotaMap.get(placa)
@@ -988,7 +1019,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       map.set(placa, (map.get(placa) ?? 0) + 1)
     }
     return map
-  }, [checklistCompletionsByDay, frotaMap, passaFiltros])
+  }, [completionsComFeito, frotaMap, passaFiltros])
 
   const placasRealizaram = useMemo(
     () => rawChecklists
@@ -1002,14 +1033,48 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     [rawChecklists, passaFiltros, diasRealizadosPorPlaca, diasNoPeriodo],
   )
 
-  const placasRealizaramSet = useMemo(
+  const placasRealizaramSetReal = useMemo(
     () => new Set(placasRealizaram.map((r) => r.placa)),
     [placasRealizaram],
   )
 
+  // Linhas sintéticas de FEITO (sem checklist real) para exibir em Realizados.
+  const feitoRows = useMemo(() => {
+    const rows: ChecklistRow[] = []
+    for (const placa of feitoPlacas) {
+      if (placasRealizaramSetReal.has(placa)) continue // já tem checklist real
+      const v = frotaMap.get(placa)
+      if (!v || !passaFiltros(v) || !setorPlacasSet.has(placa)) continue
+      rows.push({
+        placa: v.placa,
+        modelo: v.modelo,
+        base: v.base,
+        supervisor: v.supervisor,
+        coordenador: v.coordenador,
+        responsavel: v.responsavel,
+        processo: v.processo,
+        tipo: v.tipo,
+        prefixo: v.prefixo,
+        data: limites.fim,
+        dataFormatada: formatIsoDateBR(limites.fim),
+        hora: '',
+        temNc: false,
+        diasRealizados: 1,
+        diasNoPeriodo,
+        feitoManual: true,
+      })
+    }
+    return rows
+  }, [feitoPlacas, placasRealizaramSetReal, frotaMap, passaFiltros, setorPlacasSet, limites.fim, diasNoPeriodo])
+
+  const placasRealizaramSet = useMemo(
+    () => new Set<string>([...placasRealizaramSetReal, ...feitoPlacas]),
+    [placasRealizaramSetReal, feitoPlacas],
+  )
+
   const placasRealizaramLista = useMemo(
-    () => placasRealizaram.filter((r) => setorPlacasSet.has(r.placa)),
-    [placasRealizaram, setorPlacasSet],
+    () => [...placasRealizaram.filter((r) => setorPlacasSet.has(r.placa)), ...feitoRows],
+    [placasRealizaram, setorPlacasSet, feitoRows],
   )
 
   const placasNaoRealizaramLista = useMemo(
@@ -1108,7 +1173,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
   const justificadosSetorCount = useMemo(() => {
     let n = 0
-    for (const placa of justificativas.keys()) {
+    for (const [placa, entry] of justificativas) {
+      if (entry.motivo === 'FEITO') continue // FEITO conta como realizado, não justificado
       if (setorPlacasSet.has(placa)) n += 1
     }
     return n
@@ -1311,7 +1377,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         minVeiculos: rankingMinVeiculos > 1 ? rankingMinVeiculos : undefined,
         pior: buildChecklistAdherenceRanking(
           frotaFiltradaSetor,
-          checklistCompletionsByDay,
+          completionsComFeito,
           periodDays,
           rankingGroupBy,
           'worst',
@@ -1320,7 +1386,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         ),
         melhor: buildChecklistAdherenceRanking(
           frotaFiltradaSetor,
-          checklistCompletionsByDay,
+          completionsComFeito,
           periodDays,
           rankingGroupBy,
           'best',
@@ -1341,7 +1407,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     rankingGroupBy,
     rankingMinVeiculos,
     frotaFiltradaSetor,
-    checklistCompletionsByDay,
+    completionsComFeito,
     periodDays,
     limites.ini,
     limites.fim,
@@ -1720,7 +1786,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         {sectionView === 'ranking' && isAdmin ? (
           <ChecklistTop10Section
             frota={frotaFiltradaSetor}
-            completions={checklistCompletionsByDay}
+            completions={completionsComFeito}
             diasNoPeriodo={diasNoPeriodo}
             periodDays={periodDays}
             periodoLabel={periodoLabel}
@@ -1913,7 +1979,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/60">
-                          {v.dataFormatada} · {v.hora}
+                          {v.feitoManual ? `${v.dataFormatada} · Feito (manual)` : `${v.dataFormatada} · ${v.hora}`}
                         </span>
                         {multiDia && (
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 ring-1 ring-slate-200/70 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-800">

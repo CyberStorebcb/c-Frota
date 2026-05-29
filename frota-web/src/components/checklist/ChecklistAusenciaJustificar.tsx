@@ -144,6 +144,11 @@ function motivoClickHandler(
 }
 
 function motivoBtnClass(motivo: ChecklistAusenciaMotivo, base: string, variant: 'default' | 'alt') {
+  if (motivo === 'FEITO') {
+    return variant === 'default'
+      ? `${base} border-emerald-400/70 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50`
+      : `${base} border-emerald-300 bg-white text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-900 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200`
+  }
   if (motivo === 'DESMOBILIZADO') {
     return variant === 'default'
       ? `${base} border-rose-400/70 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-800/50 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50`
@@ -264,11 +269,13 @@ export function ChecklistAusenciaJustificar({
           onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, onSelect)}
           className={motivoBtnClass(motivo, btnBase, 'default')}
           title={
-            motivo === 'RESERVA'
-              ? `Justificar ${placa} como reserva — informe a placa do veículo reserva`
-              : motivo === 'DESMOBILIZADO'
-                ? `Desmobilizar ${placa} — remove da frota ativa`
-                : `Justificar ${placa} como ${motivo}`
+            motivo === 'FEITO'
+              ? `Marcar ${placa} como FEITO — move para realizados (checklist feito, mas não chegou ao sistema)`
+              : motivo === 'RESERVA'
+                ? `Justificar ${placa} como reserva — informe a placa do veículo reserva`
+                : motivo === 'DESMOBILIZADO'
+                  ? `Desmobilizar ${placa} — remove da frota ativa`
+                  : `Justificar ${placa} como ${motivo}`
           }
         >
           {saving ? '…' : motivo}
