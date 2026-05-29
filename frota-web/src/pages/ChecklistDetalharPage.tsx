@@ -1171,14 +1171,9 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
   const naoRealizaramCardCount = placasNaoRealizaramLista.length
 
-  const justificadosSetorCount = useMemo(() => {
-    let n = 0
-    for (const [placa, entry] of justificativas) {
-      if (entry.motivo === 'FEITO') continue // FEITO conta como realizado, não justificado
-      if (setorPlacasSet.has(placa)) n += 1
-    }
-    return n
-  }, [justificativas, setorPlacasSet])
+  // Usa a lista de justificados, que já aplica TODOS os filtros (gerência,
+  // responsável, supervisor, base, tipo, prefixo, setor) e exclui FEITO.
+  const justificadosSetorCount = placasJustificadasLista.length
 
   const total = ativosSetor
 
