@@ -46,6 +46,7 @@ import {
 } from '../checklists/fetchChecklistCompletions'
 import type { DashboardAdesaoChartRow } from './DashboardAdesaoCharts'
 import { DashboardLoadingScreen } from './DashboardLoadingScreen'
+import { loadChecklistAusenciaJustificativas } from '../checklists/checklistAusenciaJustificativa'
 
 /**
  * Persiste entre remounts dentro da mesma sessão do browser.
@@ -440,6 +441,22 @@ export function DashboardPage() {
   const [checklistCompletionsOp, setChecklistCompletionsOp] = useState<Set<string>>(() => new Set())
   const [checklistsPorDiaAdm, setChecklistsPorDiaAdm] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
   const [checklistCompletionsAdm, setChecklistCompletionsAdm] = useState<Set<string>>(() => new Set())
+
+  // Placas marcadas como FEITO (justificativa manual) — injetadas nas completions
+  const [feitoPlacasNoPeriodo, setFeitoPlacasNoPeriodo] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    void Promise.all([
+      loadChecklistAusenciaJustificativas({ periodoInicio: periodoInicioIso, periodoFim: periodoFimIso, setor: 'operacional' }),
+      loadChecklistAusenciaJustificativas({ periodoInicio: periodoInicioIso, periodoFim: periodoFimIso, setor: 'adm' }),
+    ]).then(([op, adm]) => {
+      const s = new Set<string>()
+      for (const [placa, entry] of [...op, ...adm]) {
+        if (entry.motivo === 'FEITO') s.add(placa)
+      }
+      setFeitoPlacasNoPeriodo(s)
+    })
+  }, [periodoInicioIso, periodoFimIso])
   // true enquanto o primeiro fetch de checklists não terminou (sem cache disponível)
   const [checklistsCarregando, setChecklistsCarregando] = useState(true)
   // Incrementado pelo botão Atualizar para forçar re-fetch das completions
@@ -497,7 +514,17 @@ export function DashboardPage() {
     }
   }, [periodoInicioIso, periodoFimIso, activeFleetMap, checklistFleetFilters, operacionalPlacasSet, adminPlacasSet, completionsRefetchTick])
 
-  const checklistCompletions = dashboardSetorAdm ? checklistCompletionsAdm : checklistCompletionsOp
+  // Injeta placas FEITO em todos os dias do período para contagem correta
+  const checklistCompletionsBase = dashboardSetorAdm ? checklistCompletionsAdm : checklistCompletionsOp
+  const checklistCompletions = useMemo(() => {
+    if (feitoPlacasNoPeriodo.size === 0) return checklistCompletionsBase
+    const s = new Set(checklistCompletionsBase)
+    const days = listDaysInPeriod(periodoInicioIso, periodoFimIso)
+    for (const placa of feitoPlacasNoPeriodo) {
+      for (const day of days) s.add(`${placa}|${day}`)
+    }
+    return s
+  }, [checklistCompletionsBase, feitoPlacasNoPeriodo, periodoInicioIso, periodoFimIso])
   const checklistsPorDia = dashboardSetorAdm ? checklistsPorDiaAdm : checklistsPorDiaOp
 
   const { rows, carregando: apontamentosCarregando, recarregar } = useApontamentos()
