@@ -29,7 +29,7 @@ import { FilterPanel, FilterPanelGroup, useFilterPanelVisible } from '../compone
 import { useFleet } from '../frota/FleetContext'
 import { useTheme } from '../theme/ThemeProvider'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
-import { apontamentoGroupKey, buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
+import { buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
 import {
   listDaysInPeriod,
 } from '../checklists/checklistTop10Ranking'
@@ -442,19 +442,27 @@ export function DashboardPage() {
   const [checklistsPorDiaAdm, setChecklistsPorDiaAdm] = useState<{ data: string; realizados: number; naoRealizados: number; comNc: number }[]>([])
   const [checklistCompletionsAdm, setChecklistCompletionsAdm] = useState<Set<string>>(() => new Set())
 
-  // Placas marcadas como FEITO (justificativa manual) — injetadas nas completions
+  // Justificativas do período (FEITO injeta nas completions; demais contam no card JUSTIFICADOS)
   const [feitoPlacasNoPeriodo, setFeitoPlacasNoPeriodo] = useState<Set<string>>(() => new Set())
+  const [justificadosCount, setJustificadosCount] = useState(0)
 
   useEffect(() => {
     void Promise.all([
       loadChecklistAusenciaJustificativas({ periodoInicio: periodoInicioIso, periodoFim: periodoFimIso, setor: 'operacional' }),
       loadChecklistAusenciaJustificativas({ periodoInicio: periodoInicioIso, periodoFim: periodoFimIso, setor: 'adm' }),
     ]).then(([op, adm]) => {
-      const s = new Set<string>()
+      const feito = new Set<string>()
+      let justCount = 0
       for (const [placa, entry] of [...op, ...adm]) {
-        if (entry.motivo === 'FEITO') s.add(placa)
+        if (entry.motivo === 'FEITO') {
+          feito.add(placa)
+        } else {
+          // RESERVA, NÃO RODOU, OFICINA — contam como justificados
+          justCount++
+        }
       }
-      setFeitoPlacasNoPeriodo(s)
+      setFeitoPlacasNoPeriodo(feito)
+      setJustificadosCount(justCount)
     })
   }, [periodoInicioIso, periodoFimIso])
   // true enquanto o primeiro fetch de checklists não terminou (sem cache disponível)
@@ -655,10 +663,7 @@ export function DashboardPage() {
         ? `${checklistsNoPeriodo} de ${esperados} checklists ${setorChecklistLabel} realizados`
         : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias · ${setorChecklistLabel})`
 
-    // Pendentes = defeitos não resolvidos agora (independente do período selecionado)
-    const pendentesUnicas = new Set(
-      pendenciasFiltradas.map((r) => apontamentoGroupKey(r) ?? r.id),
-    ).size
+    // (pendentesUnicas removido — card substituído por Justificados)
 
     return [
       {
@@ -685,12 +690,12 @@ export function DashboardPage() {
         cardHover: 'hover:border-emerald-400 dark:hover:border-emerald-500',
       },
       {
-        label: 'Pendentes',
-        value: apontamentosCarregando ? LOADING : String(pendentesUnicas),
+        label: 'Justificados',
+        value: checklistsCarregando ? LOADING : String(justificadosCount),
         Icon: ClipboardX,
-        iconWrap: 'bg-orange-50 text-orange-600 group-hover:scale-110 dark:bg-orange-950/50 dark:text-orange-400',
-        cardHover: 'hover:border-orange-400 dark:hover:border-orange-500',
-        href: '/gerenciar',
+        iconWrap: 'bg-amber-50 text-amber-600 group-hover:scale-110 dark:bg-amber-950/50 dark:text-amber-400',
+        cardHover: 'hover:border-amber-400 dark:hover:border-amber-500',
+        href: dashboardSetorAdm ? '/checklists/detalhar/adm' : '/gerenciar/checklists',
       },
       {
         label: 'Aderência da Frota',
