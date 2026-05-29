@@ -313,7 +313,15 @@ function checklistPortalRoot(embeddedInFrame?: boolean) {
 // ---------------------------------------------------------------------------
 // Tela de conclusão com resumo dos NCs
 // ---------------------------------------------------------------------------
-function SyncStatusBadge({ state, embeddedInFrame }: { state: ChecklistSyncState; embeddedInFrame?: boolean }) {
+function SyncStatusBadge({
+  state,
+  online,
+  embeddedInFrame,
+}: {
+  state: ChecklistSyncState
+  online: boolean
+  embeddedInFrame?: boolean
+}) {
   const base = `flex w-full items-center justify-center gap-2 rounded-2xl border font-bold ${
     embeddedInFrame ? 'px-3 py-2 text-[11px]' : 'px-4 py-2.5 text-xs'
   }`
@@ -336,7 +344,17 @@ function SyncStatusBadge({ state, embeddedInFrame }: { state: ChecklistSyncState
     )
   }
 
-  // syncing
+  // Ainda não confirmado e SEM internet: salvo no aparelho, enviará ao reconectar.
+  if (!online) {
+    return (
+      <div className={`${base} border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/30 dark:text-sky-300`}>
+        <CheckCircle2 size={14} />
+        Salvo no aparelho — enviará sozinho quando a internet voltar
+      </div>
+    )
+  }
+
+  // syncing (online, tentando enviar)
   return (
     <div className={`${base} border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300`}>
       <Loader2 size={14} className="animate-spin" />
@@ -404,6 +422,18 @@ function TelaConclusao({
   const [syncState, setSyncState] = useState<ChecklistSyncState>(
     isDemo || !localId ? 'confirmed' : 'syncing',
   )
+  const [online, setOnline] = useState(() => navigator.onLine)
+
+  useEffect(() => {
+    const goOnline = () => setOnline(true)
+    const goOffline = () => setOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
 
   useEffect(() => {
     if (isDemo || !localId) return
@@ -516,7 +546,7 @@ function TelaConclusao({
 
         {/* Badge de status REAL de envio ao servidor */}
         {!isDemo && (
-          <SyncStatusBadge state={syncState} embeddedInFrame={embeddedInFrame} />
+          <SyncStatusBadge state={syncState} online={online} embeddedInFrame={embeddedInFrame} />
         )}
 
         {/* Banner de bloqueio */}
@@ -686,7 +716,9 @@ function TelaConclusao({
             ? 'Você já pode fechar esta página.'
             : syncState === 'failed'
               ? 'Não feche ainda — reabra com internet para concluir o envio.'
-              : 'Aguarde a confirmação de envio antes de fechar.'}
+              : !online
+                ? 'Pode fechar — o envio será concluído sozinho quando a internet voltar.'
+                : 'Aguarde a confirmação de envio antes de fechar.'}
         </p>
       </div>
     </div>
