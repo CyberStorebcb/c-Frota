@@ -1023,6 +1023,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     () => Array.from(frotaMap.values())
       .filter(
         (v) =>
+          !desmobilizadasLocais.has(v.placa) &&
           !placasRealizaramSet.has(v.placa) &&
           !justificativas.has(v.placa) &&
           passaFiltros(v) &&
@@ -1033,7 +1034,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         diasRealizados: 0,
         diasNoPeriodo: diasNoPeriodo,
       })),
-    [frotaMap, placasRealizaramSet, justificativas, passaFiltros, diasNoPeriodo, setorPlacasSet],
+    [frotaMap, placasRealizaramSet, justificativas, passaFiltros, diasNoPeriodo, setorPlacasSet, desmobilizadasLocais],
   )
 
   const frotaFiltrada = useMemo(
@@ -1064,6 +1065,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       Array.from(frotaMap.values())
         .filter(
           (v) =>
+            !desmobilizadasLocais.has(v.placa) &&
             !placasRealizaramSet.has(v.placa) &&
             justificativas.has(v.placa) &&
             passaFiltros(v) &&
@@ -1079,7 +1081,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             diasNoPeriodo: diasNoPeriodo,
           }
         }),
-    [frotaMap, placasRealizaramSet, justificativas, passaFiltros, diasNoPeriodo, setorPlacasSet],
+    [frotaMap, placasRealizaramSet, justificativas, passaFiltros, diasNoPeriodo, setorPlacasSet, desmobilizadasLocais],
   )
 
   const justificadosFiltrados = useMemo(() => {
