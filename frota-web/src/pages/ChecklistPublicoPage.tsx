@@ -31,6 +31,7 @@ import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 import { formatPlaca, getDisplayedFleetVehicles, normalizePlaca } from '../frota/vehicleRegistry'
 import { compressChecklistImageIfNeeded } from '../utils/compressChecklistImage'
 import { buildWhatsappLink, getSupervisorWhatsapp, isSupervisorReconhecido, SUPERVISOR_WHATSAPP } from '../data/supervisorContatos'
+import { usePwaUpdate } from '../pwa/usePwaUpdate'
 
 type Resposta = 'c' | 'nc' | 'na' | null
 
@@ -2830,6 +2831,7 @@ function DemoOutroScreen({ onRestart }: { onRestart: () => void }) {
 export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolean } = {}) {
   const [searchParams] = useSearchParams()
   const isDemo = forceDemo || searchParams.get('demo') === '1'
+  const { updatePending, applyUpdate } = usePwaUpdate()
   const withFrame = forceDemo || searchParams.get('frame') !== '0'
   const loop = searchParams.get('loop') === '1'
   const speedFactor = Math.max(0.25, Number(searchParams.get('speed') ?? '1') || 1)
@@ -2996,7 +2998,24 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
     )
   }
 
-  return <>{content}</>
+  return (
+    <>
+      {updatePending && (
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-3 bg-amber-500 px-4 py-3 shadow-lg">
+          <p className="text-sm font-black text-amber-950">
+            📲 Nova versão disponível — atualize para continuar sem erros.
+          </p>
+          <button
+            onClick={applyUpdate}
+            className="shrink-0 rounded-xl bg-amber-950 px-4 py-2 text-xs font-black text-amber-100 transition active:scale-95"
+          >
+            Atualizar agora
+          </button>
+        </div>
+      )}
+      {content}
+    </>
+  )
 }
 
 function ChecklistDemoStartOverlay({
