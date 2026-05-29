@@ -7,7 +7,7 @@ type ServiceWorkerRegistrationWithSync = ServiceWorkerRegistration & {
   readonly sync: { register(tag: string): Promise<void> }
 }
 
-const RETRY_INTERVAL_MS = 2 * 60 * 1000
+const RETRY_INTERVAL_MS = 30_000 // 30s — recheck rápido para checklists com falha
 
 async function registerBackgroundSync() {
   if (!('serviceWorker' in navigator) || !('SyncManager' in window)) return

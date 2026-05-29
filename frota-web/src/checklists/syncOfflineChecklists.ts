@@ -70,6 +70,31 @@ async function sendRecord(record: OfflineChecklistRecord) {
   if (error) throw error
 }
 
+// ── retry com backoff ─────────────────────────────────────────────────────
+
+const RETRY_DELAYS_MS = [1_000, 3_000, 6_000] // 3 tentativas: 1s, 3s, 6s
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+async function sendWithRetry(record: OfflineChecklistRecord): Promise<void> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      await sendRecord(record)
+      return // sucesso
+    } catch (err) {
+      lastError = err
+      const delay = RETRY_DELAYS_MS[attempt]
+      if (delay !== undefined) await wait(delay)
+    }
+  }
+  throw lastError
+}
+
+// ── sync principal ────────────────────────────────────────────────────────
+
 let syncingPromise: Promise<SyncResult> | null = null
 
 export function syncOfflineChecklists(): Promise<SyncResult> {
@@ -89,7 +114,7 @@ export function syncOfflineChecklists(): Promise<SyncResult> {
       }
       await updateOfflineChecklist(syncingRecord)
       try {
-        await sendRecord(syncingRecord)
+        await sendWithRetry(syncingRecord)
         await removeOfflineChecklist(syncingRecord.localId)
         synced++
       } catch (error) {

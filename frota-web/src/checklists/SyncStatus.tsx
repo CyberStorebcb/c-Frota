@@ -72,13 +72,13 @@ export function SyncStatus() {
     : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
 
   const label = !online
-    ? 'Offline: envios serão salvos neste dispositivo'
+    ? 'Sem sinal — o checklist foi salvo e será enviado ao reconectar'
     : summary.syncing > 0
-    ? 'Sincronizando checklists pendentes...'
+    ? 'Enviando checklist...'
     : summary.error > 0
-    ? `${summary.error} checklist(s) aguardando nova tentativa`
+    ? `Instabilidade na rede — reenviando automaticamente em instantes`
     : summary.pending > 0
-    ? `${summary.pending} checklist(s) pendente(s) de sincronização`
+    ? `Checklist salvo — enviando em segundo plano...`
     : 'Online: checklists serão enviados automaticamente'
 
   return (
