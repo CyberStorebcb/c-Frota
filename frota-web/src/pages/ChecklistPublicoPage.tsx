@@ -18,6 +18,7 @@ import {
   Loader2,
   MapPin,
   Paperclip,
+  RefreshCw,
   X,
 } from 'lucide-react'
 import { useTheme } from '../theme/ThemeProvider'
@@ -2998,24 +2999,33 @@ export function ChecklistPublicoPage({ forceDemo = false }: { forceDemo?: boolea
     )
   }
 
-  return (
-    <>
-      {updatePending && (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-3 bg-amber-500 px-4 py-3 shadow-lg">
-          <p className="text-sm font-black text-amber-950">
-            📲 Nova versão disponível — atualize para continuar sem erros.
-          </p>
-          <button
-            onClick={applyUpdate}
-            className="shrink-0 rounded-xl bg-amber-950 px-4 py-2 text-xs font-black text-amber-100 transition active:scale-95"
-          >
-            Atualizar agora
-          </button>
+  if (updatePending && !isDemo) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[#0b1020] px-8 text-center">
+        <div className="grid h-24 w-24 place-items-center rounded-3xl bg-amber-500/15 text-amber-400">
+          <RefreshCw size={42} />
         </div>
-      )}
-      {content}
-    </>
-  )
+        <div>
+          <h2 className="text-2xl font-black tracking-tight text-white">
+            Atualização obrigatória
+          </h2>
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-400">
+            Uma nova versão do aplicativo está disponível.<br />
+            Atualize agora para garantir que o envio<br />funcione corretamente.
+          </p>
+        </div>
+        <button
+          onClick={applyUpdate}
+          className="flex items-center gap-2 rounded-2xl bg-amber-500 px-10 py-4 text-base font-black text-amber-950 shadow-lg shadow-amber-500/30 transition hover:bg-amber-400 active:scale-95"
+        >
+          <RefreshCw size={18} />
+          Atualizar agora
+        </button>
+      </div>
+    )
+  }
+
+  return <>{content}</>
 }
 
 function ChecklistDemoStartOverlay({
