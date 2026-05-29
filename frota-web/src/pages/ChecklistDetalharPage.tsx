@@ -989,7 +989,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   )
 
   // Placas marcadas manualmente como FEITO (checklist feito, mas não chegou ao sistema).
-  // Tratadas como realizadas: contam na aderência, no ranking e vão para Realizados.
+  // FEITO vai para a lista de Realizados.
   const feitoPlacas = useMemo(() => {
     const s = new Set<string>()
     for (const [placa, entry] of justificativas) {
@@ -998,20 +998,28 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     return s
   }, [justificativas])
 
-  // Completions reais + FEITO injetado em todos os dias do período (fonte única
-  // para aderência, ranking e contagem de dias realizados).
-  const completionsComFeito = useMemo(() => {
-    if (feitoPlacas.size === 0) return checklistCompletionsByDay
+  // Placas creditadas na aderência: FEITO + qualquer justificativa (RESERVA,
+  // NÃO RODOU, OFICINA). Justificativa válida não penaliza a aderência —
+  // só veículos sem checklist e sem justificativa contam negativamente.
+  const creditadasPlacas = useMemo(
+    () => new Set(justificativas.keys()),
+    [justificativas],
+  )
+
+  // Completions reais + placas creditadas injetadas em todos os dias do período
+  // (fonte única para aderência, ranking e contagem de dias realizados).
+  const completionsComCredito = useMemo(() => {
+    if (creditadasPlacas.size === 0) return checklistCompletionsByDay
     const s = new Set(checklistCompletionsByDay)
-    for (const placa of feitoPlacas) {
+    for (const placa of creditadasPlacas) {
       for (const day of periodDays) s.add(`${placa}|${day}`)
     }
     return s
-  }, [checklistCompletionsByDay, feitoPlacas, periodDays])
+  }, [checklistCompletionsByDay, creditadasPlacas, periodDays])
 
   const diasRealizadosPorPlaca = useMemo(() => {
     const map = new Map<string, number>()
-    for (const key of completionsComFeito) {
+    for (const key of completionsComCredito) {
       const pipeIdx = key.lastIndexOf('|')
       const placa = key.slice(0, pipeIdx)
       const v = frotaMap.get(placa)
@@ -1019,7 +1027,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       map.set(placa, (map.get(placa) ?? 0) + 1)
     }
     return map
-  }, [completionsComFeito, frotaMap, passaFiltros])
+  }, [completionsComCredito, frotaMap, passaFiltros])
 
   const placasRealizaram = useMemo(
     () => rawChecklists
@@ -1372,7 +1380,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         minVeiculos: rankingMinVeiculos > 1 ? rankingMinVeiculos : undefined,
         pior: buildChecklistAdherenceRanking(
           frotaFiltradaSetor,
-          completionsComFeito,
+          completionsComCredito,
           periodDays,
           rankingGroupBy,
           'worst',
@@ -1381,7 +1389,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         ),
         melhor: buildChecklistAdherenceRanking(
           frotaFiltradaSetor,
-          completionsComFeito,
+          completionsComCredito,
           periodDays,
           rankingGroupBy,
           'best',
@@ -1402,7 +1410,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     rankingGroupBy,
     rankingMinVeiculos,
     frotaFiltradaSetor,
-    completionsComFeito,
+    completionsComCredito,
     periodDays,
     limites.ini,
     limites.fim,
@@ -1477,8 +1485,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                       </p>
                       <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
                         {diasNoPeriodo === 1
-                          ? `${aderenciaStats.realizados} de ${ativosSetor} checklists realizados (${setorVeiculoLabel}).`
-                          : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} checklists esperados (${ativosSetor} veículos ${setorVeiculoLabel} × ${diasNoPeriodo} dias).`
+                          ? `${aderenciaStats.realizados} de ${ativosSetor} com aderência (realizados + justificados) (${setorVeiculoLabel}).`
+                          : `${aderenciaStats.realizados} de ${aderenciaStats.esperados} com aderência — realizados + justificados (${ativosSetor} veículos ${setorVeiculoLabel} × ${diasNoPeriodo} dias).`
                         }
                       </p>
                     </div>
@@ -1781,7 +1789,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         {sectionView === 'ranking' && isAdmin ? (
           <ChecklistTop10Section
             frota={frotaFiltradaSetor}
-            completions={completionsComFeito}
+            completions={completionsComCredito}
             diasNoPeriodo={diasNoPeriodo}
             periodDays={periodDays}
             periodoLabel={periodoLabel}
