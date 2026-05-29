@@ -253,17 +253,19 @@ export async function getOfflineQueueSummary(): Promise<SyncSummary> {
 }
 
 /**
- * Remove registros já sincronizados com mais de SYNCED_CLEANUP_DAYS dias,
- * e registros com erro que esgotaram todas as tentativas.
+ * Remove apenas registros JÁ SINCRONIZADOS com mais de SYNCED_CLEANUP_DAYS dias.
+ *
+ * IMPORTANTE: registros com erro NÃO são apagados, mesmo após esgotar as
+ * tentativas automáticas. Eles permanecem na fila para reenvio manual (painel
+ * de pendências / botão "Reenviar agora") — evita perda de dados e garante que
+ * getChecklistSyncState() distinga "confirmado" (removido) de "falhou" (mantido).
  * Chamado automaticamente pelo syncOfflineChecklists após cada sync.
  */
 export async function cleanupOfflineQueue(): Promise<void> {
   const records = await listOfflineChecklists()
   const cutoff = Date.now() - SYNCED_CLEANUP_DAYS * 86_400_000
   const toRemove = records.filter(
-    (r) =>
-      (r.status === 'synced' && new Date(r.updatedAt).getTime() < cutoff) ||
-      (r.status === 'error' && r.attempts >= MAX_RETRY_ATTEMPTS),
+    (r) => r.status === 'synced' && new Date(r.updatedAt).getTime() < cutoff,
   )
   await Promise.all(toRemove.map((r) => removeOfflineChecklist(r.localId)))
 }
