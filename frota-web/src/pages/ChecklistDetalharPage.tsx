@@ -63,7 +63,6 @@ import {
   type ChecklistAusenciaMotivo,
 } from '../checklists/checklistAusenciaJustificativa'
 import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
-import { supabase } from '../lib/supabase'
 import { desmobilizarVehicle } from '../services/catalogTrashService'
 import { DashboardLoadingScreen } from './DashboardLoadingScreen'
 

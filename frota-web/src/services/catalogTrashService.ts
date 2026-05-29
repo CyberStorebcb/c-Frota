@@ -168,9 +168,23 @@ export async function desmobilizarVehicle(
   // 2. Sem linha no Supabase — veículo só existe no catálogo embebido.
   //    Insere já desmobilizado para que o merge do FleetContext o exclua.
   const row = getTrashRowByPlaca(placaNorm) ?? TOTAL_VEHICLE_ROWS.find((r) => normalizePlaca(r.placa) === placaNorm)
-  const record = row
-    ? { ...catalogRowToSupabaseRecord(row, deletedAt), status: 'DESMOBILIZADO' }
-    : { placa: placaNorm, status: 'DESMOBILIZADO', deleted_at: deletedAt }
+  const record = {
+    ...(row
+      ? catalogRowToSupabaseRecord(row, deletedAt)
+      : {
+          placa: placaNorm,
+          modelo: '—',
+          tipo: 'VEICULOS LEVES' as VehicleTipo,
+          prefixo: 'N/A',
+          responsavel: 'NÃO ATRIBUÍDO',
+          supervisor: 'NÃO ATRIBUÍDO',
+          coordenador: 'NÃO ATRIBUÍDO',
+          base: 'N/A',
+          ano: '',
+          deleted_at: deletedAt,
+        }),
+    status: 'DESMOBILIZADO',
+  }
 
   const { error: insError } = await supabase.from('vehicles').insert(record)
   if (insError) {
