@@ -64,6 +64,7 @@ import {
 } from '../checklists/checklistAusenciaJustificativa'
 import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
 import { supabase } from '../lib/supabase'
+import { desmobilizarVehicle } from '../services/catalogTrashService'
 import { DashboardLoadingScreen } from './DashboardLoadingScreen'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -781,26 +782,14 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
       if (motivo === 'DESMOBILIZADO') {
         const placaNorm = normalizePlaca(placa)
-        const { data: desmobData, error: desmobError } = await supabase
-          .from('vehicles')
-          .update({
-            deleted_at: new Date().toISOString(),
-            status: 'DESMOBILIZADO',
-          })
-          .eq('placa', placaNorm)
-          .select('placa')   // retorna as linhas afetadas — array vazio = falha silenciosa
+        const res = await desmobilizarVehicle(placaNorm)
         setJustificativaSavingPlaca(null)
-        if (desmobError) {
-          window.alert(`Erro ao desmobilizar veículo: ${desmobError.message}`)
-          return
-        }
-        if (!desmobData || desmobData.length === 0) {
-          window.alert(`Não foi possível desmobilizar ${placa}. Verifique se o veículo existe no banco ou se você tem permissão para esta ação.`)
+        if (!res.ok) {
+          window.alert(`Não foi possível desmobilizar ${placa}: ${res.message}`)
           return
         }
         // Remove imediatamente da tela e atualiza o FleetContext
         setDesmobilizadasLocais((prev) => new Set(prev).add(placaNorm))
-        // Invalida cache do editor para refletir a mudança
         reloadFleet()
         return   // ← não cria justificativa: veículo saiu da frota de vez
       }

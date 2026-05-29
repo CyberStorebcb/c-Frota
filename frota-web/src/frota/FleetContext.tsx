@@ -74,27 +74,45 @@ const FleetContext = createContext<FleetContextValue>({
 
 export function FleetProvider({ children }: { children: ReactNode }) {
   const [supabaseVehicles, setSupabaseVehicles] = useState<FleetVehicle[]>([])
+  // Placas com deleted_at != null no Supabase — não devem ser re-adicionadas pelo catálogo embebido
+  const [deletedPlacas, setDeletedPlacas] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
     setLoading(true)
-    void fetchAllSupabasePages((from, to) =>
-      supabase
-        .from('vehicles')
-        .select('id, placa, modelo, tipo, prefixo, responsavel, supervisor, coordenador, base, ano, status, created_at, deleted_at, proprietario, setor, processo')
-        .is('deleted_at', null)
-        .order('placa', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to),
-    )
-      .then(({ data, error }) => {
-        if (error) {
+    void Promise.all([
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from('vehicles')
+          .select('id, placa, modelo, tipo, prefixo, responsavel, supervisor, coordenador, base, ano, status, created_at, deleted_at, proprietario, setor, processo')
+          .is('deleted_at', null)
+          .order('placa', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to),
+      ),
+      // Placas desmobilizadas (deleted_at != null) — só a coluna placa, egress mínimo
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from('vehicles')
+          .select('placa')
+          .not('deleted_at', 'is', null)
+          .order('placa', { ascending: true })
+          .range(from, to),
+      ),
+    ])
+      .then(([ativos, removidos]) => {
+        if (ativos.error) {
           setSupabaseVehicles([])
           setLoading(false)
           return
         }
-        setSupabaseVehicles(data.map((r) => rowToVehicle(r as SupabaseRow)))
+        setSupabaseVehicles(ativos.data.map((r) => rowToVehicle(r as SupabaseRow)))
+        if (!removidos.error && removidos.data) {
+          setDeletedPlacas(
+            new Set((removidos.data as { placa: string }[]).map((r) => normalizePlaca(r.placa))),
+          )
+        }
         setLoading(false)
       })
   }, [tick])
@@ -107,12 +125,15 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   const reload = () => setTick((t) => t + 1)
 
-  // Supabase prevalece; catálogo embebido preenche placas ausentes no Supabase
+  // Supabase prevalece; catálogo embebido preenche placas ausentes no Supabase,
+  // exceto as que estão desmobilizadas (deleted_at != null) — essas ficam de fora.
   const vehicles = useMemo(() => {
     const supaPlacas = new Set(supabaseVehicles.map((v) => v.placa))
-    const embedded = getDisplayedFleetVehicles().filter((v) => !supaPlacas.has(v.placa))
+    const embedded = getDisplayedFleetVehicles().filter(
+      (v) => !supaPlacas.has(v.placa) && !deletedPlacas.has(v.placa),
+    )
     return [...supabaseVehicles, ...embedded].sort((a, b) => a.placa.localeCompare(b.placa))
-  }, [supabaseVehicles])
+  }, [supabaseVehicles, deletedPlacas])
 
   return (
     <FleetContext.Provider value={{ vehicles, loading, reload }}>

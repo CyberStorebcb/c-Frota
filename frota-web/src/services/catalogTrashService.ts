@@ -141,6 +141,53 @@ export async function restoreCatalogVehicleFromTrash(
   return { ok: true }
 }
 
+/**
+ * Desmobiliza um veículo de vez (remove da frota ativa).
+ * Funciona tanto para veículos com linha no Supabase quanto para os que
+ * só existem no catálogo embebido — nesse caso insere a linha já desmobilizada.
+ */
+export async function desmobilizarVehicle(
+  placa: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!supabaseConfigured) return { ok: false, message: 'Supabase não configurado.' }
+  const placaNorm = normalizePlaca(placa)
+  if (!placaNorm) return { ok: false, message: 'Placa inválida.' }
+
+  const deletedAt = new Date().toISOString()
+
+  // 1. Tenta atualizar uma linha já existente
+  const { data: updated, error: updateError } = await supabase
+    .from('vehicles')
+    .update({ deleted_at: deletedAt, status: 'DESMOBILIZADO' })
+    .eq('placa', placaNorm)
+    .select('placa')
+
+  if (updateError) return { ok: false, message: updateError.message }
+  if (updated && updated.length > 0) return { ok: true }
+
+  // 2. Sem linha no Supabase — veículo só existe no catálogo embebido.
+  //    Insere já desmobilizado para que o merge do FleetContext o exclua.
+  const row = getTrashRowByPlaca(placaNorm) ?? TOTAL_VEHICLE_ROWS.find((r) => normalizePlaca(r.placa) === placaNorm)
+  const record = row
+    ? { ...catalogRowToSupabaseRecord(row, deletedAt), status: 'DESMOBILIZADO' }
+    : { placa: placaNorm, status: 'DESMOBILIZADO', deleted_at: deletedAt }
+
+  const { error: insError } = await supabase.from('vehicles').insert(record)
+  if (insError) {
+    // Corrida: linha criada nesse meio-tempo — atualiza
+    if (insError.code === '23505') {
+      const { error: upErr } = await supabase
+        .from('vehicles')
+        .update({ deleted_at: deletedAt, status: 'DESMOBILIZADO' })
+        .eq('placa', placaNorm)
+      if (upErr) return { ok: false, message: upErr.message }
+      return { ok: true }
+    }
+    return { ok: false, message: insError.message }
+  }
+  return { ok: true }
+}
+
 export type CatalogTrashSyncStats = {
   activeUpserted: number
   trashMarked: number
