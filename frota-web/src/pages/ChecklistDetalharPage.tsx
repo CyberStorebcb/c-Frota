@@ -701,7 +701,9 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const [rankingMinVeiculos, setRankingMinVeiculos] = useState(1)
   const columnsRef = useRef<HTMLDivElement>(null)
 
-  const { vehicles: allVehicles } = useFleet()
+  const { vehicles: allVehicles, reload: reloadFleet } = useFleet()
+  // Placas desmobilizadas nesta sessão — removidas imediatamente da tela
+  const [desmobilizadasLocais, setDesmobilizadasLocais] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
@@ -781,14 +783,21 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         const placaNorm = normalizePlaca(placa)
         const { error: desmobError } = await supabase
           .from('vehicles')
-          .update({ deleted_at: new Date().toISOString() })
+          .update({
+            deleted_at: new Date().toISOString(),
+            status: 'DESMOBILIZADO',
+          })
           .eq('placa', placaNorm)
           .is('deleted_at', null)
+        setJustificativaSavingPlaca(null)
         if (desmobError) {
-          setJustificativaSavingPlaca(null)
           window.alert(`Erro ao desmobilizar veículo: ${desmobError.message}`)
           return
         }
+        // Remove imediatamente da tela e atualiza o FleetContext
+        setDesmobilizadasLocais((prev) => new Set(prev).add(placaNorm))
+        reloadFleet()
+        return   // ← não cria justificativa: veículo saiu da frota de vez
       }
 
       const res = await saveChecklistAusenciaJustificativa({
@@ -1028,8 +1037,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   )
 
   const frotaFiltrada = useMemo(
-    () => Array.from(frotaMap.values()).filter(passaFiltros),
-    [frotaMap, passaFiltros],
+    () => Array.from(frotaMap.values()).filter(passaFiltros).filter((v) => !desmobilizadasLocais.has(v.placa)),
+    [frotaMap, passaFiltros, desmobilizadasLocais],
   )
 
   const frotaFiltradaSetor = useMemo(
