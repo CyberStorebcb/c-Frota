@@ -125,6 +125,28 @@ export async function listOfflineChecklists(): Promise<OfflineChecklistRecord[]>
   return records.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
+/** Estado de sincronização de um checklist específico, identificado pelo localId. */
+export type ChecklistSyncState = 'syncing' | 'confirmed' | 'failed'
+
+/**
+ * Consulta o estado real de envio de um checklist:
+ *   • 'confirmed' — não está mais na fila (foi inserido no servidor e removido)
+ *   • 'failed'    — esgotou as tentativas e continua com erro
+ *   • 'syncing'   — ainda pendente / tentando enviar
+ */
+export async function getChecklistSyncState(localId: string): Promise<ChecklistSyncState> {
+  const db = await openDb()
+  const tx = db.transaction(STORE_NAME, 'readonly')
+  const rec = await requestToPromise<OfflineChecklistRecord | undefined>(
+    tx.objectStore(STORE_NAME).get(localId),
+  )
+  await txDone(tx)
+  if (!rec) return 'confirmed'
+  if (rec.status === 'synced') return 'confirmed'
+  if (rec.status === 'error' && rec.attempts >= MAX_RETRY_ATTEMPTS) return 'failed'
+  return 'syncing'
+}
+
 export async function listPendingOfflineChecklists(): Promise<OfflineChecklistRecord[]> {
   const records = await listOfflineChecklists()
   // Registros presos em 'syncing' por mais de 5 minutos são tratados como 'error'

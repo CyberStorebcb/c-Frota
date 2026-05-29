@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { useTheme } from '../theme/ThemeProvider'
-import { enqueueChecklist, type OfflineChecklistFile } from '../checklists/offlineQueue'
+import { enqueueChecklist, getChecklistSyncState, subscribeOfflineQueue, type ChecklistSyncState, type OfflineChecklistFile } from '../checklists/offlineQueue'
 import { syncOfflineChecklists } from '../checklists/syncOfflineChecklists'
 import { SyncStatus } from '../checklists/SyncStatus'
 import { BrandLogo } from '../branding/BrandLogo'
@@ -313,11 +313,44 @@ function checklistPortalRoot(embeddedInFrame?: boolean) {
 // ---------------------------------------------------------------------------
 // Tela de conclusão com resumo dos NCs
 // ---------------------------------------------------------------------------
+function SyncStatusBadge({ state, embeddedInFrame }: { state: ChecklistSyncState; embeddedInFrame?: boolean }) {
+  const base = `flex w-full items-center justify-center gap-2 rounded-2xl border font-bold ${
+    embeddedInFrame ? 'px-3 py-2 text-[11px]' : 'px-4 py-2.5 text-xs'
+  }`
+
+  if (state === 'confirmed') {
+    return (
+      <div className={`${base} border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300`}>
+        <CheckCircle2 size={14} />
+        Envio confirmado no servidor
+      </div>
+    )
+  }
+
+  if (state === 'failed') {
+    return (
+      <div className={`${base} border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300`}>
+        <AlertTriangle size={14} />
+        Falha no envio — reabra o app com internet para reenviar
+      </div>
+    )
+  }
+
+  // syncing
+  return (
+    <div className={`${base} border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300`}>
+      <Loader2 size={14} className="animate-spin" />
+      Enviando ao servidor… mantenha a página aberta
+    </div>
+  )
+}
+
 function TelaConclusao({
   ncImperativos,
   ncCount,
   itensNc,
   offline,
+  localId,
   nomeSupervisor,
   veiculo,
   operador,
@@ -340,6 +373,7 @@ function TelaConclusao({
   ncCount: number
   itensNc: { label: string; imperativo: boolean; obs: string }[]
   offline?: boolean
+  localId?: string
   nomeSupervisor: string
   veiculo: string
   operador: string
@@ -364,6 +398,31 @@ function TelaConclusao({
   const comNc = ncCount > 0
   const [demoWhatsappOpen, setDemoWhatsappOpen] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+
+  // Estado REAL de envio ao servidor (não apenas salvo no dispositivo).
+  // Em demo não há fila — considera confirmado.
+  const [syncState, setSyncState] = useState<ChecklistSyncState>(
+    isDemo || !localId ? 'confirmed' : 'syncing',
+  )
+
+  useEffect(() => {
+    if (isDemo || !localId) return
+    let active = true
+    const check = () => {
+      void getChecklistSyncState(localId).then((st) => {
+        if (active) setSyncState(st)
+      })
+    }
+    check()
+    // Reavalia a cada mudança na fila e periodicamente enquanto está enviando
+    const unsub = subscribeOfflineQueue(check)
+    const interval = setInterval(check, 4000)
+    return () => {
+      active = false
+      unsub()
+      clearInterval(interval)
+    }
+  }, [isDemo, localId])
 
   useEffect(() => {
     scrollChecklistViewportToTop()
@@ -444,18 +503,21 @@ function TelaConclusao({
 
         <div>
           <h1 className={`font-black text-slate-900 dark:text-slate-100 ${embeddedInFrame ? 'text-xl' : 'text-2xl'}`}>
-            {offline ? 'Checklist salvo no dispositivo' : bloqueado ? 'Veículo impedido!' : comNc ? 'Checklist enviado' : 'Tudo Conforme!'}
+            {bloqueado ? 'Veículo impedido!' : comNc ? 'Itens não conformes' : 'Tudo Conforme!'}
           </h1>
           <p className={`mt-2 font-semibold text-slate-500 dark:text-slate-400 ${embeddedInFrame ? 'text-xs leading-snug' : 'text-sm'}`}>
-            {offline
-              ? 'Assim que a internet voltar, o aplicativo tentará sincronizar automaticamente.'
-              : bloqueado
+            {bloqueado
               ? `${ncImperativos} item(s) impeditivo(s) NC. O veículo está impedido de ser conduzido até a correção.`
               : comNc
                 ? `${ncCount} item(s) com NC registrado(s). Avise o supervisor.`
                 : 'Todos os itens estão Conformes. Bom trabalho!'}
           </p>
         </div>
+
+        {/* Badge de status REAL de envio ao servidor */}
+        {!isDemo && (
+          <SyncStatusBadge state={syncState} embeddedInFrame={embeddedInFrame} />
+        )}
 
         {/* Banner de bloqueio */}
         {bloqueado && (
@@ -587,7 +649,7 @@ function TelaConclusao({
           {/* Data e hora */}
           <div className="px-4 py-3 text-center">
             <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-              {offline ? 'Salvo em' : 'Enviado em'}
+              {syncState === 'confirmed' ? 'Enviado em' : 'Preenchido em'}
             </p>
             <p className={`mt-0.5 font-black tabular-nums text-slate-800 dark:text-slate-100 ${embeddedInFrame ? 'text-base' : 'text-lg'}`}>
               {submittedAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
@@ -619,7 +681,13 @@ function TelaConclusao({
           </button>
         )}
 
-        <p className="text-xs font-semibold text-slate-400">Você já pode fechar esta página.</p>
+        <p className="text-xs font-semibold text-slate-400">
+          {isDemo || syncState === 'confirmed'
+            ? 'Você já pode fechar esta página.'
+            : syncState === 'failed'
+              ? 'Não feche ainda — reabra com internet para concluir o envio.'
+              : 'Aguarde a confirmação de envio antes de fechar.'}
+        </p>
       </div>
     </div>
 
@@ -1158,6 +1226,7 @@ function FormularioChecklist({
     ncImperativos: number
     itensNc: { label: string; imperativo: boolean; obs: string }[]
     offline?: boolean
+    localId?: string
     nomeSupervisor: string
     veiculo: string
     fotosPreview: string[]
@@ -1950,7 +2019,7 @@ function FormularioChecklist({
       // Salva na fila local (IndexedDB) — funciona online e offline.
       // O sync em background faz o upload das fotos + INSERT no banco,
       // permitindo que o operador veja o resultado imediatamente.
-      await enqueueChecklist(
+      const enqueued = await enqueueChecklist(
         buildChecklistPayload({ ...observacoes }, []),
         buildOfflineFiles(),
       )
@@ -1963,7 +2032,7 @@ function FormularioChecklist({
         .map((it) => ({ label: it.label, imperativo: !!it.imperativo, obs: observacoes[it.id] ?? '' }))
 
       const fotosPreview = Object.values(fotosItem).flat().map((f) => URL.createObjectURL(f))
-      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: !navigator.onLine, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: [], problemas, descricaoProblema, submittedAt: new Date(), schemaNome: schema.nome, dadosVeiculo, grupos: schema.grupos, respostas: respostas as Record<string, string | null>, observacoes, matricula })
+      setResultadoFinal({ ncCount, ncImperativos, itensNc, offline: !navigator.onLine, localId: enqueued.localId, nomeSupervisor: supervisor, veiculo: formatPlaca(dadosVeiculo['placa'] ?? ''), fotosPreview, fotosUrls: [], problemas, descricaoProblema, submittedAt: new Date(), schemaNome: schema.nome, dadosVeiculo, grupos: schema.grupos, respostas: respostas as Record<string, string | null>, observacoes, matricula })
       clearFormDraft()
       onConcluido?.()
       setConcluido(true)
@@ -1981,6 +2050,7 @@ function FormularioChecklist({
         ncCount={resultadoFinal.ncCount}
         itensNc={resultadoFinal.itensNc}
         offline={resultadoFinal.offline}
+        localId={resultadoFinal.localId}
         nomeSupervisor={resultadoFinal.nomeSupervisor}
         veiculo={resultadoFinal.veiculo}
         operador={operador}
