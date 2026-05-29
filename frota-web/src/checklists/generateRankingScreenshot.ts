@@ -6,6 +6,8 @@ export type RankingScreenshotInput = {
   diasNoPeriodo: number
   groupLabel: string
   minVeiculos?: number
+  /** Filtros ativos ex: "Gerência: JÚLIO · Base: BCB" */
+  filtrosAtivos?: string
   pior: ChecklistAdherenceEntry[]
   melhor: ChecklistAdherenceEntry[]
 }
@@ -184,6 +186,28 @@ function drawArenaHeader(ctx: Ctx, x: number, y: number, w: number, h: number, i
     tx,
     y + 96,
   )
+
+  if (input.filtrosAtivos) {
+    // Pílula de filtros ativos em destaque âmbar
+    const pillText = `Filtro: ${input.filtrosAtivos}`
+    setFont(ctx, 15, 700)
+    const pillW = ctx.measureText(pillText).width + 28
+    const pillH = 30
+    const pillX = tx
+    const pillY = y + 122
+    const pillR = pillH / 2
+    ctx.beginPath()
+    ctx.roundRect(pillX, pillY, pillW, pillH, pillR)
+    ctx.fillStyle = 'rgba(251,191,36,0.15)'
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(251,191,36,0.45)'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+    ctx.fillStyle = '#fcd34d'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(pillText, pillX + 14, pillY + pillH / 2)
+    ctx.textBaseline = 'top'
+  }
 
   ctx.textAlign = 'right'
   setFont(ctx, 14, 600)
@@ -521,7 +545,8 @@ export function generateRankingScreenshot(input: RankingScreenshotInput): string
   const leftH = measureColumnHeight('nao', input.pior)
   const rightH = measureColumnHeight('sim', input.melhor)
   const boardsH = Math.max(leftH, rightH)
-  const H = L.pad + L.arenaH + L.gap + boardsH + L.pad
+  const arenaH = input.filtrosAtivos ? L.arenaH + 42 : L.arenaH
+  const H = L.pad + arenaH + L.gap + boardsH + L.pad
 
   const canvas = document.createElement('canvas')
   canvas.width = W * SCALE
@@ -535,9 +560,9 @@ export function generateRankingScreenshot(input: RankingScreenshotInput): string
   ctx.fillStyle = '#020617'
   ctx.fillRect(0, 0, W, H)
 
-  drawArenaHeader(ctx, L.pad, L.pad, W - L.pad * 2, L.arenaH, input)
+  drawArenaHeader(ctx, L.pad, L.pad, W - L.pad * 2, arenaH, input)
 
-  const boardsY = L.pad + L.arenaH + L.gap
+  const boardsY = L.pad + arenaH + L.gap
   drawCompetitionBoard(ctx, L.pad, boardsY, cardW, boardsH, 'nao', input.pior, input.groupLabel, input.diasNoPeriodo)
   drawCompetitionBoard(
     ctx,

@@ -1372,12 +1372,24 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     try {
       const groupLabel =
         CHECKLIST_TOP10_GROUP_OPTIONS.find((o) => o.value === rankingGroupBy)?.label ?? 'Responsável'
+
+      // Monta string dos filtros ativos para exibir no screenshot
+      const partesFiltro: string[] = []
+      if (filtroCoordenador && filtroCoordenador !== 'todos') partesFiltro.push(`Gerência: ${filtroCoordenador.toUpperCase()}`)
+      if (filtroSupervisor   && filtroSupervisor   !== 'todos') partesFiltro.push(`Supervisor: ${filtroSupervisor.toUpperCase()}`)
+      if (filtroResponsavel  && filtroResponsavel  !== 'todos') partesFiltro.push(`Responsável: ${filtroResponsavel.toUpperCase()}`)
+      if (filtroBase         && filtroBase         !== 'todos') partesFiltro.push(`Base: ${filtroBase.toUpperCase()}`)
+      if (filtroTipo         && filtroTipo         !== 'todos') partesFiltro.push(`Tipo: ${filtroTipo.toUpperCase()}`)
+      if (filtroPrefixo      && filtroPrefixo      !== 'todos') partesFiltro.push(`Prefixo: ${filtroPrefixo.toUpperCase()}`)
+      const filtrosAtivos = partesFiltro.length > 0 ? partesFiltro.join(' · ') : undefined
+
       const dataUrl = generateRankingScreenshot({
         periodoLabel,
         periodoResumo,
         diasNoPeriodo,
         groupLabel,
         minVeiculos: rankingMinVeiculos > 1 ? rankingMinVeiculos : undefined,
+        filtrosAtivos,
         pior: buildChecklistAdherenceRanking(
           frotaFiltradaSetor,
           completionsComCredito,
@@ -1414,6 +1426,12 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     periodDays,
     limites.ini,
     limites.fim,
+    filtroCoordenador,
+    filtroSupervisor,
+    filtroResponsavel,
+    filtroBase,
+    filtroTipo,
+    filtroPrefixo,
   ])
 
   // ── render ────────────────────────────────────────────────────────────────
