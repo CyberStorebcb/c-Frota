@@ -64,6 +64,7 @@ import {
 } from '../checklists/checklistAusenciaJustificativa'
 import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
 import { supabase } from '../lib/supabase'
+import { DashboardLoadingScreen } from './DashboardLoadingScreen'
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -1568,9 +1569,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       {/* Abas + listas */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {loading ? (
-        <div className="flex flex-1 items-center justify-center py-20">
-          <span className="size-7 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400" />
-        </div>
+        <DashboardLoadingScreen done={false} />
       ) : (
         <div
           ref={columnsRef}
