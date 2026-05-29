@@ -148,8 +148,12 @@ export function LoginPage() {
     e.preventDefault()
     setRecoveryError(null)
     setRecoveryPending(true)
+    // Usa a URL de produção configurada (VITE_SITE_URL) quando disponível, para
+    // o link do e-mail nunca apontar para localhost mesmo se o reset for pedido
+    // de um ambiente de teste. Fallback: origem atual.
+    const siteUrl = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '') || window.location.origin
     const { error: err } = await supabase.auth.resetPasswordForEmail(recoveryEmail.trim(), {
-      redirectTo: `${window.location.origin}/trocar-senha`,
+      redirectTo: `${siteUrl}/trocar-senha`,
     })
     setRecoveryPending(false)
     if (err) {
