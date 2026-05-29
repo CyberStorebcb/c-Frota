@@ -14,6 +14,7 @@ import {
   FileDown,
   FileSpreadsheet,
   Camera,
+  Loader2,
   LayoutGrid,
   List,
   Maximize2,
@@ -52,6 +53,7 @@ import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
 import { buildActiveFleetMap, passesChecklistFleetFilters } from '../checklists/checklistFleetScope'
 import { fetchCompletedChecklistsInPeriod } from '../checklists/fetchChecklistCompletions'
 import { downloadDataUrl, generateRankingScreenshot } from '../checklists/generateRankingScreenshot'
+import { generateSummaryScreenshot } from '../checklists/generateSummaryScreenshot'
 import { useFleet } from '../frota/FleetContext'
 import { useAuth } from '../auth/AuthContext'
 import { ChecklistAusenciaJustificar } from '../components/checklist/ChecklistAusenciaJustificar'
@@ -1378,6 +1380,47 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     [exportMeta, naoRealizaramFiltrados, realizaramFiltrados, justificadosFiltrados],
   )
 
+  const [capturandoResumo, setCapturandoResumo] = useState(false)
+
+  const capturarResumo = useCallback(async () => {
+    setCapturandoResumo(true)
+    try {
+      const partesFiltro: string[] = []
+      if (filtroCoordenador && filtroCoordenador !== 'todos') partesFiltro.push(`Gerência: ${filtroCoordenador.toUpperCase()}`)
+      if (filtroSupervisor   && filtroSupervisor   !== 'todos') partesFiltro.push(`Supervisor: ${filtroSupervisor.toUpperCase()}`)
+      if (filtroResponsavel  && filtroResponsavel  !== 'todos') partesFiltro.push(`Responsável: ${filtroResponsavel.toUpperCase()}`)
+      if (filtroBase         && filtroBase         !== 'todos') partesFiltro.push(`Base: ${filtroBase.toUpperCase()}`)
+      if (filtroTipo         && filtroTipo         !== 'todos') partesFiltro.push(`Tipo: ${filtroTipo.toUpperCase()}`)
+      if (filtroPrefixo      && filtroPrefixo      !== 'todos') partesFiltro.push(`Prefixo: ${filtroPrefixo.toUpperCase()}`)
+
+      const dataUrl = generateSummaryScreenshot({
+        titulo: isAdmPage ? 'Checklist Administrativo' : 'Checklist Operacional',
+        periodoLabel,
+        periodoResumo,
+        diasNoPeriodo,
+        filtrosAtivos: partesFiltro.length > 0 ? partesFiltro.join(' · ') : undefined,
+        ativos:           ativosSetor,
+        realizaram:       realizaramSetorCount,
+        naoRealizaram:    naoRealizaramCardCount,
+        justificados:     justificadosSetorCount,
+        aderenciaPct:     aderenciaStats.pct,
+        aderenciaRealizado: aderenciaStats.realizados,
+        aderenciaEsperado:  aderenciaStats.esperados,
+        setorLabel:       setorVeiculoLabel,
+      })
+      downloadDataUrl(dataUrl, `resumo-checklist-${limites.ini}-${limites.fim}.png`)
+    } catch {
+      window.alert('Não foi possível capturar a imagem do resumo.')
+    } finally {
+      setCapturandoResumo(false)
+    }
+  }, [
+    isAdmPage, periodoLabel, periodoResumo, diasNoPeriodo,
+    filtroCoordenador, filtroSupervisor, filtroResponsavel, filtroBase, filtroTipo, filtroPrefixo,
+    ativosSetor, realizaramSetorCount, naoRealizaramCardCount, justificadosSetorCount,
+    aderenciaStats, setorVeiculoLabel, limites.ini, limites.fim,
+  ])
+
   const capturarRanking = useCallback(async () => {
     setCapturandoFoto(true)
     try {
@@ -1603,6 +1646,23 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                 <p className="mt-1 text-[11px] font-semibold text-amber-800/60 dark:text-amber-200/60">RESERVA ou NÃO RODOU</p>
               </div>
             </div>
+
+            {/* Botão FOTO do resumo */}
+            {isAdmin && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void capturarResumo()}
+                  disabled={capturandoResumo}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  {capturandoResumo
+                    ? <><Loader2 size={13} className="animate-spin" />Gerando…</>
+                    : <><Camera size={13} />Foto do resumo</>
+                  }
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </section>
