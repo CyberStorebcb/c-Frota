@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { useTheme } from '../theme/ThemeProvider'
-import { enqueueChecklist, getChecklistSyncState, retryChecklist, subscribeOfflineQueue, type ChecklistSyncState, type OfflineChecklistFile } from '../checklists/offlineQueue'
+import { enqueueChecklist, getChecklistSyncState, getOfflineQueueSummary, retryAllStuck, retryChecklist, subscribeOfflineQueue, type ChecklistSyncState, type OfflineChecklistFile } from '../checklists/offlineQueue'
 import { syncOfflineChecklists } from '../checklists/syncOfflineChecklists'
 import { SyncStatus } from '../checklists/SyncStatus'
 import { PendingChecklistsPanel } from '../components/checklist/PendingChecklistsPanel'
@@ -86,6 +86,37 @@ function TelaEscolhaChecklist({
   hideSync?: boolean
   embeddedInFrame?: boolean
 }) {
+  const [syncing, setSyncing]       = useState(false)
+  const [syncDone, setSyncDone]     = useState(false)
+  const [pendingCount, setPending]  = useState(0)
+  const [online, setOnline]         = useState(() => navigator.onLine)
+
+  useEffect(() => {
+    const refresh = () =>
+      void getOfflineQueueSummary().then((s) => setPending(s.pending + s.error + s.syncing))
+    refresh()
+    const unsub = subscribeOfflineQueue(refresh)
+    const goOnline  = () => setOnline(true)
+    const goOffline = () => setOnline(false)
+    window.addEventListener('online',  goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => { unsub(); window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline) }
+  }, [])
+
+  const handleSync = async () => {
+    if (syncing) return
+    setSyncing(true)
+    setSyncDone(false)
+    try {
+      await retryAllStuck()
+      await syncOfflineChecklists()
+      setSyncDone(true)
+      setTimeout(() => setSyncDone(false), 3000)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <div
       className={`flex flex-col items-center px-4 pb-8 ${CHECKLIST_PAGE_BG} ${
@@ -130,11 +161,77 @@ function TelaEscolhaChecklist({
         </div>
 
         <p className="mt-6 text-center text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-        Atenção ao preenchimento, pois os formulários serão avaliados e validados.
+          Atenção ao preenchimento, pois os formulários serão avaliados e validados.
         </p>
 
+        {/* Botão de sincronização manual */}
         {!hideSync && (
           <div className="mt-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => void handleSync()}
+              disabled={syncing || !online}
+              className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 text-left transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+                syncDone
+                  ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-950/30'
+                  : pendingCount > 0
+                    ? 'border-amber-300 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30'
+                    : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+                  syncDone
+                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+                    : pendingCount > 0
+                      ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400'
+                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                }`}>
+                  {syncing
+                    ? <Loader2 size={18} className="animate-spin" />
+                    : syncDone
+                      ? <CheckCircle2 size={18} />
+                      : <RefreshCw size={18} />
+                  }
+                </div>
+                <div>
+                  <p className={`text-sm font-black ${
+                    syncDone ? 'text-emerald-700 dark:text-emerald-300'
+                    : pendingCount > 0 ? 'text-amber-800 dark:text-amber-200'
+                    : 'text-slate-800 dark:text-slate-100'
+                  }`}>
+                    {syncing ? 'Sincronizando…'
+                      : syncDone ? 'Sincronizado com sucesso!'
+                      : 'Sincronizar checklists'}
+                  </p>
+                  <p className={`text-[11px] font-semibold ${
+                    syncDone ? 'text-emerald-600/70 dark:text-emerald-400/70'
+                    : pendingCount > 0 ? 'text-amber-700/70 dark:text-amber-300/70'
+                    : 'text-slate-500 dark:text-slate-400'
+                  }`}>
+                    {!online
+                      ? 'Sem internet — conecte-se para sincronizar'
+                      : syncDone
+                        ? 'Todos os checklists foram enviados'
+                        : pendingCount > 0
+                          ? `${pendingCount} checklist(s) aguardando envio`
+                          : 'Toque para enviar checklists pendentes'}
+                  </p>
+                </div>
+              </div>
+              {!syncing && !syncDone && (
+                <span className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black ${
+                  !online
+                    ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    : pendingCount > 0
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                }`}>
+                  {!online ? 'Offline' : pendingCount > 0 ? `${pendingCount}` : 'OK'}
+                </span>
+              )}
+            </button>
+
             <PendingChecklistsPanel />
             <SyncStatus />
           </div>
