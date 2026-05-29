@@ -22,9 +22,10 @@ import {
   X,
 } from 'lucide-react'
 import { useTheme } from '../theme/ThemeProvider'
-import { enqueueChecklist, getChecklistSyncState, subscribeOfflineQueue, type ChecklistSyncState, type OfflineChecklistFile } from '../checklists/offlineQueue'
+import { enqueueChecklist, getChecklistSyncState, retryChecklist, subscribeOfflineQueue, type ChecklistSyncState, type OfflineChecklistFile } from '../checklists/offlineQueue'
 import { syncOfflineChecklists } from '../checklists/syncOfflineChecklists'
 import { SyncStatus } from '../checklists/SyncStatus'
+import { PendingChecklistsPanel } from '../components/checklist/PendingChecklistsPanel'
 import { BrandLogo } from '../branding/BrandLogo'
 import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
@@ -133,7 +134,8 @@ function TelaEscolhaChecklist({
         </p>
 
         {!hideSync && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
+            <PendingChecklistsPanel />
             <SyncStatus />
           </div>
         )}
@@ -317,10 +319,14 @@ function SyncStatusBadge({
   state,
   online,
   embeddedInFrame,
+  retrying,
+  onRetry,
 }: {
   state: ChecklistSyncState
   online: boolean
   embeddedInFrame?: boolean
+  retrying?: boolean
+  onRetry?: () => void
 }) {
   const base = `flex w-full items-center justify-center gap-2 rounded-2xl border font-bold ${
     embeddedInFrame ? 'px-3 py-2 text-[11px]' : 'px-4 py-2.5 text-xs'
@@ -337,9 +343,22 @@ function SyncStatusBadge({
 
   if (state === 'failed') {
     return (
-      <div className={`${base} border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300`}>
-        <AlertTriangle size={14} />
-        Falha no envio — reabra o app com internet para reenviar
+      <div className="w-full space-y-2">
+        <div className={`${base} border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300`}>
+          <AlertTriangle size={14} />
+          Falha no envio — o checklist está salvo no aparelho
+        </div>
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={retrying || !online}
+          className={`flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 font-black text-white transition active:scale-[.98] hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 ${
+            embeddedInFrame ? 'px-3 py-2 text-[11px]' : 'px-4 py-2.5 text-xs'
+          }`}
+        >
+          {retrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {retrying ? 'Reenviando…' : !online ? 'Sem internet para reenviar' : 'Reenviar agora'}
+        </button>
       </div>
     )
   }
@@ -423,6 +442,7 @@ function TelaConclusao({
     isDemo || !localId ? 'confirmed' : 'syncing',
   )
   const [online, setOnline] = useState(() => navigator.onLine)
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     const goOnline = () => setOnline(true)
@@ -434,6 +454,18 @@ function TelaConclusao({
       window.removeEventListener('offline', goOffline)
     }
   }, [])
+
+  const handleRetry = useCallback(async () => {
+    if (!localId || retrying) return
+    setRetrying(true)
+    try {
+      await retryChecklist(localId)
+      await syncOfflineChecklists()
+      setSyncState(await getChecklistSyncState(localId))
+    } finally {
+      setRetrying(false)
+    }
+  }, [localId, retrying])
 
   useEffect(() => {
     if (isDemo || !localId) return
@@ -546,7 +578,13 @@ function TelaConclusao({
 
         {/* Badge de status REAL de envio ao servidor */}
         {!isDemo && (
-          <SyncStatusBadge state={syncState} online={online} embeddedInFrame={embeddedInFrame} />
+          <SyncStatusBadge
+            state={syncState}
+            online={online}
+            embeddedInFrame={embeddedInFrame}
+            retrying={retrying}
+            onRetry={() => void handleRetry()}
+          />
         )}
 
         {/* Banner de bloqueio */}

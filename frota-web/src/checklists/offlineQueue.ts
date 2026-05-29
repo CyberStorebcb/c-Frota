@@ -168,6 +168,69 @@ export async function updateOfflineChecklist(record: OfflineChecklistRecord) {
   notify()
 }
 
+/**
+ * Reseta um checklist para nova tentativa de envio (zera attempts e erro),
+ * mesmo que já tenha esgotado o limite. Use junto com syncOfflineChecklists().
+ */
+export async function retryChecklist(localId: string): Promise<void> {
+  const db = await openDb()
+  const tx = db.transaction(STORE_NAME, 'readwrite')
+  const store = tx.objectStore(STORE_NAME)
+  const rec = await requestToPromise<OfflineChecklistRecord | undefined>(store.get(localId))
+  if (rec) {
+    store.put({ ...rec, status: 'pending', attempts: 0, lastError: null, updatedAt: new Date().toISOString() })
+  }
+  await txDone(tx)
+  notify()
+}
+
+/** Reseta TODOS os checklists pendentes/com erro para nova tentativa. */
+export async function retryAllStuck(): Promise<void> {
+  const db = await openDb()
+  const tx = db.transaction(STORE_NAME, 'readwrite')
+  const store = tx.objectStore(STORE_NAME)
+  const records = await requestToPromise<OfflineChecklistRecord[]>(store.getAll())
+  const now = new Date().toISOString()
+  for (const rec of records) {
+    if (rec.status === 'pending' || rec.status === 'error' || rec.status === 'syncing') {
+      store.put({ ...rec, status: 'pending', attempts: 0, lastError: null, updatedAt: now })
+    }
+  }
+  await txDone(tx)
+  notify()
+}
+
+/** Itens presos na fila (pendentes ou com erro) com dados para exibição. */
+export type StuckChecklistInfo = {
+  localId: string
+  placa: string
+  operador: string
+  dataInspecao: string
+  status: OfflineChecklistStatus
+  attempts: number
+  lastError: string | null
+  createdAt: string
+}
+
+export async function listStuckChecklists(): Promise<StuckChecklistInfo[]> {
+  const records = await listOfflineChecklists()
+  return records
+    .filter((r) => r.status !== 'synced')
+    .map((r) => {
+      const dv = (r.payload.dados_veiculo ?? {}) as Record<string, unknown>
+      return {
+        localId: r.localId,
+        placa: String(dv.placa ?? '—'),
+        operador: r.payload.nome_operador ?? '—',
+        dataInspecao: r.payload.data_inspecao ?? '—',
+        status: r.status,
+        attempts: r.attempts,
+        lastError: r.lastError,
+        createdAt: r.createdAt,
+      }
+    })
+}
+
 export async function removeOfflineChecklist(localId: string) {
   const db = await openDb()
   const tx = db.transaction(STORE_NAME, 'readwrite')
