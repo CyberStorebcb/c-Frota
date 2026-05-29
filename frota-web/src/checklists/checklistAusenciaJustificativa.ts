@@ -46,9 +46,12 @@ function writeLocalCache(map: Record<string, ChecklistAusenciaJustificativa>): v
 
 function isMissingJustificativasTableError(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false
+  // Só aceita erros de "tabela não existe" ou "schema cache desatualizado".
+  // NÃO captura violações de constraint (23514), erros de permissão (42501)
+  // ou qualquer outro erro real de banco — esses devem propagar para o caller.
   if (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST204') return true
   const msg = (error.message ?? '').toLowerCase()
-  return msg.includes('schema cache') || msg.includes('checklist_ausencia_justificativas')
+  return msg.includes('schema cache')
 }
 
 function validatePlacaReserva(

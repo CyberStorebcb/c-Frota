@@ -773,15 +773,26 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
   useEffect(() => {
     let cancelled = false
-    void loadChecklistAusenciaJustificativas({
-      periodoInicio: limites.ini,
-      periodoFim: limites.fim,
-      setor: setorVeiculo,
-    }).then((map) => {
-      if (!cancelled) setJustificativas(map)
-    })
+
+    const reloadJustificativas = () => {
+      void loadChecklistAusenciaJustificativas({
+        periodoInicio: limites.ini,
+        periodoFim: limites.fim,
+        setor: setorVeiculo,
+      }).then((map) => {
+        if (!cancelled) setJustificativas(map)
+      })
+    }
+
+    reloadJustificativas()
+
+    // Recarrega a cada 60s para que todos os usuários vejam justificativas
+    // aplicadas por outros admins sem precisar recarregar a página manualmente.
+    const interval = setInterval(reloadJustificativas, 60_000)
+
     return () => {
       cancelled = true
+      clearInterval(interval)
     }
   }, [limites.ini, limites.fim, setorVeiculo])
 
