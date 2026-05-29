@@ -2438,7 +2438,7 @@ function FormularioChecklist({
                                     { n: '2', texto: <>Toque em <strong>Configurações</strong></> },
                                     { n: '3', texto: <>Toque em <strong>Configurações do site</strong></> },
                                     { n: '4', texto: <>Toque em <strong>Localização</strong></> },
-                                    { n: '5', texto: <>Encontre <strong>c-frota.vercel.app</strong> em "Bloqueados" e toque para <strong>Permitir</strong></> },
+                                    { n: '5', texto: <>Encontre <strong>cgb-frota.vercel.app</strong> em "Bloqueados" e toque para <strong>Permitir</strong></> },
                                     { n: '6', texto: <>Volte aqui e toque em <strong>Tentar novamente</strong></> },
                                   ].map(({ n, texto }) => (
                                     <li key={n} className="flex items-start gap-2">
