@@ -1284,7 +1284,7 @@ export function ManagePage() {
                                 <Check size={14} strokeWidth={3} className="text-emerald-600" aria-hidden />
                                 Sim
                               </span>
-                              {r.resolvidoPor && (
+                              {r.resolvidoPor && r.resolvidoPor !== 'desconhecido' && (
                                 <span
                                   className="inline-flex flex-col items-center rounded border-[2.5px] border-double border-emerald-600/70 px-1.5 py-0.5 text-[9px] font-black uppercase leading-tight tracking-wider text-emerald-700 dark:border-emerald-500/60 dark:text-emerald-400"
                                   style={{ transform: 'rotate(-3deg)' }}
