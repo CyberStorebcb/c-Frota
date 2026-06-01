@@ -948,8 +948,15 @@ export function ChecklistResultadosPage() {
   const [rows, setRows]               = useState<ChecklistRow[]>([])
   const [filtrosVisiveis, setFiltrosVisiveis] = useFilterPanelVisible('frota.filtros.checklists')
   const [carregando, setCarregando]   = useState(true)
-  const [exportando, setExportando]       = useState(false)
-  const [exportandoXlsx, setExportandoXlsx] = useState(false)
+  const [exportando, setExportando]           = useState(false)
+  const [exportandoXlsx, setExportandoXlsx]   = useState(false)
+  const [xlsxModalOpen, setXlsxModalOpen]     = useState(false)
+  const [xlsxTipo, setXlsxTipo]               = useState<'mes' | 'intervalo' | 'tudo'>('mes')
+  const hoje = new Date()
+  const mesAtualISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
+  const [xlsxMes, setXlsxMes]                 = useState(mesAtualISO)
+  const [xlsxInicio, setXlsxInicio]           = useState('')
+  const [xlsxFim, setXlsxFim]                 = useState('')
   const [erro, setErro]               = useState('')
   const [totalRegistros, setTotal]    = useState(0)
   const [totalComNc, setTotalComNc]   = useState(0)
@@ -1163,16 +1170,31 @@ export function ChecklistResultadosPage() {
     setExportando(false)
   }
 
-  const handleExportarExcel = async () => {
+  const handleExportarExcel = () => setXlsxModalOpen(true)
+
+  const confirmarExportarExcel = async () => {
+    setXlsxModalOpen(false)
     setExportandoXlsx(true)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const base: any = supabase
+    let q: any = supabase
       .from('checklists')
       .select('*')
-      .order(ordemCol, { ascending: ordemDir === 'asc' })
+      .order('data_inspecao', { ascending: false })
       .limit(50000)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (applyFilters(base) as any)
+
+    if (xlsxTipo === 'mes' && xlsxMes) {
+      const [y, m] = xlsxMes.split('-').map(Number)
+      const ini = `${y}-${String(m).padStart(2, '0')}-01`
+      const ultimo = new Date(y, m, 0).getDate()
+      const fim = `${y}-${String(m).padStart(2, '0')}-${String(ultimo).padStart(2, '0')}`
+      q = q.gte('data_inspecao', ini).lte('data_inspecao', fim)
+    } else if (xlsxTipo === 'intervalo') {
+      if (xlsxInicio) q = q.gte('data_inspecao', xlsxInicio)
+      if (xlsxFim)    q = q.lte('data_inspecao', xlsxFim)
+    }
+    // 'tudo' → sem filtro de data
+
+    const { data } = await q
     if (data) exportarExcel(data as ChecklistRow[])
     setExportandoXlsx(false)
   }
@@ -1381,8 +1403,103 @@ export function ChecklistResultadosPage() {
   const filtrados = rows  // filtro de texto já vai pro servidor
   const totalNc = filtrados.reduce((acc, r) => acc + r.nc_count, 0)
 
+  // Lista dos últimos 24 meses para o seletor
+  const mesesOpcoes = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
+    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    return { val, label: label.charAt(0).toUpperCase() + label.slice(1) }
+  })
+
   return (
     <div className="space-y-5">
+
+      {/* Modal de período para exportação Excel */}
+      {xlsxModalOpen && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet size={18} className="text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">Exportar Excel — Período</h3>
+                </div>
+                <button type="button" onClick={() => setXlsxModalOpen(false)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Opções */}
+              <div className="space-y-3 p-5">
+
+                {/* Mês */}
+                <label className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3.5 transition ${xlsxTipo === 'mes' ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/30' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}>
+                  <input type="radio" name="xlsxTipo" value="mes" checked={xlsxTipo === 'mes'} onChange={() => setXlsxTipo('mes')} className="mt-0.5 accent-emerald-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Mês específico</p>
+                    {xlsxTipo === 'mes' && (
+                      <select
+                        value={xlsxMes}
+                        onChange={(e) => setXlsxMes(e.target.value)}
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        {mesesOpcoes.map((o) => (
+                          <option key={o.val} value={o.val}>{o.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </label>
+
+                {/* Intervalo */}
+                <label className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3.5 transition ${xlsxTipo === 'intervalo' ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/30' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}>
+                  <input type="radio" name="xlsxTipo" value="intervalo" checked={xlsxTipo === 'intervalo'} onChange={() => setXlsxTipo('intervalo')} className="mt-0.5 accent-emerald-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Intervalo de datas</p>
+                    {xlsxTipo === 'intervalo' && (
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <div className="flex-1">
+                          <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">De</label>
+                          <input type="date" value={xlsxInicio} onChange={(e) => setXlsxInicio(e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Até</label>
+                          <input type="date" value={xlsxFim} onChange={(e) => setXlsxFim(e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </label>
+
+                {/* Tudo */}
+                <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5 transition ${xlsxTipo === 'tudo' ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/30' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}>
+                  <input type="radio" name="xlsxTipo" value="tudo" checked={xlsxTipo === 'tudo'} onChange={() => setXlsxTipo('tudo')} className="accent-emerald-600" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Tudo</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Exporta todos os registros sem filtro de data</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+                <button type="button" onClick={() => setXlsxModalOpen(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                  Cancelar
+                </button>
+                <button type="button" onClick={() => void confirmarExportarExcel()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-extrabold text-white hover:bg-emerald-700">
+                  <FileSpreadsheet size={15} />
+                  Baixar Excel
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
 
       {/* Cabeçalho */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
