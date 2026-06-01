@@ -115,8 +115,257 @@ function exportarCSV(rows: ChecklistRow[]) {
   URL.revokeObjectURL(url)
 }
 
-// Desenha um gráfico horizontal de barras em Canvas e retorna base64 PNG
-function desenharGrafico(
+// ─── exportarExcel ────────────────────────────────────────────────────────────
+// Usa ExcelJS para formatação rica + injeta gráficos nativos Excel via JSZip/OOXML.
+// A imagem 1×1 transparente força o ExcelJS a criar o scaffolding de drawing; depois
+// substituímos drawing1.xml e seus rels pelos XMLs dos gráficos de barras.
+// ──────────────────────────────────────────────────────────────────────────────
+async function exportarExcel(rows: ChecklistRow[]) {
+  const EJS      = await import('exceljs')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ExcelJS: any = (EJS as any).default ?? EJS
+  const wb       = new ExcelJS.Workbook()
+  wb.creator     = 'CGB Frota'
+  wb.created     = new Date()
+
+  // Paleta
+  const VERDE_ESCURO = { argb: 'FF064e3b' }
+  const VERDE_HEADER = { argb: 'FF065f46' }
+  const BRANCO       = { argb: 'FFFFFFFF' }
+  const CINZA_LINHA  = { argb: 'FFf8fafc' }
+  const BORDA        = { argb: 'FFe2e8f0' }
+  const borda = {
+    top:    { style: 'thin' as const, color: BORDA },
+    left:   { style: 'thin' as const, color: BORDA },
+    bottom: { style: 'thin' as const, color: BORDA },
+    right:  { style: 'thin' as const, color: BORDA },
+  }
+
+  // ── Sheet 1: Checklists ────────────────────────────────────
+  const ws = wb.addWorksheet('Checklists', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+    pageSetup: { fitToPage: true, fitToWidth: 1, orientation: 'landscape' },
+  })
+  ws.columns = [
+    { key: 'data',       width: 14 }, { key: 'tipo',       width: 14 },
+    { key: 'operador',   width: 28 }, { key: 'matricula',  width: 11 },
+    { key: 'supervisor', width: 26 }, { key: 'placa',      width: 10 },
+    { key: 'km',         width: 11 }, { key: 'horimetro',  width: 11 },
+    { key: 'modelo',     width: 28 }, { key: 'prefixo',    width: 28 },
+    { key: 'localidade', width: 20 }, { key: 'processo',   width: 14 },
+    { key: 'c',          width:  9 }, { key: 'nc',         width:  9 },
+    { key: 'problemas',  width: 42 },
+  ]
+  const headerRow = ws.addRow([
+    'Data Inspeção','Tipo','Operador','Matrícula','Supervisor',
+    'Placa','KM Atual','Horímetro','Marca/Modelo','Prefixo',
+    'Localidade','Processo','C','NC','Problemas',
+  ])
+  headerRow.height = 28
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  headerRow.eachCell((cell: any) => {
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: VERDE_ESCURO }
+    cell.font      = { bold: true, color: BRANCO, size: 10, name: 'Calibri' }
+    cell.alignment = { vertical: 'middle', horizontal: 'center' }
+    cell.border    = borda
+  })
+  rows.forEach((r, i) => {
+    const dv  = r.dados_veiculo ?? {}
+    const c   = Object.values(r.respostas).filter((v) => v === 'c').length
+    const row = ws.addRow([
+      r.data_inspecao, TIPO_BADGE[r.tipo]?.label ?? r.tipo, r.nome_operador, r.matricula,
+      r.nome_supervisor ?? '', formatPlaca(String(dv.placa ?? '')),
+      dv.km_atual ?? '', dv.horimetro ?? '', dv.marca_modelo ?? '',
+      dv.prefixo ?? '', dv.localidade ?? '', dv.processo ?? '',
+      c, r.nc_count, r.problemas ?? '',
+    ])
+    row.height = 17
+    const bg = i % 2 === 0 ? BRANCO : CINZA_LINHA
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    row.eachCell((cell: any, col: number) => {
+      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: bg }
+      cell.font      = { size: 10, name: 'Calibri' }
+      cell.border    = borda
+      cell.alignment = { vertical: 'middle', horizontal: col <= 2 || col >= 13 ? 'center' : 'left' }
+    })
+    const ncCell = row.getCell(14)
+    if (r.nc_count > 0) {
+      ncCell.font = { bold: true, color: { argb: 'FFdc2626' }, size: 10, name: 'Calibri' }
+      ncCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFfef2f2' } }
+    } else {
+      ncCell.font = { bold: true, color: { argb: 'FF16a34a' }, size: 10, name: 'Calibri' }
+    }
+  })
+
+  // ── Sheet 2: Gráficos ──────────────────────────────────────
+  const ws2 = wb.addWorksheet('Graficos') // sem acento para evitar encoding em fórmulas OOXML
+
+  const aggBy = (key: (r: ChecklistRow) => string) => {
+    const map: Record<string, { total: number; nc: number }> = {}
+    rows.forEach((r) => {
+      const k = (key(r) || '(sem info)').trim()
+      if (!map[k]) map[k] = { total: 0, nc: 0 }
+      map[k].total += 1
+      map[k].nc    += r.nc_count > 0 ? 1 : 0
+    })
+    return Object.entries(map)
+      .map(([label, v]) => ({ label, ...v }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 30)
+  }
+  const porBase = aggBy((r) => r.dados_veiculo?.localidade ?? '')
+  const porSup  = aggBy((r) => r.nome_supervisor ?? '')
+
+  // Posições fixas (1-based) para as tabelas de dados — charts referenciam estes ranges
+  const BASE_HDR  = 2;  const BASE_DS = 3;  const BASE_DE = BASE_DS + porBase.length - 1
+  const SUP_HDR   = 36; const SUP_DS  = 37; const SUP_DE  = SUP_DS  + porSup.length  - 1
+  const COL       = 13 // coluna M
+
+  const addTabela = (
+    titleRow: number, hdrRow: number, dataStart: number,
+    titulo: string, cab: string[],
+    dados: { label: string; total: number; nc: number }[],
+  ) => {
+    const tc = ws2.getCell(titleRow, COL)
+    tc.value = titulo
+    tc.font  = { bold: true, size: 12, color: { argb: 'FF064e3b' }, name: 'Calibri' }
+    tc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFecfdf5' } }
+    ws2.getRow(titleRow).height = 22
+    const hr = ws2.getRow(hdrRow); hr.height = 20
+    cab.forEach((h, ci) => {
+      const c = hr.getCell(COL + ci)
+      c.value = h; c.font = { bold: true, color: BRANCO, size: 10, name: 'Calibri' }
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: VERDE_HEADER }
+      c.alignment = { horizontal: 'center', vertical: 'middle' }; c.border = borda
+    })
+    dados.forEach((d, i) => {
+      const r = ws2.getRow(dataStart + i); r.height = 17
+      const bg = i % 2 === 0 ? BRANCO : CINZA_LINHA
+      const pct = d.total > 0 ? `${((d.nc / d.total) * 100).toFixed(1)}%` : '0%'
+      ;[d.label, d.total, d.nc, pct].forEach((v, ci) => {
+        const c = r.getCell(COL + ci)
+        c.value = v; c.fill = { type: 'pattern', pattern: 'solid', fgColor: bg }
+        c.font = { size: 10, name: 'Calibri' }
+        c.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' }
+        c.border = borda
+      })
+    })
+    ws2.getColumn(COL).width = 32; ws2.getColumn(COL+1).width = 10
+    ws2.getColumn(COL+2).width = 10; ws2.getColumn(COL+3).width = 10
+  }
+
+  addTabela(1,  BASE_HDR, BASE_DS, 'Checklists por Base / Localidade', ['Base / Localidade','Total','Com NC','% NC'], porBase)
+  addTabela(35, SUP_HDR,  SUP_DS,  'Checklists por Supervisor',        ['Supervisor','Total','Com NC','% NC'],        porSup)
+
+  // PNG 1×1 transparente — força ExcelJS a gerar scaffolding de drawing (drawing1.xml + rels + sheet ref)
+  const DUMMY = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  const dummyId = wb.addImage({ base64: DUMMY, extension: 'png' })
+  ws2.addImage(dummyId, { tl: { col: 0, row: 0 }, ext: { width: 1, height: 1 } })
+
+  const buf = await wb.xlsx.writeBuffer() as ArrayBuffer
+
+  // ── Injeção de gráficos nativos via JSZip ─────────────────
+  const JSZip = (await import('jszip')).default
+  const zip   = await JSZip.loadAsync(buf)
+
+  const ref = (col: string, r1: number, r2: number) => `Graficos!$${col}$${r1}:$${col}$${r2}`
+
+  const makeChart = (title: string, hdr: number, ds: number, de: number, ax1: number, ax2: number) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<c:lang val="pt-BR"/><c:roundedCorners val="0"/>
+<c:chart>
+<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="pt-BR" b="1"/><a:t>${title}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>
+<c:autoTitleDeleted val="0"/>
+<c:plotArea><c:layout/>
+<c:barChart>
+<c:barDir val="bar"/><c:grouping val="clustered"/><c:varyColors val="0"/>
+<c:ser>
+<c:idx val="0"/><c:order val="0"/>
+<c:tx><c:strRef><c:f>Graficos!$N$${hdr}</c:f></c:strRef></c:tx>
+<c:spPr><a:solidFill><a:srgbClr val="065f46"/></a:solidFill></c:spPr>
+<c:invertIfNegative val="0"/>
+<c:cat><c:strRef><c:f>${ref('M',ds,de)}</c:f></c:strRef></c:cat>
+<c:val><c:numRef><c:f>${ref('N',ds,de)}</c:f></c:numRef></c:val>
+</c:ser>
+<c:ser>
+<c:idx val="1"/><c:order val="1"/>
+<c:tx><c:strRef><c:f>Graficos!$O$${hdr}</c:f></c:strRef></c:tx>
+<c:spPr><a:solidFill><a:srgbClr val="dc2626"/></a:solidFill></c:spPr>
+<c:invertIfNegative val="0"/>
+<c:cat><c:strRef><c:f>${ref('M',ds,de)}</c:f></c:strRef></c:cat>
+<c:val><c:numRef><c:f>${ref('O',ds,de)}</c:f></c:numRef></c:val>
+</c:ser>
+<c:axId val="${ax1}"/><c:axId val="${ax2}"/>
+</c:barChart>
+<c:catAx><c:axId val="${ax1}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/>
+<c:axPos val="l"/><c:tickLblPos val="nextTo"/><c:crossAx val="${ax2}"/>
+<c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/>
+</c:catAx>
+<c:valAx><c:axId val="${ax2}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/>
+<c:axPos val="b"/><c:tickLblPos val="nextTo"/><c:crossAx val="${ax1}"/><c:crossBetween val="between"/>
+</c:valAx>
+</c:plotArea>
+<c:legend><c:legendPos val="r"/></c:legend>
+<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/>
+</c:chart></c:chartSpace>`
+
+  zip.file('xl/charts/chart1.xml', makeChart('Checklists por Base / Localidade', BASE_HDR, BASE_DS, BASE_DE, 100001, 100002))
+  zip.file('xl/charts/chart2.xml', makeChart('Checklists por Supervisor',        SUP_HDR,  SUP_DS,  SUP_DE,  200001, 200002))
+
+  // Substituí drawing1.xml pelo posicionamento dos dois gráficos
+  zip.file('xl/drawings/drawing1.xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+<xdr:twoCellAnchor moveWithCells="0" sizeWithCells="0">
+<xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+<xdr:to><xdr:col>10</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>32</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="Grafico 1"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>
+<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId1"/></a:graphicData></a:graphic>
+</xdr:graphicFrame><xdr:clientData/>
+</xdr:twoCellAnchor>
+<xdr:twoCellAnchor moveWithCells="0" sizeWithCells="0">
+<xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>34</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+<xdr:to><xdr:col>10</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>67</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="3" name="Grafico 2"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>
+<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId2"/></a:graphicData></a:graphic>
+</xdr:graphicFrame><xdr:clientData/>
+</xdr:twoCellAnchor>
+</xdr:wsDr>`)
+
+  // Substituí drawing1.xml.rels — aponta para charts em vez de imagem
+  zip.file('xl/drawings/_rels/drawing1.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart2.xml"/>
+</Relationships>`)
+
+  // [Content_Types].xml — registra os dois arquivos de chart
+  const ctFile = zip.file('[Content_Types].xml')
+  if (ctFile) {
+    let ct = await ctFile.async('string')
+    if (!ct.includes('drawingml.chart+xml')) {
+      ct = ct.replace('</Types>',
+        `<Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>
+<Override PartName="/xl/charts/chart2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>
+</Types>`)
+      zip.file('[Content_Types].xml', ct)
+    }
+  }
+
+  const final = await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+  const blob  = new Blob([final], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url   = URL.createObjectURL(blob)
+  const a     = document.createElement('a')
+  a.href = url; a.download = `checklists_${new Date().toISOString().slice(0, 10)}.xlsx`; a.click()
+  URL.revokeObjectURL(url)
+}
+
+// LEGADO — mantido para eventual remoção futura
+function _desenharGrafico(
   titulo: string,
   dados: { label: string; total: number; nc: number }[],
 ): string {
