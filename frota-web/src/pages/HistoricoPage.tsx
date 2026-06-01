@@ -197,7 +197,7 @@ async function mergeOsIntoReport(reportBytes: ArrayBuffer, osDataUrl: string): P
 }
 
 export function HistoricoPage() {
-  const { rows } = useApontamentos()
+  const { rows, fetchApontamentoDetalhes } = useApontamentos()
   const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
   const [query, setQuery] = useState('')
   const [valorMin, setValorMin] = useState(() => lsGet('frota.historico.valorMin', ''))
@@ -317,6 +317,9 @@ export function HistoricoPage() {
 
   const gerarPdf = async (e: HistoricoResolvidoEntry) => {
     const r = apontamentoParaPdf(e)
+    // reparo_imagens não vem no select principal — busca sob demanda antes de gerar o PDF
+    const detalhes = await fetchApontamentoDetalhes(r.id)
+    if (detalhes.reparoImagens.length) r.reparoImagens = detalhes.reparoImagens
     const { jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'pt', format: 'a4' })
     const pageW = doc.internal.pageSize.getWidth()
