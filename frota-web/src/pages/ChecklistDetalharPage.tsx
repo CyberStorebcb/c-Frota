@@ -49,7 +49,7 @@ import { RESPONSAVEL_FILTER_SELECT_OPTIONS } from '../data/responsavelFilterOpti
 import { PREFIXO_FILTER_SELECT_OPTIONS } from '../data/prefixoFilterOptions'
 import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
-import { listDaysInPeriod } from '../checklists/checklistTop10Ranking'
+import { listDaysInPeriod, pesosDias } from '../checklists/checklistTop10Ranking'
 import { buildActiveFleetMap, passesChecklistFleetFilters } from '../checklists/checklistFleetScope'
 import { fetchCompletedChecklistsInPeriod } from '../checklists/fetchChecklistCompletions'
 import { downloadDataUrl, generateRankingScreenshot } from '../checklists/generateRankingScreenshot'
@@ -1205,7 +1205,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       if (!setorPlacasSet.has(placa)) continue
       realizados += count
     }
-    const esperados = ativosSetor * periodDays.length
+    const esperados = ativosSetor * pesosDias(periodDays)
     const pct = esperados > 0 ? Math.min(100, Math.round((realizados / esperados) * 100)) : 0
     return { realizados, esperados, pct }
   }, [diasRealizadosPorPlaca, ativosSetor, periodDays, setorPlacasSet])

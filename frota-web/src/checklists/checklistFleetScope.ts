@@ -1,3 +1,4 @@
+import { pesoDia } from './checklistTop10Ranking'
 import { matchesBaseFilter } from '../data/baseFilterOptions'
 import { matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { matchesPrefixoFilter } from '../data/prefixoFilterOptions'
@@ -149,9 +150,10 @@ export function aggregateChecklistCompletions(
   return {
     completions,
     porDia: Array.from(dayMap.entries()).map(([data, stats]) => {
-      // naoRealizados = operacionais ativos - total de checklists do dia (mesma logica da aderencia)
-      // Total bruto de checklists no numerador, operacionais no denominador
-      const naoRealizados = opPlacas ? Math.max(0, totalOperacionais - stats.realizados) : 0
+      // naoRealizados = meta efetiva do dia - realizados
+      // Aos domingos a meta é 20% da frota (DOMINGO_FATOR = 0.2)
+      const metaEfetiva = opPlacas ? Math.round(totalOperacionais * pesoDia(data)) : 0
+      const naoRealizados = opPlacas ? Math.max(0, metaEfetiva - stats.realizados) : 0
       return { data, ...stats, naoRealizados }
     }),
   }

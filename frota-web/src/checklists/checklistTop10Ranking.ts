@@ -33,6 +33,27 @@ function groupLabel(row: ChecklistTop10Row, groupBy: ChecklistTop10GroupBy): str
   }
 }
 
+// ─── Peso de domingo ──────────────────────────────────────────────────────────
+// Aos domingos a meta é reduzida em 80 % — apenas 20 % da frota é esperada.
+export const DOMINGO_FATOR = 0.2
+
+export function isDomingo(iso: string): boolean {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return false
+  return new Date(y, m - 1, d).getDay() === 0 // 0 = domingo
+}
+
+/** Retorna o peso do dia: 0.2 para domingo, 1.0 para os demais. */
+export function pesoDia(iso: string): number {
+  return isDomingo(iso) ? DOMINGO_FATOR : 1.0
+}
+
+/** Soma os pesos de um array de dias ISO (domingos valem 0.2). */
+export function pesosDias(days: string[]): number {
+  return days.reduce((s, d) => s + pesoDia(d), 0)
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function listDaysInPeriod(ini: string, fim: string): string[] {
   const [yi, mi, di] = ini.split('-').map(Number)
   const [yf, mf, df] = fim.split('-').map(Number)
@@ -89,7 +110,7 @@ export function computeFleetAdherence(
   days: string[],
 ): FleetAdherenceStats {
   const placas = [...fleetPlacas]
-  const esperados = placas.length * days.length
+  const esperados = placas.length * pesosDias(days)
   if (esperados === 0) {
     return { realizados: 0, esperados: 0, pct: 0 }
   }
@@ -127,7 +148,7 @@ export function buildChecklistAdherenceRanking(
     const label = groupLabel(vehicle, groupBy)
     const stats = groups.get(label) ?? { veiculos: 0, realizados: 0, esperados: 0 }
     stats.veiculos += 1
-    stats.esperados += days.length
+    stats.esperados += pesosDias(days)
     stats.realizados += countPlacaCompletions(vehicle.placa, days, completions)
     groups.set(label, stats)
   }
