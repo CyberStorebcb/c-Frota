@@ -16,6 +16,7 @@ import {
   Clock,
   Download,
   ExternalLink,
+  FileSpreadsheet,
   FileText,
   Image,
   Pencil,
@@ -111,6 +112,57 @@ function exportarCSV(rows: ChecklistRow[]) {
   a.href = url; a.download = `checklists_${new Date().toISOString().slice(0,10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function exportarExcel(rows: ChecklistRow[]) {
+  import('xlsx').then((XLSX) => {
+    const data = rows.map((r) => {
+      const dv = r.dados_veiculo ?? {}
+      const c  = Object.values(r.respostas).filter((v) => v === 'c').length
+      return {
+        'Data Inspeção':  r.data_inspecao,
+        'Tipo':           TIPO_BADGE[r.tipo]?.label ?? r.tipo,
+        'Operador':       r.nome_operador,
+        'Matrícula':      r.matricula,
+        'Supervisor':     r.nome_supervisor ?? '',
+        'Placa':          formatPlaca(String(dv.placa ?? '')),
+        'KM Atual':       dv.km_atual ?? '',
+        'Horímetro':      dv.horimetro ?? '',
+        'Marca/Modelo':   dv.marca_modelo ?? '',
+        'Prefixo':        dv.prefixo ?? '',
+        'Localidade':     dv.localidade ?? '',
+        'Processo':       dv.processo ?? '',
+        'Conformes (C)':  c,
+        'Não Conf. (NC)': r.nc_count,
+        'Problemas':      r.problemas ?? '',
+      }
+    })
+
+    const ws = XLSX.utils.json_to_sheet(data)
+
+    // Larguras das colunas
+    ws['!cols'] = [
+      { wch: 14 }, // Data Inspeção
+      { wch: 14 }, // Tipo
+      { wch: 26 }, // Operador
+      { wch: 10 }, // Matrícula
+      { wch: 22 }, // Supervisor
+      { wch: 10 }, // Placa
+      { wch: 10 }, // KM Atual
+      { wch: 10 }, // Horímetro
+      { wch: 28 }, // Marca/Modelo
+      { wch: 28 }, // Prefixo
+      { wch: 20 }, // Localidade
+      { wch: 16 }, // Processo
+      { wch: 13 }, // Conformes
+      { wch: 13 }, // NC
+      { wch: 40 }, // Problemas
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Checklists')
+    XLSX.writeFile(wb, `checklists_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  })
 }
 
 // Sparkline SVG — tendência semanal de NC
@@ -896,7 +948,8 @@ export function ChecklistResultadosPage() {
   const [rows, setRows]               = useState<ChecklistRow[]>([])
   const [filtrosVisiveis, setFiltrosVisiveis] = useFilterPanelVisible('frota.filtros.checklists')
   const [carregando, setCarregando]   = useState(true)
-  const [exportando, setExportando]   = useState(false)
+  const [exportando, setExportando]       = useState(false)
+  const [exportandoXlsx, setExportandoXlsx] = useState(false)
   const [erro, setErro]               = useState('')
   const [totalRegistros, setTotal]    = useState(0)
   const [totalComNc, setTotalComNc]   = useState(0)
@@ -1108,6 +1161,20 @@ export function ChecklistResultadosPage() {
     const { data } = await (applyFilters(base) as any)
     if (data) exportarCSV(data as ChecklistRow[])
     setExportando(false)
+  }
+
+  const handleExportarExcel = async () => {
+    setExportandoXlsx(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const base: any = supabase
+      .from('checklists')
+      .select('*')
+      .order(ordemCol, { ascending: ordemDir === 'asc' })
+      .limit(50000)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (applyFilters(base) as any)
+    if (data) exportarExcel(data as ChecklistRow[])
+    setExportandoXlsx(false)
   }
 
   const handleCapturar = () => {
@@ -1360,6 +1427,15 @@ export function ChecklistResultadosPage() {
           >
             <Download size={16} className={exportando ? 'animate-bounce' : ''} />
             {exportando ? 'Exportando...' : 'Exportar CSV'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportarExcel()}
+            disabled={exportandoXlsx || carregando}
+            className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-extrabold text-emerald-800 shadow-soft hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+          >
+            <FileSpreadsheet size={16} className={exportandoXlsx ? 'animate-bounce' : ''} />
+            {exportandoXlsx ? 'Gerando...' : 'Exportar Excel'}
           </button>
           <button
             type="button"
