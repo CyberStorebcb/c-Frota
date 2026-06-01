@@ -52,6 +52,7 @@ export type Apontamento = {
   descricaoProblema: string
   /** Item 🚫 impeditivo no checklist — NC impede condução. */
   imperativo: boolean
+  resolvidoPor: string | null
   justificado: boolean
   justificativa: string | null
   justificativaData: string | null
@@ -70,6 +71,7 @@ export type NovoApontamento = Omit<
 type Resolucao = {
   id: string          // `${checklistId}__${itemId}`
   resolvido: boolean
+  resolvidoPor: string | null
   dataResolvido: string | null
   horaResolvido: string | null
   reparoValor: number | null
@@ -88,6 +90,7 @@ function rowToResolucao(r: any): Resolucao {
   return {
     id:                  r.id,
     resolvido:           Boolean(r.resolvido),
+    resolvidoPor:        r.resolvido_por        ?? null,
     dataResolvido:       r.data_resolvido      ?? null,
     horaResolvido:       r.hora_resolvido      ?? null,
     reparoValor:         r.reparo_valor        != null ? Number(r.reparo_valor) : null,
@@ -163,6 +166,7 @@ function checklistItemToApontamento(cl: any, itemId: string, resolucoes: Map<str
     horaApontamento: cl.created_at ? new Date(cl.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
     prazo,
     resolvido:       res?.resolvido       ?? false,
+    resolvidoPor:    res?.resolvidoPor    ?? null,
     dataResolvido:   res?.dataResolvido   ?? null,
     horaResolvido:   res?.horaResolvido   ?? null,
     reparoValor:     res?.reparoValor     ?? null,
@@ -425,6 +429,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
           ? {
               ...r,
               resolvido: true,
+              resolvidoPor: usuarioEmail,
               dataResolvido,
               horaResolvido: hora,
               reparoValor:     payload?.valor ?? r.reparoValor ?? null,
@@ -449,6 +454,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         data_apontamento: row?.dataApontamento ?? hoje,
         prazo:            row?.prazo          ?? hoje,
         resolvido:        true,
+        resolvido_por:    usuarioEmail,
         data_resolvido:   dataResolvido,
         hora_resolvido:   hora,
         reparo_valor:     payload?.valor ?? null,

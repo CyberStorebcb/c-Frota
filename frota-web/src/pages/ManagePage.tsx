@@ -59,6 +59,13 @@ import {
 } from '../frota/vehicleRegistry'
 import { uploadChecklistEvidenceFile } from '../lib/checklistEvidenceUpload'
 
+/** Extrai o primeiro nome do email: "claudio.ferreira@cgb..." → "CLAUDIO" */
+function primeiroNomeDoEmail(email: string): string {
+  const local = email.split('@')[0] ?? ''
+  const parte = local.split('.')[0] ?? local
+  return parte.toUpperCase()
+}
+
 const LOADING_MESSAGES = [
   'Acessando os dados, aguarde...',
   'Buscando checklists do período...',
@@ -833,6 +840,7 @@ export function ManagePage() {
               osArquivo: null,
               dataResolvido: payload.dataResolvido,
             },
+        user?.email ?? 'desconhecido',
       )
     }
     setSalvando(false)
@@ -1268,13 +1276,30 @@ export function ManagePage() {
                             </button>
                           )}
                           {r.resolvido ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
-                              title="Resolvido"
-                            >
-                              <Check size={14} strokeWidth={3} className="text-emerald-600" aria-hidden />
-                              Sim
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                                title="Resolvido"
+                              >
+                                <Check size={14} strokeWidth={3} className="text-emerald-600" aria-hidden />
+                                Sim
+                              </span>
+                              {r.resolvidoPor && (
+                                <span
+                                  className="inline-flex flex-col items-center rounded border-[2.5px] border-double border-emerald-600/70 px-1.5 py-0.5 text-[9px] font-black uppercase leading-tight tracking-wider text-emerald-700 dark:border-emerald-500/60 dark:text-emerald-400"
+                                  style={{ transform: 'rotate(-3deg)' }}
+                                  title={`Resolvido por ${r.resolvidoPor}`}
+                                >
+                                  <span>{primeiroNomeDoEmail(r.resolvidoPor)}</span>
+                                  {r.dataResolvido && (
+                                    <span className="text-[8px] font-bold opacity-80">
+                                      {new Date(r.dataResolvido + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
+                                      {r.horaResolvido ? ` · ${r.horaResolvido}` : ''}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
                           ) : r.justificado ? (
                             <>
                               <div className="flex flex-col items-center gap-0.5">

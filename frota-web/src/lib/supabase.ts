@@ -49,6 +49,7 @@ export type ApontamentoRow = {
   data_apontamento: string
   prazo: string
   resolvido: boolean
+  resolvido_por: string | null
   data_resolvido: string | null
   hora_resolvido: string | null
   reparo_valor: number | null
