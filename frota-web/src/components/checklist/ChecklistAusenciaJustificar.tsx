@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { MessageSquareWarning } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Camera, CheckCircle2, MessageSquareWarning, X } from 'lucide-react'
 import {
   CHECKLIST_AUSENCIA_MOTIVOS,
   type ChecklistAusenciaMotivo,
@@ -132,12 +132,106 @@ function DesmobilizarConfirmDialog({
   )
 }
 
+function FeitoFotoForm({
+  placa,
+  saving,
+  onConfirm,
+  onCancel,
+}: {
+  placa: string
+  saving?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const [preview, setPreview] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setPreview(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className="w-full min-w-[220px] rounded-xl border border-emerald-200 bg-emerald-50/90 p-2.5 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/40">
+      <p className="text-[10px] font-black uppercase tracking-wide text-emerald-900 dark:text-emerald-100">
+        Foto de confirmação — {placa}
+      </p>
+      <p className="mt-0.5 text-[10px] text-emerald-800/80 dark:text-emerald-200/70">
+        Tire uma foto do checklist físico como comprovante.
+      </p>
+
+      <div className="mt-2 flex flex-col gap-2">
+        {preview ? (
+          <div className="relative">
+            <img
+              src={preview}
+              alt="Prévia da foto"
+              className="h-24 w-full rounded-lg object-cover ring-2 ring-emerald-400/60"
+            />
+            <button
+              type="button"
+              onClick={() => { setPreview(null); if (inputRef.current) inputRef.current.value = '' }}
+              className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-slate-900/70 text-white hover:bg-slate-900"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => inputRef.current?.click()}
+            className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-emerald-300 bg-white py-3 text-[10px] font-bold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/40"
+          >
+            <Camera size={14} />
+            Tirar / Selecionar foto
+          </button>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFile}
+        />
+
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            disabled={saving || !preview}
+            onClick={onConfirm}
+            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <CheckCircle2 size={12} />
+            {saving ? '…' : 'Confirmar FEITO'}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onCancel}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function motivoClickHandler(
   motivo: ChecklistAusenciaMotivo,
   abrirReserva: () => void,
   abrirDesmobilizar: () => void,
+  abrirFeito: () => void,
   onSelect: (motivo: ChecklistAusenciaMotivo) => void,
 ) {
+  if (motivo === 'FEITO') return abrirFeito()
   if (motivo === 'RESERVA') return abrirReserva()
   if (motivo === 'DESMOBILIZADO') return abrirDesmobilizar()
   return onSelect(motivo)
@@ -168,6 +262,7 @@ export function ChecklistAusenciaJustificar({
 }: Props) {
   const [reservaOpen, setReservaOpen] = useState(false)
   const [desmobilizarOpen, setDesmobilizarOpen] = useState(false)
+  const [feitoOpen, setFeitoOpen] = useState(false)
   const btnBase =
     'rounded-lg border px-2 py-1.5 text-[10px] font-black uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50'
 
@@ -175,6 +270,22 @@ export function ChecklistAusenciaJustificar({
   const fecharReserva = () => setReservaOpen(false)
   const abrirDesmobilizar = () => setDesmobilizarOpen(true)
   const fecharDesmobilizar = () => setDesmobilizarOpen(false)
+  const abrirFeito = () => setFeitoOpen(true)
+  const fecharFeito = () => setFeitoOpen(false)
+
+  if (feitoOpen) {
+    return (
+      <FeitoFotoForm
+        placa={placa}
+        saving={saving}
+        onCancel={fecharFeito}
+        onConfirm={() => {
+          onSelect('FEITO')
+          fecharFeito()
+        }}
+      />
+    )
+  }
 
   if (reservaOpen) {
     return (
@@ -244,7 +355,7 @@ export function ChecklistAusenciaJustificar({
             key={motivo}
             type="button"
             disabled={saving}
-            onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, onSelect)}
+            onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, onSelect)}
             className={motivoBtnClass(motivo, btnBase, 'alt')}
             title={`Alterar justificativa de ${placa} para ${motivo}`}
           >
@@ -266,7 +377,7 @@ export function ChecklistAusenciaJustificar({
           key={motivo}
           type="button"
           disabled={saving}
-          onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, onSelect)}
+          onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, onSelect)}
           className={motivoBtnClass(motivo, btnBase, 'default')}
           title={
             motivo === 'FEITO'
