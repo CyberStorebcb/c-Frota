@@ -332,7 +332,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
         fetchAllSupabasePages((from, to) => {
           let q = supabase
             .from('apontamentos')
-            .select('id, resolvido, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, justificado, justificativa, justificativa_data, agendamento_data')
+            .select('id, resolvido, resolvido_por, data_resolvido, hora_resolvido, reparo_valor, reparo_descricao, justificado, justificativa, justificativa_data, agendamento_data')
           if (dataCorteIso) q = q.gte('data_apontamento', dataCorteIso)
           return q.order('id', { ascending: true }).range(from, to)
         }),
