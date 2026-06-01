@@ -464,7 +464,7 @@ function JustificadosPanel({
       ) : displayMode === 'list' ? (
         <ListaJustificados
           items={items}
-          isAdmin={canJustify}
+          isAdmin={isAdmin}
           savingPlaca={savingPlaca}
           onAlterarMotivo={onAlterarMotivo}
           onRemover={onRemover}

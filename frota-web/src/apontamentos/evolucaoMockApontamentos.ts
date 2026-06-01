@@ -53,6 +53,7 @@ function mk(
     justificativaData:    null,
     justificativaImagem:  null,
     agendamentoData:      null,
+    resolvidoPor:         null,
   }
 }
 
