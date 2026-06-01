@@ -30,6 +30,7 @@ import { fetchAllSupabasePages } from '../lib/supabasePaginate'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 import { useAuth } from '../auth/AuthContext'
 import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
+import { Portal } from '../components/ui/Portal'
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath()
