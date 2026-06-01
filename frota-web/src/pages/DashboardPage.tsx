@@ -661,8 +661,8 @@ export function DashboardPage() {
     const aderenciaSub = checklistsCarregando
       ? 'Carregando…'
       : periodDays.length === 1
-        ? `${checklistsNoPeriodo} de ${esperados} checklists ${setorChecklistLabel} realizados`
-        : `${checklistsNoPeriodo} de ${esperados} esperados (${periodDays.length} dias · ${setorChecklistLabel})`
+        ? `${checklistsNoPeriodo} checklists ${setorChecklistLabel} realizados`
+        : `${checklistsNoPeriodo} realizados · ${periodDays.length} dias · ${setorChecklistLabel}`
 
     // (pendentesUnicas removido — card substituído por Justificados)
 
