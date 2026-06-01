@@ -5,6 +5,7 @@ import {
   Mail,
   RefreshCw,
   Search,
+  Settings2,
   Shield,
   ShieldCheck,
   User,
@@ -21,6 +22,7 @@ import {
   type CreateUserMode,
 } from '../services/adminUsersService'
 import { VehicleTrashSection } from '../components/admin/VehicleTrashSection'
+import { UserPermissionsModal } from '../components/admin/UserPermissionsModal'
 
 type ProfileRow = {
   id: string
@@ -76,6 +78,7 @@ export function UsuariosPage() {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const [resetModal, setResetModal] = useState<{ id: string; email: string } | null>(null)
+  const [permModal, setPermModal] = useState<{ id: string; email: string; role: 'admin' | 'user' } | null>(null)
   const [novaSenha, setNovaSenha] = useState('')
   const [redefinindo, setRedefinindo] = useState(false)
 
@@ -150,6 +153,10 @@ export function UsuariosPage() {
   const abrirResetModal = (u: ProfileRow) => {
     setResetModal({ id: u.id, email: u.email })
     setNovaSenha('')
+  }
+
+  const abrirPermModal = (u: ProfileRow) => {
+    setPermModal({ id: u.id, email: u.email, role: u.role })
   }
 
   const fecharResetModal = () => {
@@ -390,6 +397,15 @@ export function UsuariosPage() {
                               <KeyRound size={12} aria-hidden />
                               Senha
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => abrirPermModal(u)}
+                              title="Gerenciar permissões"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-extrabold text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+                            >
+                              <Settings2 size={12} aria-hidden />
+                              Gerenciar
+                            </button>
                             <select
                               value={u.role}
                               disabled={isSelf}
@@ -434,6 +450,14 @@ export function UsuariosPage() {
                       >
                         <KeyRound size={12} aria-hidden />
                         Redefinir senha
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => abrirPermModal(u)}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      >
+                        <Settings2 size={12} aria-hidden />
+                        Gerenciar
                       </button>
                       <select
                         value={u.role}
@@ -654,6 +678,15 @@ export function UsuariosPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {permModal ? (
+        <UserPermissionsModal
+          user={permModal}
+          onClose={() => setPermModal(null)}
+          onSaved={showMsg}
+          onError={(text) => showMsg(text, false)}
+        />
       ) : null}
     </div>
   )

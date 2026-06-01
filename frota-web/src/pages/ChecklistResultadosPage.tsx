@@ -29,6 +29,7 @@ import { supabase, type ChecklistRow } from '../lib/supabase'
 import { fetchAllSupabasePages } from '../lib/supabasePaginate'
 import { SCHEMA_MAP } from '../data/checklistSchemas'
 import { useAuth } from '../auth/AuthContext'
+import { hasPermission } from '../auth/permissions'
 import { formatPlaca, normalizePlaca } from '../frota/vehicleRegistry'
 import { Portal } from '../components/ui/Portal'
 
@@ -1140,7 +1141,7 @@ function calcSemanas(rows: ChecklistRow[], n = 8) {
 
 export function ChecklistResultadosPage() {
   const { user } = useAuth()
-  const podeGerenciar = user?.role === 'admin' || user?.role === 'super_admin'
+  const podeGerenciar = hasPermission(user, 'manage_checklists')
 
   const [capturando, setCapturando]   = useState(false)
   const [rows, setRows]               = useState<ChecklistRow[]>([])

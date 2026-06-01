@@ -2,12 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { canJustifyByEmail } from './canJustify'
+import { hasPermission, type UserPermission } from './permissions'
 
 export type AuthUser = {
   id: string
   email: string
   role: 'super_admin' | 'admin' | 'user'
   mustChangePassword: boolean
+  permissions: UserPermission[]
   /** true se o email pertence a um supervisor ou coordenador autorizado a justificar. */
   canJustify: boolean
 }
@@ -25,10 +27,14 @@ const AuthContext = createContext<Ctx | null>(null)
 
 type ProfileRow = { role: string; must_change_password: boolean }
 
-async function fetchProfile(userId: string, email: string): Promise<{ role: 'super_admin' | 'admin' | 'user'; mustChangePassword: boolean }> {
+async function fetchProfile(userId: string, email: string): Promise<{
+  role: 'super_admin' | 'admin' | 'user'
+  mustChangePassword: boolean
+  permissions: UserPermission[]
+}> {
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase()
   if (adminEmail && email.trim().toLowerCase() === adminEmail) {
-    return { role: 'super_admin', mustChangePassword: false }
+    return { role: 'super_admin', mustChangePassword: false, permissions: [] }
   }
   try {
     const { data } = await Promise.race([
@@ -41,20 +47,39 @@ async function fetchProfile(userId: string, email: string): Promise<{ role: 'sup
       rawRole === 'super_admin' ? 'super_admin'
       : rawRole === 'admin' ? 'admin'
       : 'user'
-    return { role, mustChangePassword: p?.must_change_password ?? false }
+
+    let permissions: UserPermission[] = []
+    if (role === 'user') {
+      const { data: permRows } = await supabase
+        .from('user_permissions')
+        .select('permission')
+        .eq('user_id', userId)
+      permissions = (permRows ?? []).map((r) => r.permission as UserPermission)
+    }
+
+    return { role, mustChangePassword: p?.must_change_password ?? false, permissions }
   } catch {
-    return { role: 'user', mustChangePassword: false }
+    return { role: 'user', mustChangePassword: false, permissions: [] }
   }
 }
 
-function toAuthUser(supabaseUser: User, role: 'super_admin' | 'admin' | 'user', mustChangePassword: boolean): AuthUser {
+function toAuthUser(
+  supabaseUser: User,
+  role: 'super_admin' | 'admin' | 'user',
+  mustChangePassword: boolean,
+  permissions: UserPermission[],
+): AuthUser {
   const email = supabaseUser.email ?? ''
+  const userLike = { role, permissions }
   return {
     id: supabaseUser.id,
     email,
     role,
     mustChangePassword,
-    canJustify: role === 'admin' || role === 'super_admin' || canJustifyByEmail(email),
+    permissions,
+    canJustify:
+      hasPermission(userLike, 'justify') ||
+      canJustifyByEmail(email),
   }
 }
 
@@ -64,6 +89,7 @@ const SCREENSHOT_MOCK_USER: AuthUser = {
   email: 'apresentacao@cgbengenharia.com.br',
   role: 'super_admin',
   mustChangePassword: false,
+  permissions: [],
   canJustify: true,
 }
 
@@ -111,8 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (session?.user) {
-          const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
-          setUser(toAuthUser(session.user, role, mustChangePassword))
+          const { role, mustChangePassword, permissions } = await fetchProfile(session.user.id, session.user.email ?? '')
+          setUser(toAuthUser(session.user, role, mustChangePassword, permissions))
         } else {
           setUser(null)
         }
@@ -126,8 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (initialEventFired) return  // onAuthStateChange já tratou
       clearTimeout(timeout)
       if (session?.user) {
-        const { role, mustChangePassword } = await fetchProfile(session.user.id, session.user.email ?? '')
-        setUser(toAuthUser(session.user, role, mustChangePassword))
+        const { role, mustChangePassword, permissions } = await fetchProfile(session.user.id, session.user.email ?? '')
+        setUser(toAuthUser(session.user, role, mustChangePassword, permissions))
       }
       setLoading(false)
     }).catch(() => { clearTimeout(timeout); setLoading(false) })

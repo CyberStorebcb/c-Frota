@@ -44,6 +44,7 @@ import {
   generateResolvidosScreenshot,
 } from '../apontamentos/generateResolvidosScreenshot'
 import { useAuth } from '../auth/AuthContext'
+import { hasPermission } from '../auth/permissions'
 import { BASE_FILTER_SELECT_OPTIONS, matchesBaseFilter } from '../data/baseFilterOptions'
 import { COORDENADOR_FILTER_SELECT_OPTIONS, matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { SUPERVISOR_FILTER_SELECT_OPTIONS, matchesSupervisorFilter } from '../data/supervisorFilterOptions'
@@ -231,8 +232,8 @@ function StatPill({
 export function ManagePage() {
   const { rows, carregando, marcarResolvido, marcarJustificado, fetchApontamentoDetalhes, checklistsRealizadosTotal, periodoCarregado, setPeriodoCarregado, recarregar } = useApontamentos()
   const { user } = useAuth()
-  const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
-  const canJustify = canMarkResolved || (user?.canJustify ?? false)
+  const canMarkResolved = hasPermission(user, 'resolve_apontamentos')
+  const canJustify = user?.canJustify ?? false
   const [searchParams, setSearchParams] = useSearchParams()
 
   const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }

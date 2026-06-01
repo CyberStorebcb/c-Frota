@@ -35,6 +35,7 @@ import * as XLSX from 'xlsx'
 import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { apontamentoGroupKey } from '../apontamentos/groupApontamentos'
 import { useAuth } from '../auth/AuthContext'
+import { hasPermission } from '../auth/permissions'
 import { askGemini, isGeminiConfigured } from '../services/aiService'
 import {
   apontamentoVeiculoIdFromPlaca,
@@ -685,17 +686,7 @@ export function RegistroVeiculosPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const VEHICLE_REGISTER_ALLOWED_EMAILS = [
-    'italo.fontes@cgbengenharia.com.br',
-    'igor.dionisio@cgbengenharia.com.br',
-    'ruan.valmir@cgbengenharia.com.br',
-    'lucas.moreira@cgbengenharia.com.br',
-    'valvick.sales@cgbengenharia.com.br',
-  ]
-
-  const canRegisterVehicle =
-    (user?.role === 'admin' || user?.role === 'super_admin') &&
-    VEHICLE_REGISTER_ALLOWED_EMAILS.includes((user?.email ?? '').trim().toLowerCase())
+  const canRegisterVehicle = hasPermission(user, 'manage_vehicles')
 
   const goToGerenciarVeiculo = (vehicle: FleetVehicle) => {
     const veiculoId = apontamentoVeiculoIdFromPlaca(vehicle.placa)
