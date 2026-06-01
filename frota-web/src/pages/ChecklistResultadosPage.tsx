@@ -437,7 +437,8 @@ function _desenharGrafico(
   return canvas.toDataURL('image/png').replace('data:image/png;base64,', '')
 }
 
-async function exportarExcel(rows: ChecklistRow[]) {
+// [função antiga removida — ver implementação acima com gráficos nativos]
+async function _exportarExcelLegado(rows: ChecklistRow[]) {
   // ExcelJS suporta estilo completo (cores, bordas, fontes)
   const EJS   = await import('exceljs')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
