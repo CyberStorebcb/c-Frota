@@ -1,12 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { canJustifyByEmail } from './canJustify'
 
 export type AuthUser = {
   id: string
   email: string
   role: 'super_admin' | 'admin' | 'user'
   mustChangePassword: boolean
+  /** true se o email pertence a um supervisor ou coordenador autorizado a justificar. */
+  canJustify: boolean
 }
 
 type Ctx = {
@@ -45,11 +48,13 @@ async function fetchProfile(userId: string, email: string): Promise<{ role: 'sup
 }
 
 function toAuthUser(supabaseUser: User, role: 'super_admin' | 'admin' | 'user', mustChangePassword: boolean): AuthUser {
+  const email = supabaseUser.email ?? ''
   return {
     id: supabaseUser.id,
-    email: supabaseUser.email ?? '',
+    email,
     role,
     mustChangePassword,
+    canJustify: role === 'admin' || role === 'super_admin' || canJustifyByEmail(email),
   }
 }
 
@@ -59,6 +64,7 @@ const SCREENSHOT_MOCK_USER: AuthUser = {
   email: 'apresentacao@cgbengenharia.com.br',
   role: 'super_admin',
   mustChangePassword: false,
+  canJustify: true,
 }
 
 function readScreenshotBypassUser(): AuthUser | null {

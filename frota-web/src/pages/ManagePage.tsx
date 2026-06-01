@@ -232,6 +232,7 @@ export function ManagePage() {
   const { rows, carregando, marcarResolvido, marcarJustificado, fetchApontamentoDetalhes, checklistsRealizadosTotal, periodoCarregado, setPeriodoCarregado, recarregar } = useApontamentos()
   const { user } = useAuth()
   const canMarkResolved = user?.role === 'admin' || user?.role === 'super_admin'
+  const canJustify = canMarkResolved || (user?.canJustify ?? false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
@@ -662,7 +663,7 @@ export function ManagePage() {
   const justImgRef = useRef<HTMLInputElement | null>(null)
 
   const openJustModal = (r: Apontamento) => {
-    if (!canMarkResolved) return
+    if (!canJustify) return
     setJustId(r.id)
     setJustData(r.justificativaData ?? new Date().toISOString().slice(0, 10))
     setJustTexto(r.justificativa ?? '')
@@ -709,7 +710,7 @@ export function ManagePage() {
   }
 
   const confirmJust = async () => {
-    if (!canMarkResolved || !justId || !justTexto.trim()) return
+    if (!canJustify || !justId || !justTexto.trim()) return
     setSalvandoJust(true)
     await marcarJustificado(
       justId,
@@ -1316,28 +1317,28 @@ export function ManagePage() {
                                   </span>
                                 )}
                               </div>
+                              {canJustify ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { stopRowClick(e); openJustModal(r) }}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
+                                  title="Editar justificativa"
+                                >
+                                  <MessageSquareWarning size={15} aria-hidden />
+                                </button>
+                              ) : null}
                               {canMarkResolved ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { stopRowClick(e); openJustModal(r) }}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
-                                    title="Editar justificativa"
-                                  >
-                                    <MessageSquareWarning size={15} aria-hidden />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      stopRowClick(e)
-                                      openResolveModal(r, group?.ocorrencias.map((o) => o.id))
-                                    }}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
-                                    title="Marcar como resolvido"
-                                  >
-                                    <Check size={17} strokeWidth={3} aria-hidden />
-                                  </button>
-                                </>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    stopRowClick(e)
+                                    openResolveModal(r, group?.ocorrencias.map((o) => o.id))
+                                  }}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/60 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 hover:ring-2 hover:ring-emerald-400/40 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+                                  title="Marcar como resolvido"
+                                >
+                                  <Check size={17} strokeWidth={3} aria-hidden />
+                                </button>
                               ) : null}
                             </>
                           ) : (
@@ -1349,17 +1350,19 @@ export function ManagePage() {
                                 <X size={13} strokeWidth={2.5} className="text-rose-600" aria-hidden />
                                 Não
                               </span>
+                              {canJustify ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { stopRowClick(e); openJustModal(r) }}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
+                                  title="Adicionar justificativa"
+                                  aria-label="Justificar não resolução"
+                                >
+                                  <MessageSquareWarning size={15} aria-hidden />
+                                </button>
+                              ) : null}
                               {canMarkResolved ? (
                                 <>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { stopRowClick(e); openJustModal(r) }}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/60 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100 hover:ring-2 hover:ring-amber-300/40 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
-                                    title="Adicionar justificativa"
-                                    aria-label="Justificar não resolução"
-                                  >
-                                    <MessageSquareWarning size={15} aria-hidden />
-                                  </button>
                                   <button
                                     type="button"
                                     onClick={(e) => {

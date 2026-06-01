@@ -464,7 +464,7 @@ function JustificadosPanel({
       ) : displayMode === 'list' ? (
         <ListaJustificados
           items={items}
-          isAdmin={isAdmin}
+          isAdmin={canJustify}
           savingPlaca={savingPlaca}
           onAlterarMotivo={onAlterarMotivo}
           onRemover={onRemover}
@@ -663,6 +663,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const savedFilters = useMemo(() => loadChecklistDetalharFilters(setorVeiculo), [setorVeiculo])
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  const canJustify = user?.canJustify ?? false
   const isAdmPage = setorVeiculo === 'adm'
   const outraPaginaPath = isAdmPage
     ? `/checklists/detalhar?${searchParams.toString()}`
@@ -771,7 +772,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     [periodo, customDesde, customAte],
   )
 
-  const showJustificarNaoRealizaram = isAdmin && focusedSide === 'nao'
+  const showJustificarNaoRealizaram = canJustify && focusedSide === 'nao'
 
   useEffect(() => {
     let cancelled = false
@@ -1795,7 +1796,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                   </button>
                 )}
               </div>
-              {(justificadosSetorCount > 0 || isAdmin) && (
+              {(justificadosSetorCount > 0 || canJustify) && (
                 <button
                   type="button"
                   onClick={() =>
@@ -1895,7 +1896,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             countLabel={justificadosFiltrados.length}
             subtitle={subtitleJustificados}
             displayMode={displayMode}
-            isAdmin={isAdmin}
+            isAdmin={canJustify}
             isFullscreen={isFullscreen}
             savingPlaca={justificativaSavingPlaca}
             onAlterarMotivo={(placa, motivo, placaReserva) => void salvarJustificativa(placa, motivo, placaReserva)}
@@ -2116,7 +2117,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             countLabel={justificadosFiltrados.length}
             subtitle={subtitleJustificados}
             displayMode={displayMode}
-            isAdmin={isAdmin}
+            isAdmin={canJustify}
             isFullscreen={isFullscreen}
             savingPlaca={justificativaSavingPlaca}
             onAlterarMotivo={(placa, motivo, placaReserva) => void salvarJustificativa(placa, motivo, placaReserva)}
