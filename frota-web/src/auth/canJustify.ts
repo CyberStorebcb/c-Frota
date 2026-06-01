@@ -8,6 +8,9 @@ function norm(s: string): string {
 const FIRST_NAMES: Set<string> = new Set([
   ...OFFICIAL_COORDENADORES.map((n) => norm(n.split(' ')[0]!)),
   ...OFFICIAL_SUPERVISORS.map((n) => norm(n.split(' ')[0]!)),
+  // Casos em que o email usa nome diferente do apelido na lista
+  'valdir',    // Valdir Rabelo — lista tem WALDIR mas email começa com valdir
+  'francisco', // Francisco Leandro Nunes — lista tem LEANDRO mas email começa com francisco
 ])
 
 /**
