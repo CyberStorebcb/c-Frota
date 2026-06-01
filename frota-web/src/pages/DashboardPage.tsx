@@ -32,6 +32,7 @@ import { useApontamentos } from '../apontamentos/ApontamentosContext'
 import { buildManageTableRows, type ApontamentoGroup } from '../apontamentos/groupApontamentos'
 import {
   listDaysInPeriod,
+  pesosDias,
 } from '../checklists/checklistTop10Ranking'
 import {
   aggregateChecklistCompletions,
@@ -652,7 +653,7 @@ export function DashboardPage() {
     const ativosOperacionais = scopedFleetPlacasSet.size
 
     // Aderência segue o período e o setor do card (operacional ou ADM):
-    const esperados = ativosSetorFiltrado * periodDays.length
+    const esperados = ativosSetorFiltrado * pesosDias(periodDays)
     const pctAderencia = esperados > 0 ? Math.min(100, Math.round((checklistsNoPeriodo / esperados) * 100)) : 0
     const aderencia = checklistsCarregando
       ? LOADING
