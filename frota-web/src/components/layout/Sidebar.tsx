@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Car, ClipboardList, Database, LayoutDashboard, LogOut, Settings2, Shield, X } from 'lucide-react'
+import { Car, ClipboardList, Database, FileText, LayoutDashboard, LogOut, Settings2, Shield, X } from 'lucide-react'
 import { InstagramIcon } from '../../branding/InstagramIcon'
 import { SOCIAL_LINKS } from '../../branding/socialLinks'
 import { useAuth } from '../../auth/AuthContext'
@@ -12,6 +12,10 @@ const baseNav = [
   { to: '/gerenciar', label: 'Gerenciar', icon: Settings2, end: true },
   { to: '/registro', label: 'Registro', icon: Car, end: false },
   { to: '/gerenciar/checklists', label: 'Checklists', icon: ClipboardList, end: false },
+] as const
+
+const adminNav = [
+  { to: '/os', label: 'OS', icon: FileText, end: true },
 ] as const
 
 export function Sidebar({
@@ -95,8 +99,10 @@ function Header({ collapsed }: { collapsed: boolean }) {
 
 function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => void }) {
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
   const navItems = [
     ...baseNav,
+    ...(isAdmin ? adminNav : []),
     ...(user?.role === 'super_admin'
       ? ([
           { to: '/admin/frota', label: 'Banco de Dados', icon: Database, end: false },

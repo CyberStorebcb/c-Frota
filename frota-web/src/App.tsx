@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { RequireAuth } from './components/auth/RequireAuth'
-import { RequireSuperAdmin } from './components/auth/RequireAdmin'
+import { RequireAdmin, RequireSuperAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
 import { RouteFallback } from './components/RouteFallback'
 import { ApontamentosLayout } from './layouts/ApontamentosLayout'
@@ -70,6 +70,9 @@ const FrotaEditorPage = lazy(() =>
 const TrocarSenhaPage = lazy(() =>
   import('./pages/TrocarSenhaPage').then((m) => ({ default: m.TrocarSenhaPage })),
 )
+const OsPage = lazy(() =>
+  import('./pages/OsPage').then((m) => ({ default: m.OsPage })),
+)
 
 /** Links antigos /checklist/:tipo — exceto /checklist/demo */
 function ChecklistTipoRedirect() {
@@ -103,6 +106,14 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<ApontamentosProvider><AuthedShellWithTour /></ApontamentosProvider>}>
             <Route index element={<DashboardPage />} />
+            <Route
+              path="/os"
+              element={
+                <RequireAdmin>
+                  <OsPage />
+                </RequireAdmin>
+              }
+            />
             <Route path="/gerenciar" element={<ApontamentosLayout />}>
               <Route index element={<ManagePage />} />
               <Route path="ranking" element={<ResolutoresRankingPage />} />
