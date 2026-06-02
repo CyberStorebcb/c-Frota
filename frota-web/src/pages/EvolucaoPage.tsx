@@ -8,6 +8,7 @@ import {
   Download,
   TrendingDown,
   TrendingUp,
+  Trophy,
   Zap,
 } from 'lucide-react'
 import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
@@ -718,6 +719,13 @@ export function EvolucaoPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            to="/gerenciar/ranking"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-extrabold text-emerald-800 shadow-soft hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60"
+          >
+            <Trophy size={18} aria-hidden />
+            Ranking
+          </Link>
           <button
             type="button"
             onClick={exportarCsv}

@@ -21,6 +21,7 @@ import {
   Upload,
   Settings2,
   Truck,
+  Trophy,
   X,
   ZoomIn,
   MessageSquareWarning,
@@ -906,6 +907,13 @@ export function ManagePage() {
             <RefreshCw size={18} className={carregando ? 'animate-spin' : ''} />
             Atualizar
           </button>
+          <Link
+            to="/gerenciar/ranking"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-extrabold text-emerald-800 shadow-soft hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60 sm:flex-initial"
+          >
+            <Trophy size={18} />
+            Ranking
+          </Link>
           <Link
             to="/gerenciar/evolucao"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 sm:flex-initial"

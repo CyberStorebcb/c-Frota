@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CalendarCheck2, ChevronLeft, ChevronRight, FileDown, History, TrendingUp, Truck, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CalendarCheck2, ChevronLeft, ChevronRight, FileDown, History, TrendingUp, Trophy, Truck, X } from 'lucide-react'
 import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import { buildHistoricoResolvidoEntries, type HistoricoResolvidoEntry } from '../apontamentos/groupApontamentos'
@@ -823,6 +823,13 @@ export function HistoricoPage() {
           </div>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <Link
+            to="/gerenciar/ranking"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-extrabold text-emerald-800 shadow-soft hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60"
+          >
+            <Trophy size={18} aria-hidden />
+            Ranking
+          </Link>
           <Link
             to="/gerenciar/evolucao"
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"

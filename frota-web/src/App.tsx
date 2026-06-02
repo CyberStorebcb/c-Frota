@@ -38,6 +38,9 @@ const DashboardPage = lazy(() =>
 const EvolucaoPage = lazy(() =>
   import('./pages/EvolucaoPage').then((m) => ({ default: m.EvolucaoPage })),
 )
+const ResolutoresRankingPage = lazy(() =>
+  import('./pages/ResolutoresRankingPage').then((m) => ({ default: m.ResolutoresRankingPage })),
+)
 const HistoricoPage = lazy(() =>
   import('./pages/HistoricoPage').then((m) => ({ default: m.HistoricoPage })),
 )
@@ -102,6 +105,7 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="/gerenciar" element={<ApontamentosLayout />}>
               <Route index element={<ManagePage />} />
+              <Route path="ranking" element={<ResolutoresRankingPage />} />
               <Route path="evolucao" element={<EvolucaoPage />} />
               <Route path="historico" element={<HistoricoPage />} />
               <Route path="checklists" element={<ChecklistsPage />} />

@@ -161,6 +161,58 @@ body {
   animation: rank-alert-pulse 2s ease-in-out infinite;
 }
 
+@keyframes rank-crown-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(4deg);
+  }
+}
+
+@keyframes rank-score-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rank-particle-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px) scale(1);
+  }
+}
+
+.rank-crown-float {
+  animation: rank-crown-float 2.4s ease-in-out infinite;
+}
+
+.rank-score-pop {
+  animation: rank-score-pop 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--podium-i, 0) * 100ms + 200ms);
+}
+
+.rank-particle {
+  animation: rank-particle-rise 2.2s ease-out infinite;
+  animation-delay: var(--particle-delay, 0ms);
+}
+
 
 /* Screen-reader only (resumo de gráficos / dados) */
 .sr-only {
