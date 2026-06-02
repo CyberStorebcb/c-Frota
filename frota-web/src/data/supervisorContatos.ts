@@ -11,6 +11,9 @@ export const SUPERVISOR_WHATSAPP: Record<string, string> = {
   'DEILTON SOUZA RIBEIRO':                   '5599984399031',  // GSTC - BCB
   'EDIVAN DE LIMA CARVALHO':                 '5591992011146',  // GOMAN - STI
   'EVERALDO NOGUEIRA FILHO':                 '5587981781206',  // GOMAN - BCB
+  'EVERTON SIQUEIRA PEREIRA':                 '559984576126',   // +55 99 8457-6126
+  'ANTONIO SILVA DE ABREU':                  '558781433941',   // +55 87 8143-3941
+  'FRANCISCO LEANDRO NUNES DA SILVA':        '559193403983',   // +55 91 9340-3983
   'GUILHERME FONSECA DE SOUSA NOGUEIRA':     '5599984044443',  // GSTC - PDT
   'JOAO CLIMACO MEDEIROS DE AZEVEDO JUNIOR': '5598988896598',  // GOMAN - PDS
   'JOSIEL MENESES DOS SANTOS':               '5599984057032',  // GOMAN - BDC
@@ -39,22 +42,36 @@ function norm(s: string): string {
     .replace(/\s+/g, ' ')
 }
 
+/** Variantes usadas no catálogo de frota → nome canônico do mapeamento WhatsApp. */
+const SUPERVISOR_NAME_ALIASES: Record<string, string> = {
+  'EVERTON SIQUEIRA': 'EVERTON SIQUEIRA PEREIRA',
+  'FRANCISCO LEANDRO NUNES': 'FRANCISCO LEANDRO NUNES DA SILVA',
+}
+
+function resolveSupervisorKey(nomeSupervisor: string): string | null {
+  const normalizado = norm(nomeSupervisor)
+  for (const [key] of Object.entries(SUPERVISOR_WHATSAPP)) {
+    if (norm(key) === normalizado) return key
+  }
+  for (const [alias, canonical] of Object.entries(SUPERVISOR_NAME_ALIASES)) {
+    if (norm(alias) === normalizado) return canonical
+  }
+  return null
+}
+
 /** Retorna o número WhatsApp do supervisor, fallback ou null. */
 export function getSupervisorWhatsapp(nomeSupervisor: string): string | null {
-  const normalizado = norm(nomeSupervisor)
-  for (const [key, numero] of Object.entries(SUPERVISOR_WHATSAPP)) {
-    if (norm(key) === normalizado) return numero
-  }
+  const key = resolveSupervisorKey(nomeSupervisor)
+  if (key) return SUPERVISOR_WHATSAPP[key] ?? null
   return SUPERVISOR_WHATSAPP_FALLBACK || null
 }
 
 /** Retorna true somente se o supervisor tem número real cadastrado (mínimo 12 dígitos). */
 export function isSupervisorReconhecido(nomeSupervisor: string): boolean {
-  const normalizado = norm(nomeSupervisor)
-  for (const [key, numero] of Object.entries(SUPERVISOR_WHATSAPP)) {
-    if (norm(key) === normalizado && numero.length >= 12) return true
-  }
-  return false
+  const key = resolveSupervisorKey(nomeSupervisor)
+  if (!key) return false
+  const numero = SUPERVISOR_WHATSAPP[key]
+  return Boolean(numero && numero.length >= 12)
 }
 
 /** Gera o link wa.me com a mensagem pré-formatada. */

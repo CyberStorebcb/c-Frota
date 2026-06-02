@@ -24,6 +24,8 @@ const AUTHORIZED_SUPERVISOR_NORMS = new Set(AUTHORIZED_SUPERVISORS.map(normSup))
 /** Variantes legadas no catálogo que mapeiam para um supervisor autorizado. */
 const SUPERVISOR_LEGACY_ALIASES: Record<string, string> = {
   'antonio marcos salazar': 'antonio marcos salazar dos reis',
+  'everton siqueira pereira': 'everton siqueira',
+  'francisco leandro nunes da silva': 'francisco leandro nunes',
   'joadson carlos da silva ferreira': 'joadson carlos',
   'wallyson da silva almeida': 'wallyson da silva',
   'laercio corta lima': 'laercio costa lima',
