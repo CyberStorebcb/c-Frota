@@ -177,11 +177,15 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     setPending(true)
-    const res = await login(email, password)
-    setPending(false)
-    if (res.ok === false) {
-      setError(res.message)
-      return
+    try {
+      const res = await login(email, password)
+      if (res.ok === false) {
+        setError(res.message)
+      }
+    } catch {
+      setError('Erro ao conectar. Verifique sua conexão e tente novamente.')
+    } finally {
+      setPending(false)
     }
   }
 

@@ -27,6 +27,18 @@ const AuthContext = createContext<Ctx | null>(null)
 
 type ProfileRow = { role: string; must_change_password: boolean }
 
+async function fetchUserPermissions(userId: string): Promise<UserPermission[]> {
+  try {
+    const { data: permRows } = await Promise.race([
+      supabase.from('user_permissions').select('permission').eq('user_id', userId),
+      new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 3000)),
+    ])
+    return (permRows ?? []).map((r) => r.permission as UserPermission)
+  } catch {
+    return []
+  }
+}
+
 async function fetchProfile(userId: string, email: string): Promise<{
   role: 'super_admin' | 'admin' | 'user'
   mustChangePassword: boolean
@@ -48,14 +60,7 @@ async function fetchProfile(userId: string, email: string): Promise<{
       : rawRole === 'admin' ? 'admin'
       : 'user'
 
-    let permissions: UserPermission[] = []
-    if (role === 'user') {
-      const { data: permRows } = await supabase
-        .from('user_permissions')
-        .select('permission')
-        .eq('user_id', userId)
-      permissions = (permRows ?? []).map((r) => r.permission as UserPermission)
-    }
+    const permissions = role === 'user' ? await fetchUserPermissions(userId) : []
 
     return { role, mustChangePassword: p?.must_change_password ?? false, permissions }
   } catch {
@@ -122,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timeout = setTimeout(() => setLoading(false), 8000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: Session | null) => {
+      (event: string, session: Session | null) => {
         // USER_UPDATED é disparado pelo updateUser() durante troca de senha.
         // Ignorar para não sobrescrever o mustChangePassword que já foi limpo localmente.
         if (event === 'USER_UPDATED') return
@@ -136,14 +141,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsPasswordRecovery(true)
         }
 
-        if (session?.user) {
-          const { role, mustChangePassword, permissions } = await fetchProfile(session.user.id, session.user.email ?? '')
-          setUser(toAuthUser(session.user, role, mustChangePassword, permissions))
-        } else {
-          setUser(null)
-        }
-        setLoading(false)
-      }
+        // Deferir I/O para não bloquear signInWithPassword (deadlock do Supabase).
+        setTimeout(() => {
+          void (async () => {
+            if (session?.user) {
+              const { role, mustChangePassword, permissions } = await fetchProfile(
+                session.user.id,
+                session.user.email ?? '',
+              )
+              setUser(toAuthUser(session.user, role, mustChangePassword, permissions))
+            } else {
+              setUser(null)
+            }
+            setLoading(false)
+          })()
+        }, 0)
+      },
     )
 
     // getSession() como fallback: se onAuthStateChange não disparar (sem sessão,
