@@ -13,6 +13,15 @@ export type ResolutorRankingEntry = {
   count: number
 }
 
+/** Exclui resoluções sem e-mail válido (ex.: legado `desconhecido` gravado no banco). */
+export function isResolutorIdentificado(resolvidoPor: string | null | undefined): boolean {
+  const email = resolvidoPor?.trim()
+  if (!email) return false
+  if (!email.includes('@')) return false
+  if (email.toLowerCase() === 'desconhecido') return false
+  return true
+}
+
 export function buildResolutoresRanking(
   rows: { resolvido: boolean; resolvidoPor: string | null }[],
   nomeFromEmail: (email: string) => string,
@@ -22,7 +31,8 @@ export function buildResolutoresRanking(
   for (const row of rows) {
     if (!row.resolvido) continue
     const email = row.resolvidoPor?.trim() || null
-    const key = email?.toLowerCase() ?? '__desconhecido__'
+    if (!isResolutorIdentificado(email)) continue
+    const key = email.toLowerCase()
     const existing = counts.get(key)
     if (existing) {
       existing.count += 1
@@ -30,7 +40,7 @@ export function buildResolutoresRanking(
     }
     counts.set(key, {
       email,
-      nome: email ? nomeFromEmail(email) : 'DESCONHECIDO',
+      nome: nomeFromEmail(email),
       count: 1,
     })
   }

@@ -415,7 +415,7 @@ export function ApontamentosProvider({ children }: { children: ReactNode }) {
   const marcarResolvido = useCallback(async (
     id: string,
     payload?: { valor: number | null; descricao: string | null; imagens: string[]; osArquivo?: string | null; dataResolvido?: string | null },
-    usuarioEmail = 'desconhecido',
+    usuarioEmail: string | null = null,
   ) => {
     const now = new Date()
     const hoje = localIsoDate(now)
