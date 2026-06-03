@@ -2,6 +2,7 @@ import { pesoDia } from './checklistTop10Ranking'
 import { matchesBaseFilter } from '../data/baseFilterOptions'
 import { matchesCoordenadorFilter } from '../data/coordenadorFilterOptions'
 import { matchesPrefixoFilter } from '../data/prefixoFilterOptions'
+import { matchesProcessoFilter } from '../data/processoFilterOptions'
 import { matchesResponsavelFilter } from '../data/responsavelFilterOptions'
 import { matchesSupervisorFilter } from '../data/supervisorFilterOptions'
 import { matchesTipoFilter } from '../data/tipoFilterOptions'
@@ -23,6 +24,7 @@ export type ChecklistFleetVehicle = {
   responsavel: string
   tipo: string
   prefixo: string
+  processo: string
 }
 
 export type ChecklistFleetFilters = {
@@ -32,6 +34,7 @@ export type ChecklistFleetFilters = {
   responsavel?: string
   tipo?: string
   prefixo?: string
+  processo?: string
 }
 
 
@@ -50,6 +53,9 @@ export function passesChecklistFleetFilters(
   }
   if (filters.prefixo && filters.prefixo !== 'todos' && filters.prefixo.trim()) {
     if (!matchesPrefixoFilter(v.prefixo, filters.prefixo)) return false
+  }
+  if (filters.processo && filters.processo !== 'todos') {
+    if (!matchesProcessoFilter(v.processo, filters.processo)) return false
   }
   return true
 }
@@ -76,6 +82,7 @@ export function buildActiveFleetMap(vehicles: FleetVehicle[]): Map<string, Check
       responsavel: v.responsavel ?? '',
       tipo: v.tipo ?? '',
       prefixo: v.prefixo ?? '',
+      processo: v.processo ?? '',
     })
   }
 

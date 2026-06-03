@@ -48,6 +48,7 @@ import { SUPERVISOR_FILTER_SELECT_OPTIONS } from '../data/supervisorFilterOption
 import { RESPONSAVEL_FILTER_SELECT_OPTIONS } from '../data/responsavelFilterOptions'
 import { PREFIXO_FILTER_SELECT_OPTIONS } from '../data/prefixoFilterOptions'
 import { TIPO_FILTER_SELECT_OPTIONS } from '../data/tipoFilterOptions'
+import { PROCESSO_FILTER_SELECT_OPTIONS } from '../data/processoFilterOptions'
 import { ChecklistTop10Section, CHECKLIST_TOP10_GROUP_OPTIONS, buildChecklistAdherenceRanking, type ChecklistTop10GroupBy } from '../components/checklist/ChecklistTop10Section'
 import { listDaysInPeriod, pesosDias } from '../checklists/checklistTop10Ranking'
 import { buildActiveFleetMap, passesChecklistFleetFilters } from '../checklists/checklistFleetScope'
@@ -695,6 +696,9 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     const v = pickFilter(searchParams.get('prefixo'), savedFilters, 'prefixo', 'todos')
     return v === '' ? 'todos' : v
   })
+  const [filtroProcesso, setFiltroProcesso] = useState(() =>
+    pickFilter(searchParams.get('processo'), savedFilters, 'processo', 'todos'),
+  )
   const [busca, setBusca] = useState(() => savedFilters?.busca ?? '')
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => savedFilters?.filtrosVisiveis ?? false)
   const [displayMode, setDisplayMode] = useState<DisplayMode>(() => parseSavedDisplayMode(savedFilters?.viewMode))
@@ -746,6 +750,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       supervisor: filtroSupervisor,
       tipo: filtroTipo,
       prefixo: filtroPrefixo,
+      processo: filtroProcesso,
       busca,
       filtrosVisiveis,
       viewMode: toSavedViewMode(displayMode, sectionView),
@@ -761,6 +766,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     filtroSupervisor,
     filtroTipo,
     filtroPrefixo,
+    filtroProcesso,
     busca,
     filtrosVisiveis,
     displayMode,
@@ -990,16 +996,17 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
 
   // ── aplicar filtros ───────────────────────────────────────────────────────
   const passaFiltros = useCallback(
-    (r: { placa?: string; base: string; supervisor: string; coordenador: string; responsavel: string; tipo?: string; prefixo?: string }) =>
-      passesChecklistFleetFilters({ tipo: '', prefixo: '', placa: r.placa ?? '', ...r }, {
+    (r: { placa?: string; base: string; supervisor: string; coordenador: string; responsavel: string; tipo?: string; prefixo?: string; processo?: string }) =>
+      passesChecklistFleetFilters({ tipo: '', prefixo: '', processo: '', placa: r.placa ?? '', ...r }, {
         base: filtroBase,
         supervisor: filtroSupervisor,
         coordenador: filtroCoordenador,
         responsavel: filtroResponsavel,
         tipo: filtroTipo,
         prefixo: filtroPrefixo,
+        processo: filtroProcesso,
       }),
-    [filtroBase, filtroResponsavel, filtroSupervisor, filtroCoordenador, filtroTipo, filtroPrefixo],
+    [filtroBase, filtroResponsavel, filtroSupervisor, filtroCoordenador, filtroTipo, filtroPrefixo, filtroProcesso],
   )
 
   // Placas marcadas manualmente como FEITO (checklist feito, mas não chegou ao sistema).
@@ -1279,9 +1286,10 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     if (filtroBase !== 'todos') n += 1
     if (filtroTipo !== 'todos') n += 1
     if (filtroPrefixo !== 'todos') n += 1
+    if (filtroProcesso !== 'todos') n += 1
     if (busca.trim().length > 0) n += 1
     return n
-  }, [periodo, filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor, filtroTipo, filtroPrefixo, busca])
+  }, [periodo, filtroBase, filtroCoordenador, filtroResponsavel, filtroSupervisor, filtroTipo, filtroPrefixo, filtroProcesso, busca])
 
   const limparFiltros = useCallback(() => {
     setPeriodo('hoje')
@@ -1293,6 +1301,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     setFiltroSupervisor('todos')
     setFiltroTipo('todos')
     setFiltroPrefixo('todos')
+    setFiltroProcesso('todos')
     setBusca('')
   }, [])
 
@@ -1722,9 +1731,10 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             <Select label="Supervisor" value={filtroSupervisor} onChange={setFiltroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} tone="dark" />
             <Select label="Base" value={filtroBase} onChange={setFiltroBase} options={baseOptions} tone="dark" />
           </FilterPanelGroup>
-          <FilterPanelGroup title="Veículo" columns="sm:grid-cols-2">
+          <FilterPanelGroup title="Veículo" columns="sm:grid-cols-3">
             <Select label="Tipo" value={filtroTipo} onChange={setFiltroTipo} options={TIPO_FILTER_SELECT_OPTIONS} tone="dark" />
             <Select label="Prefixo" value={filtroPrefixo} onChange={setFiltroPrefixo} options={prefixoOptions} tone="dark" />
+            <Select label="Processo" value={filtroProcesso} onChange={setFiltroProcesso} options={PROCESSO_FILTER_SELECT_OPTIONS} tone="dark" />
           </FilterPanelGroup>
         </div>
       </FilterPanel>
