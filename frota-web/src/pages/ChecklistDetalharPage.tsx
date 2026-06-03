@@ -170,6 +170,7 @@ type ChecklistDetalharFiltersState = {
   supervisor: string
   tipo: string
   prefixo: string
+  processo: string
   busca: string
   filtrosVisiveis: boolean
   viewMode: ViewMode
