@@ -843,7 +843,7 @@ export function ManagePage() {
               osArquivo: null,
               dataResolvido: payload.dataResolvido,
             },
-        user?.email ?? null,
+        user?.email ?? undefined,
       )
     }
     setSalvando(false)

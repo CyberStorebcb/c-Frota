@@ -32,7 +32,7 @@ export function buildResolutoresRanking(
     if (!row.resolvido) continue
     const email = row.resolvidoPor?.trim() || null
     if (!isResolutorIdentificado(email)) continue
-    const key = email.toLowerCase()
+    const key = email!.toLowerCase()
     const existing = counts.get(key)
     if (existing) {
       existing.count += 1
@@ -40,7 +40,7 @@ export function buildResolutoresRanking(
     }
     counts.set(key, {
       email,
-      nome: nomeFromEmail(email),
+      nome: nomeFromEmail(email!),
       count: 1,
     })
   }
