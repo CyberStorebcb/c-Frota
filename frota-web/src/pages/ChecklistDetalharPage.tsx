@@ -884,7 +884,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         supervisor: active.supervisor,
         coordenador: active.coordenador,
         responsavel: active.responsavel,
-        processo: v.prefixo ?? '',
+        processo: v.processo ?? '',
         tipo: active.tipo,
         prefixo: active.prefixo,
       })
