@@ -71,6 +71,7 @@ function fileSafeName(s: string) {
 
 async function dataUrlToJpeg(dataUrl: string): Promise<{ data: string; w: number; h: number }> {
   const img = new Image()
+  img.crossOrigin = 'anonymous'
   img.decoding = 'async'
   img.src = dataUrl
   await img.decode()
@@ -85,8 +86,13 @@ async function dataUrlToJpeg(dataUrl: string): Promise<{ data: string; w: number
   const ctx = canvas.getContext('2d')
   if (!ctx) return { data: dataUrl, w: img.width, h: img.height }
   ctx.drawImage(img, 0, 0, w, h)
-  const jpg = canvas.toDataURL('image/jpeg', 0.88)
-  return { data: jpg, w, h }
+  try {
+    const jpg = canvas.toDataURL('image/jpeg', 0.88)
+    return { data: jpg, w, h }
+  } catch {
+    // Canvas tainted — retorna o original sem conversão
+    return { data: dataUrl, w: img.width, h: img.height }
+  }
 }
 
 /** Para URLs do R2 (pub-*.r2.dev), faz proxy pelo Worker para evitar CORS tainted canvas. */
@@ -113,20 +119,30 @@ async function urlToPngData(url: string): Promise<{ data: string; w: number; h: 
       fr.readAsDataURL(blob)
     })
   } catch {
-    // Fallback: load as img without crossOrigin (works for display, may taint canvas)
-    const img = new Image()
-    img.decoding = 'async'
-    img.src = url
-    await img.decode()
-    const canvas = document.createElement('canvas')
-    canvas.width = img.width
-    canvas.height = img.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return { data: url, w: img.width, h: img.height }
-    ctx.drawImage(img, 0, 0)
-    return { data: canvas.toDataURL('image/png'), w: img.width, h: img.height }
+    // Fallback: tenta carregar com crossOrigin="anonymous" para não contaminar o canvas
+    try {
+      dataUrl = await new Promise<string>((resolve, reject) => {
+        const img2 = new Image()
+        img2.crossOrigin = 'anonymous'
+        img2.decoding = 'async'
+        img2.onload = () => {
+          const c = document.createElement('canvas')
+          c.width = img2.width; c.height = img2.height
+          const cx = c.getContext('2d')
+          if (!cx) { reject(new Error('no ctx')); return }
+          cx.drawImage(img2, 0, 0)
+          try { resolve(c.toDataURL('image/png')) } catch (e) { reject(e) }
+        }
+        img2.onerror = reject
+        img2.src = url
+      })
+    } catch {
+      // Não foi possível rasterizar — jsPDF usará a URL diretamente (pode falhar em alguns viewers)
+      return { data: url, w: 0, h: 0 }
+    }
   }
   const img = new Image()
+  img.crossOrigin = 'anonymous'
   img.decoding = 'async'
   img.src = dataUrl
   await img.decode()
@@ -136,7 +152,11 @@ async function urlToPngData(url: string): Promise<{ data: string; w: number; h: 
   const ctx = canvas.getContext('2d')
   if (!ctx) return { data: dataUrl, w: img.width, h: img.height }
   ctx.drawImage(img, 0, 0)
-  return { data: canvas.toDataURL('image/png'), w: img.width, h: img.height }
+  try {
+    return { data: canvas.toDataURL('image/png'), w: img.width, h: img.height }
+  } catch {
+    return { data: dataUrl, w: img.width, h: img.height }
+  }
 }
 
 /** Data URL (reparo) ou URL http(s) (fotos da NC no storage) → raster para jsPDF. */
