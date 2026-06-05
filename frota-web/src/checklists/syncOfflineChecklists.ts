@@ -12,6 +12,8 @@ import {
 export type SyncResult = {
   synced: number
   failed: number
+  /** URLs de evidência enviadas, indexadas pelo localId do registro. */
+  uploadedUrlsByLocalId: Record<string, string[]>
 }
 
 type SyncListener = (result: SyncResult) => void
@@ -40,7 +42,7 @@ async function uploadOfflineFile(schemaId: string, ts: number, file: OfflineChec
   return url
 }
 
-async function sendRecord(record: OfflineChecklistRecord) {
+async function sendRecord(record: OfflineChecklistRecord): Promise<string[]> {
   const ts = Date.now()
   const payload: ChecklistInsert = {
     ...record.payload,
@@ -68,6 +70,7 @@ async function sendRecord(record: OfflineChecklistRecord) {
 
   const { error } = await supabase.from('checklists').insert(payload)
   if (error) throw error
+  return payload.evidencia_urls
 }
 
 // ── retry com backoff ─────────────────────────────────────────────────────
@@ -78,12 +81,11 @@ function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
 }
 
-async function sendWithRetry(record: OfflineChecklistRecord): Promise<void> {
+async function sendWithRetry(record: OfflineChecklistRecord): Promise<string[]> {
   let lastError: unknown
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
-      await sendRecord(record)
-      return // sucesso
+      return await sendRecord(record)
     } catch (err) {
       lastError = err
       const delay = RETRY_DELAYS_MS[attempt]
@@ -104,6 +106,7 @@ export function syncOfflineChecklists(): Promise<SyncResult> {
     const records = await listPendingOfflineChecklists()
     let synced = 0
     let failed = 0
+    const uploadedUrlsByLocalId: Record<string, string[]> = {}
 
     for (const record of records) {
       const syncingRecord: OfflineChecklistRecord = {
@@ -114,8 +117,9 @@ export function syncOfflineChecklists(): Promise<SyncResult> {
       }
       await updateOfflineChecklist(syncingRecord)
       try {
-        await sendWithRetry(syncingRecord)
+        const urls = await sendWithRetry(syncingRecord)
         await removeOfflineChecklist(syncingRecord.localId)
+        uploadedUrlsByLocalId[syncingRecord.localId] = urls
         synced++
       } catch (error) {
         await updateOfflineChecklist({
@@ -129,7 +133,7 @@ export function syncOfflineChecklists(): Promise<SyncResult> {
 
     await cleanupOfflineQueue()
 
-    const result: SyncResult = { synced, failed }
+    const result: SyncResult = { synced, failed, uploadedUrlsByLocalId }
     if (synced > 0) notifySyncResult(result)
     return result
   })().finally(() => {

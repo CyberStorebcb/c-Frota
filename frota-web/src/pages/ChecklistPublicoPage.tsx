@@ -2191,8 +2191,14 @@ function FormularioChecklist({
         buildOfflineFiles(),
       )
 
-      // Dispara sync em background sem bloquear a UI
-      void syncOfflineChecklists()
+      // Dispara sync em background sem bloquear a UI.
+      // Quando concluído, atualiza fotosUrls para que o link do WhatsApp inclua as fotos.
+      syncOfflineChecklists().then((result) => {
+        const urls = result.uploadedUrlsByLocalId[enqueued.localId]
+        if (urls?.length) {
+          setResultadoFinal((prev) => prev ? { ...prev, fotosUrls: urls } : prev)
+        }
+      }).catch(() => {})
 
       const itensNc = todosItens
         .filter((it) => respostas[it.id] === 'nc')
