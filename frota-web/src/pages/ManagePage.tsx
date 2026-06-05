@@ -867,6 +867,18 @@ export function ManagePage() {
     }
   }, [canMarkResolved, resolveOpen])
 
+  // Carrega reparoImagens sob demanda quando o modal de detalhe é aberto
+  useEffect(() => {
+    if (!detailApontamento?.id) return
+    const id = detailApontamento.id
+    void fetchApontamentoDetalhes(id).then((detalhes) => {
+      if (!detalhes.reparoImagens.length) return
+      setDetailApontamento((prev) =>
+        prev?.id === id ? { ...prev, reparoImagens: detalhes.reparoImagens } : prev,
+      )
+    })
+  }, [detailApontamento?.id, fetchApontamentoDetalhes])
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">

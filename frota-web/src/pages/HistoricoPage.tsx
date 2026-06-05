@@ -318,8 +318,18 @@ export function HistoricoPage() {
   const gerarPdf = async (e: HistoricoResolvidoEntry) => {
     const r = apontamentoParaPdf(e)
     // reparo_imagens não vem no select principal — busca sob demanda antes de gerar o PDF
-    const detalhes = await fetchApontamentoDetalhes(r.id)
+    let detalhes = await fetchApontamentoDetalhes(r.id)
+    // Se o representante não tem imagens e há outras ocorrências, verifica os demais IDs do grupo
+    // (as imagens são salvas apenas no ID primário, que pode diferir do representante)
+    if (!detalhes.reparoImagens.length && e.ocorrencias.length > 1) {
+      for (const o of e.ocorrencias) {
+        if (o.id === r.id) continue
+        const d = await fetchApontamentoDetalhes(o.id)
+        if (d.reparoImagens.length || d.osArquivo) { detalhes = d; break }
+      }
+    }
     if (detalhes.reparoImagens.length) r.reparoImagens = detalhes.reparoImagens
+    if (detalhes.osArquivo) r.osArquivo = detalhes.osArquivo
     const { jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'pt', format: 'a4' })
     const pageW = doc.internal.pageSize.getWidth()
