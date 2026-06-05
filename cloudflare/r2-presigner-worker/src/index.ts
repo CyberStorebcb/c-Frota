@@ -19,7 +19,7 @@ function cors(origin: string | null): HeadersInit {
   const allow = origin ?? '*'
   return {
     'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
   }
@@ -69,6 +69,28 @@ export default {
       return new Response(null, { headers: cors(origin) })
     }
 
+    const url = new URL(request.url)
+    const pathname = url.pathname.replace(/\/$/, '')
+
+    // ── GET /read — proxy de leitura com CORS (resolve tainted canvas no PDF) ──
+    if (request.method === 'GET' && (pathname === '/read' || pathname.endsWith('/read'))) {
+      const publicBase = env.R2_PUBLIC_BASE_URL?.trim()
+      if (!publicBase) return json({ error: 'server_misconfigured' }, 500, origin)
+      const key = url.searchParams.get('key') ?? ''
+      if (!isSafeObjectKey(key)) return new Response('invalid_key', { status: 400, headers: cors(origin) })
+      const objectUrl = publicObjectUrl(publicBase, key)
+      let upstream: Response
+      try { upstream = await fetch(objectUrl) } catch {
+        return new Response('fetch_failed', { status: 502, headers: cors(origin) })
+      }
+      if (!upstream.ok) return new Response('not_found', { status: upstream.status, headers: cors(origin) })
+      const headers = new Headers(cors(origin))
+      const ct = upstream.headers.get('Content-Type')
+      if (ct) headers.set('Content-Type', ct)
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+      return new Response(upstream.body, { status: 200, headers })
+    }
+
     if (request.method !== 'POST') {
       return json({ error: 'method_not_allowed' }, 405, origin)
     }
@@ -83,9 +105,6 @@ export default {
     if (!accountId || !bucket || !publicBase) {
       return json({ error: 'server_misconfigured' }, 500, origin)
     }
-
-    const url = new URL(request.url)
-    const pathname = url.pathname.replace(/\/$/, '')
 
     // ── Rota /upload — recebe arquivo via multipart/form-data e faz PUT no R2 server-side ──
     // Elimina a necessidade de CORS no bucket R2 para uploads do browser.

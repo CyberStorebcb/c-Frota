@@ -89,11 +89,21 @@ async function dataUrlToJpeg(dataUrl: string): Promise<{ data: string; w: number
   return { data: jpg, w, h }
 }
 
+/** Para URLs do R2 (pub-*.r2.dev), faz proxy pelo Worker para evitar CORS tainted canvas. */
+function r2ProxyUrl(url: string): string | null {
+  const workerBase = (import.meta.env.VITE_R2_PRESIGN_URL as string | undefined)?.trim()
+  if (!workerBase) return null
+  const m = url.match(/\/\/pub-[^/]+\.r2\.dev\/(.+)$/)
+  if (!m) return null
+  return `${workerBase.replace(/\/$/, '')}/read?key=${encodeURIComponent(decodeURIComponent(m[1]))}`
+}
+
 async function urlToPngData(url: string): Promise<{ data: string; w: number; h: number }> {
-  // Fetch first so the canvas doesn't get tainted by cross-origin img elements
+  // Para URLs do R2, usa proxy do Worker que retorna com headers CORS corretos
+  const fetchUrl = r2ProxyUrl(url) ?? url
   let dataUrl: string
   try {
-    const resp = await fetch(url, { cache: 'force-cache' })
+    const resp = await fetch(fetchUrl, { cache: 'force-cache' })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const blob = await resp.blob()
     dataUrl = await new Promise<string>((resolve, reject) => {
