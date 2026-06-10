@@ -133,11 +133,11 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
 
   if (data.length === 0) return null
 
-  const H = 200
+  const H = 220
   const padTop = 24
   const padBot = 48
   const padLeft = 44
-  const padRight = 16
+  const padRight = 52          // espaço para o eixo Y direito (dias)
   const chartW = svgW - padLeft - padRight
   const chartH = H - padTop - padBot
 
@@ -154,10 +154,11 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
     .map((d, i) => d.diasMedios != null ? `${barCx(i).toFixed(1)},${yLine(d.diasMedios).toFixed(1)}` : null)
     .filter(Boolean) as string[]
 
-  // grid horizontais
+  // grid horizontais (escala de barras — eixo esquerdo)
   const gridLines = [0, 0.25, 0.5, 0.75, 1].map((t) => ({
     y: padTop + chartH * (1 - t),
-    val: Math.round(maxBars * t),
+    valBar: Math.round(maxBars * t),
+    valDias: Math.round(maxDias * t * 10) / 10,  // para eixo direito
   }))
 
   const labelEvery = data.length > 20 ? Math.ceil(data.length / 10) : data.length > 10 ? 2 : 1
@@ -165,11 +166,14 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
   return (
     <div className="relative w-full select-none">
       <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${svgW} ${H}`} className="overflow-visible">
-        {/* grid */}
-        {gridLines.map(({ y, val }) => (
+        {/* grid + eixo esquerdo (barras) + eixo direito (dias) */}
+        {gridLines.map(({ y, valBar, valDias }) => (
           <g key={y}>
             <line x1={padLeft} y1={y} x2={svgW - padRight} y2={y} stroke="currentColor" strokeOpacity="0.07" strokeWidth="1" className="text-slate-900 dark:text-white" />
-            <text x={padLeft - 6} y={y + 4} textAnchor="end" fontSize="10" fill="currentColor" fillOpacity="0.35" className="text-slate-900 dark:text-white">{val}</text>
+            {/* eixo esquerdo — contagem */}
+            <text x={padLeft - 6} y={y + 4} textAnchor="end" fontSize="10" fill="currentColor" fillOpacity="0.35" className="text-slate-900 dark:text-white">{valBar}</text>
+            {/* eixo direito — dias médios */}
+            <text x={svgW - padRight + 6} y={y + 4} textAnchor="start" fontSize="10" fill="#f59e0b" fillOpacity="0.7">{valDias}d</text>
           </g>
         ))}
 
@@ -232,15 +236,31 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
           const cx = barCx(i)
           const cy = yLine(d.diasMedios)
           const isHov = hov === i
+          const labelVal = d.diasMedios % 1 === 0 ? `${d.diasMedios}d` : `${d.diasMedios}d`
+          // posiciona label acima do ponto, sem sair do topo
+          const labelY = Math.max(padTop - 4, cy - 7)
           return (
-            <circle
-              key={d.chave + 'dot'}
-              cx={cx} cy={cy} r={isHov ? 5 : 3}
-              fill={diasColor(d.diasMedios)}
-              stroke="white" strokeWidth="1.5"
+            <g key={d.chave + 'dot'}
               onMouseEnter={() => setHov(i)}
               onMouseLeave={() => setHov(null)}
-            />
+            >
+              <circle
+                cx={cx} cy={cy} r={isHov ? 5 : 3}
+                fill={diasColor(d.diasMedios)}
+                stroke="white" strokeWidth="1.5"
+              />
+              {/* label do valor sempre visível */}
+              <text
+                x={cx} y={labelY}
+                textAnchor="middle"
+                fontSize="9"
+                fontWeight="800"
+                fill="#f59e0b"
+                opacity={isHov ? 1 : 0.75}
+              >
+                {labelVal}
+              </text>
+            </g>
           )
         })}
 
