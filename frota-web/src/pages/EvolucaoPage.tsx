@@ -620,8 +620,8 @@ export function EvolucaoPage() {
     })
   }, [rows, filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo, agregacao, chartData, boundaryRange])
 
-  // KPIs globais: total de defeitos no recorte (resolvidos + pendentes)
-  const totalDefeitos = useMemo(() => {
+  // Filtro de campo compartilhado (sem filtro de data) — base para os KPIs globais
+  const rowsComFiltrosCampo = useMemo(() => {
     return rows.filter((r) => {
       if (filtroBase !== 'todos' && !matchesBaseFilter(r.base, filtroBase)) return false
       if (filtroCoord !== 'todos' && !matchesCoordenadorFilter(r.coordenador, filtroCoord)) return false
@@ -629,10 +629,13 @@ export function EvolucaoPage() {
       if (filtroSupervisor !== 'todos' && !matchesSupervisorFilter(r.supervisor, filtroSupervisor)) return false
       if (filtroPrefixo !== 'todos' && r.prefixo !== filtroPrefixo) return false
       return true
-    }).length
+    })
   }, [rows, filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo])
 
-  const totalPendentes = totalDefeitos - resolvidosFiltrados.length
+  // Contagem direta — evita inconsistência entre cards quando há resolvidos sem dataResolvido
+  const totalDefeitos   = rowsComFiltrosCampo.length
+  const resolvidosTotais = useMemo(() => rowsComFiltrosCampo.filter((r) => r.resolvido).length, [rowsComFiltrosCampo])
+  const totalPendentes   = useMemo(() => rowsComFiltrosCampo.filter((r) => !r.resolvido).length, [rowsComFiltrosCampo])
 
   // Tendência: compara últimos 2 períodos com dados
   const tendencia = useMemo(() => {
@@ -858,7 +861,7 @@ export function EvolucaoPage() {
 
         {/* Gauge taxa */}
         <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-slate-800 dark:bg-slate-950">
-          <TaxaGauge resolvidos={resolvidosFiltrados.length} total={totalDefeitos} />
+          <TaxaGauge resolvidos={resolvidosTotais} total={totalDefeitos} />
         </div>
       </div>
 
