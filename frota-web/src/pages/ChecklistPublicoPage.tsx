@@ -1349,6 +1349,9 @@ function FormularioChecklist({
     'empilhadeira': [],
   }
 
+  // Veículos do Supabase (inclui cadastros recentes como GLP03)
+  const { vehicles: supabaseFleetVehicles } = useFleet()
+
   // Opções dinâmicas vindas do registro de veículos (catálogo estático + Supabase)
   const opcoesVeiculo = useMemo(() => {
     const staticVehicles = getDisplayedFleetVehicles()
@@ -1419,7 +1422,6 @@ function FormularioChecklist({
   const fileRef = useRef<HTMLInputElement>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const scrollTimers = useRef<ReturnType<typeof setTimeout>[]>([])
-  const { vehicles: supabaseFleetVehicles } = useFleet()
   const [fleetTick, setFleetTick] = useState(0)
   const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
   const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
