@@ -300,7 +300,11 @@ type JustificadoRow = VeiculoRow & { motivo: ChecklistAusenciaMotivo; placaReser
 
 function JustificadoMotivoBadge({ motivo, placaReserva }: { motivo: ChecklistAusenciaMotivo; placaReserva?: string }) {
   return (
-    <span className="inline-flex flex-wrap items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+    <span className={`inline-flex flex-wrap items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+      motivo === 'FÉRIAS'
+        ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200'
+        : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
+    }`}>
       {motivo}
       {motivo === 'RESERVA' && placaReserva ? (
         <span className="font-bold normal-case tracking-normal text-amber-900/90 dark:text-amber-100">
@@ -483,9 +487,7 @@ function JustificadosPanel({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</span>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
-                      {v.motivo}
-                    </span>
+                    <JustificadoMotivoBadge motivo={v.motivo} />
                     {v.motivo === 'RESERVA' && v.placaReserva ? (
                       <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
                         Reserva {formatPlaca(v.placaReserva)}
@@ -849,11 +851,13 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   const removerJustificativa = useCallback(
     async (placa: string) => {
       setJustificativaSavingPlaca(placa)
+      const motivoAtual = justificativas.get(placa)?.motivo
       const res = await removeChecklistAusenciaJustificativa({
         placa,
         periodoInicio: limites.ini,
         periodoFim: limites.fim,
         setor: setorVeiculo,
+        motivo: motivoAtual,
       })
       setJustificativaSavingPlaca(null)
       if (!res.ok) {
@@ -866,7 +870,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         return next
       })
     },
-    [limites.ini, limites.fim, setorVeiculo],
+    [justificativas, limites.ini, limites.fim, setorVeiculo],
   )
 
   // ── frota ATIVA — mesmo critério do Dashboard (ATIVOS + TRANSPORTE) ──

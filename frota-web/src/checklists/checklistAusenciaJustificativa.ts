@@ -1,7 +1,7 @@
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import { normalizePlaca } from '../frota/vehicleRegistry'
 
-export const CHECKLIST_AUSENCIA_MOTIVOS = ['FEITO', 'RESERVA', 'NÃO RODOU', 'OFICINA', 'DESMOBILIZADO'] as const
+export const CHECKLIST_AUSENCIA_MOTIVOS = ['FEITO', 'RESERVA', 'NÃO RODOU', 'OFICINA', 'DESMOBILIZADO', 'FÉRIAS'] as const
 export type ChecklistAusenciaMotivo = (typeof CHECKLIST_AUSENCIA_MOTIVOS)[number]
 
 export type ChecklistAusenciaJustificativaEntry = {
@@ -121,6 +121,20 @@ export async function loadChecklistAusenciaJustificativas(params: {
 
   if (!supabaseConfigured) return map
 
+  // Férias persistentes — injetadas primeiro para que justificativas de período
+  // (FEITO, RESERVA, etc.) possam sobrepor caso o admin tenha ajustado.
+  const { data: feriasData } = await supabase
+    .from('vehicle_ferias')
+    .select('placa')
+    .eq('setor', setor)
+
+  for (const row of (feriasData ?? []) as { placa: string }[]) {
+    const placa = normalizePlaca(row.placa)
+    if (placa && !map.has(placa)) {
+      map.set(placa, { motivo: 'FÉRIAS' })
+    }
+  }
+
   const { data, error } = await supabase
     .from('checklist_ausencia_justificativas')
     .select('placa, motivo, placa_reserva, periodo_inicio, periodo_fim, setor, updated_at')
@@ -164,6 +178,23 @@ export async function saveChecklistAusenciaJustificativa(params: {
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const placa = normalizePlaca(params.placa)
   if (!placa) return { ok: false, message: 'Placa inválida.' }
+
+  // FÉRIAS vai para tabela própria (persistente, sem período).
+  if (params.motivo === 'FÉRIAS') {
+    if (!supabaseConfigured) return { ok: true }
+    const { error } = await supabase.from('vehicle_ferias').upsert(
+      { placa, setor: params.setor, created_by: (await supabase.auth.getUser()).data.user?.id ?? null },
+      { onConflict: 'placa,setor' },
+    )
+    if (error) return { ok: false, message: error.message }
+    return { ok: true }
+  }
+
+  // Qualquer outro motivo: limpa eventual férias pendente para esta placa
+  // (ex: admin troca FÉRIAS → RESERVA) e salva na tabela de período.
+  if (supabaseConfigured) {
+    await supabase.from('vehicle_ferias').delete().eq('placa', placa).eq('setor', params.setor)
+  }
 
   const reservaCheck = validatePlacaReserva(placa, params.motivo, params.placaReserva)
   if (!reservaCheck.ok) return reservaCheck
@@ -210,9 +241,22 @@ export async function removeChecklistAusenciaJustificativa(params: {
   periodoInicio: string
   periodoFim: string
   setor: string
+  motivo?: ChecklistAusenciaMotivo
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const placa = normalizePlaca(params.placa)
   if (!placa) return { ok: false, message: 'Placa inválida.' }
+
+  // FÉRIAS vive na tabela própria — remove de lá.
+  if (params.motivo === 'FÉRIAS') {
+    if (!supabaseConfigured) return { ok: true }
+    const { error } = await supabase
+      .from('vehicle_ferias')
+      .delete()
+      .eq('placa', placa)
+      .eq('setor', params.setor)
+    if (error) return { ok: false, message: error.message }
+    return { ok: true }
+  }
 
   const local = readLocalCache()
   delete local[storageKey(params.setor, placa, params.periodoInicio, params.periodoFim)]
