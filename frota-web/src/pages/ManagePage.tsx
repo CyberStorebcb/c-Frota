@@ -561,11 +561,27 @@ export function ManagePage() {
   // ── Editor de data de resolução (superadmin) ───────────────────────────────
   const [editDataOpen, setEditDataOpen] = useState(false)
   const [editDataValue, setEditDataValue] = useState('')
+  const [editDataAssinatura, setEditDataAssinatura] = useState('')
   const [editDataSalvando, setEditDataSalvando] = useState(false)
+
+  // Lista de resolvedores únicos extraída dos rows (emails com pelo menos 1 resolução)
+  const resolvedoresUnicos = useMemo(() => {
+    const seen = new Set<string>()
+    const lista: { email: string; nome: string }[] = []
+    for (const r of rows) {
+      if (r.resolvidoPor && !seen.has(r.resolvidoPor)) {
+        seen.add(r.resolvidoPor)
+        lista.push({ email: r.resolvidoPor, nome: primeiroNomeDoEmail(r.resolvidoPor) })
+      }
+    }
+    return lista.sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [rows])
 
   const abrirEditData = () => {
     if (!detailApontamento) return
     setEditDataValue(detailApontamento.dataResolvido ?? new Date().toISOString().slice(0, 10))
+    // Pré-seleciona a assinatura original; se não existe nos resolvedores, usa email do usuário
+    setEditDataAssinatura(detailApontamento.resolvidoPor ?? user?.email ?? '')
     setEditDataOpen(true)
   }
 
@@ -581,7 +597,7 @@ export function ManagePage() {
         osArquivo: detailApontamento.osArquivo,
         dataResolvido: editDataValue,
       },
-      user?.email ?? undefined,
+      editDataAssinatura || user?.email || undefined,  // usa assinatura selecionada
     )
     setEditDataOpen(false)
     setEditDataSalvando(false)
@@ -1661,32 +1677,55 @@ export function ManagePage() {
                         )}
                       </div>
 
-                      {/* Editor inline de data (superadmin) */}
+                      {/* Editor inline de data + assinatura (superadmin) */}
                       {isSuperAdmin && editDataOpen ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="date"
-                            value={editDataValue}
-                            onChange={(e) => setEditDataValue(e.target.value)}
-                            max={new Date().toISOString().slice(0, 10)}
-                            className="flex-1 rounded-lg border border-emerald-300 bg-white px-2 py-1 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-emerald-700 dark:bg-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
-                          />
-                          <button
-                            type="button"
-                            onClick={confirmarEditData}
-                            disabled={editDataSalvando || !editDataValue}
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
-                          >
-                            {editDataSalvando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                            Salvar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditDataOpen(false)}
-                            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                          >
-                            <X size={12} />
-                          </button>
+                        <div className="mt-1 flex flex-col gap-2">
+                          {/* Data */}
+                          <div>
+                            <div className="mb-0.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Data</div>
+                            <input
+                              type="date"
+                              value={editDataValue}
+                              onChange={(e) => setEditDataValue(e.target.value)}
+                              max={new Date().toISOString().slice(0, 10)}
+                              className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-emerald-700 dark:bg-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+                            />
+                          </div>
+                          {/* Assinatura */}
+                          <div>
+                            <div className="mb-0.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Assinatura (quem resolveu)</div>
+                            <select
+                              value={editDataAssinatura}
+                              onChange={(e) => setEditDataAssinatura(e.target.value)}
+                              className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-emerald-700 dark:bg-slate-900 dark:text-slate-100"
+                            >
+                              <option value="">— selecione —</option>
+                              {resolvedoresUnicos.map((r) => (
+                                <option key={r.email} value={r.email}>
+                                  {r.nome} ({r.email})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* Botões */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={confirmarEditData}
+                              disabled={editDataSalvando || !editDataValue || !editDataAssinatura}
+                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {editDataSalvando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                              Salvar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditDataOpen(false)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                            >
+                              <X size={12} /> Cancelar
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <p className="font-bold text-slate-800 dark:text-slate-200">
