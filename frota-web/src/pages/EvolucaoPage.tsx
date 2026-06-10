@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useApontamentos, type Apontamento, type PeriodoCarregado } from '../apontamentos/ApontamentosContext'
+import { apontamentoGroupKey } from '../apontamentos/groupApontamentos'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import {
   type EvolucaoFiltros,
@@ -632,10 +633,16 @@ export function EvolucaoPage() {
     })
   }, [rows, filtroBase, filtroCoord, filtroResp, filtroSupervisor, filtroPrefixo])
 
-  // Contagem direta — evita inconsistência entre cards quando há resolvidos sem dataResolvido
-  const totalDefeitos   = rowsComFiltrosCampo.length
+  // Contagem direta com deduplicação (igual ao ManagePage) — mesma placa + mesmo item NC = 1 defeito
   const resolvidosTotais = useMemo(() => rowsComFiltrosCampo.filter((r) => r.resolvido).length, [rowsComFiltrosCampo])
-  const totalPendentes   = useMemo(() => rowsComFiltrosCampo.filter((r) => !r.resolvido).length, [rowsComFiltrosCampo])
+  const totalPendentes = useMemo(() =>
+    new Set(
+      rowsComFiltrosCampo
+        .filter((r) => !r.resolvido)
+        .map((r) => apontamentoGroupKey(r) ?? r.id),
+    ).size,
+  [rowsComFiltrosCampo])
+  const totalDefeitos = resolvidosTotais + totalPendentes
 
   // Tendência: compara últimos 2 períodos com dados
   const tendencia = useMemo(() => {
