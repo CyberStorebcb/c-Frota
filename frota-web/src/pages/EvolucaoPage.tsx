@@ -141,7 +141,7 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
   const chartW = svgW - padLeft - padRight
   const chartH = H - padTop - padBot
 
-  const maxBars = Math.max(...data.map((d) => d.resolvidos), 1)
+  const maxBars = Math.max(...data.map((d) => d.resolvidos + d.pendentes), 1)
   const maxDias = Math.max(...data.map((d) => d.diasMedios ?? 0), 1)
 
   const barW = Math.max(4, Math.floor(chartW / data.length) - 4)
@@ -193,24 +193,33 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
           </g>
         ))}
 
-        {/* barras — apenas resolvidos por semana (população consistente: itens resolvidos nessa semana) */}
+        {/* barras empilhadas: verde (resolvidos) embaixo, vermelho (pendentes) em cima */}
         {data.map((d, i) => {
           const cx = barCx(i)
           const half = barW / 2
-          const hResolv = d.resolvidos > 0 ? (d.resolvidos / maxBars) * chartH : 0
+          const rTot = d.resolvidos + d.pendentes
+          const hResolv = rTot > 0 ? (d.resolvidos / maxBars) * chartH : 0
+          const hPend  = rTot > 0 ? (d.pendentes  / maxBars) * chartH : 0
           const isHov = hov === i
           return (
             <g key={d.chave} onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}>
-              {/* resolvidos */}
+              {/* resolvidos — parte de baixo */}
               {hResolv > 0 && (
                 <rect
                   x={cx - half} y={yBar(d.resolvidos)} width={barW} height={hResolv}
                   rx="2" fill="#16a34a" opacity={isHov ? 1 : 0.8}
                 />
               )}
-              {/* label topo ao passar o mouse */}
-              {isHov && d.resolvidos > 0 && (
-                <text x={cx} y={yBar(d.resolvidos) - 4} textAnchor="middle" fontSize="10" fontWeight="800" fill="#94a3b8">{d.resolvidos}</text>
+              {/* pendentes — parte de cima */}
+              {hPend > 0 && (
+                <rect
+                  x={cx - half} y={yBar(rTot)} width={barW} height={hPend}
+                  rx="2" fill="#dc2626" opacity={isHov ? 0.95 : 0.65}
+                />
+              )}
+              {/* label total ao passar o mouse */}
+              {isHov && rTot > 0 && (
+                <text x={cx} y={yBar(rTot) - 4} textAnchor="middle" fontSize="10" fontWeight="800" fill="#94a3b8">{rTot}</text>
               )}
               {/* label eixo X */}
               {i % labelEvery === 0 && (
@@ -274,17 +283,18 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
         {hov != null && data[hov] && (() => {
           const d = data[hov]!
           const cx = barCx(hov)
-          const bw = 148
-          const bh = 64
+          const bw = 168
+          const bh = 82
           const tx = Math.max(padLeft, Math.min(cx - bw / 2, svgW - padRight - bw))
           const ty = padTop - 8 - bh
           return (
             <g pointerEvents="none">
               <rect x={tx} y={ty} width={bw} height={bh} rx="8" fill="rgb(15,23,42)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
               <text x={tx + bw / 2} y={ty + 15} textAnchor="middle" fontSize="10" fontWeight="800" fill="#e2e8f0">{d.periodo}</text>
-              <text x={tx + 10} y={ty + 32} fontSize="10" fill="#4ade80" fontWeight="700">✓ {d.resolvidos} resolvido{d.resolvidos !== 1 ? 's' : ''} nessa semana</text>
-              <text x={tx + 10} y={ty + 50} fontSize="10" fill="#fbbf24" fontWeight="700">
-                {d.diasMedios != null ? `⊘ média de ${d.diasMedios}d para resolver` : '⊘ sem média de resolução'}
+              <text x={tx + 10} y={ty + 32} fontSize="10" fill="#4ade80" fontWeight="700">✓ {d.resolvidos} resolvidos na semana</text>
+              <text x={tx + 10} y={ty + 48} fontSize="10" fill="#f87171" fontWeight="700">⏳ {d.pendentes} apontados ainda em aberto</text>
+              <text x={tx + 10} y={ty + 66} fontSize="10" fill="#fbbf24" fontWeight="700">
+                {d.diasMedios != null ? `⊘ ${d.diasMedios}d médios p/ resolver` : '⊘ sem média de resolução'}
               </text>
             </g>
           )
@@ -295,7 +305,11 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pt-1">
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-sm bg-emerald-600 opacity-80" />
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Resolvidos na semana</span>
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Resolvidos</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-sm bg-red-600 opacity-65" />
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Pendentes apontados na semana</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-2 w-5 rounded-full bg-amber-400 opacity-85" />
