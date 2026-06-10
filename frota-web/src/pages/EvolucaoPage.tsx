@@ -150,9 +150,25 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
   const yBar = (v: number) => padTop + chartH - (v / maxBars) * chartH
   const yLine = (v: number) => padTop + chartH - (v / maxDias) * chartH
 
-  const linePoints = data
-    .map((d, i) => d.diasMedios != null ? `${barCx(i).toFixed(1)},${yLine(d.diasMedios).toFixed(1)}` : null)
-    .filter(Boolean) as string[]
+  // Pontos da linha (apenas os que têm diasMedios)
+  const linePts = data
+    .map((d, i) => d.diasMedios != null ? { x: barCx(i), y: yLine(d.diasMedios) } : null)
+    .filter((p): p is { x: number; y: number } => p != null)
+
+  // Constrói path SVG com curvas bezier cúbicas suavizadas entre os pontos
+  // (ponto de controle horizontal no centro → transição suave sem ângulos)
+  function buildSmoothPath(pts: { x: number; y: number }[]): string {
+    if (pts.length < 2) return ''
+    if (pts.length === 2) return `M ${pts[0]!.x},${pts[0]!.y} L ${pts[1]!.x},${pts[1]!.y}`
+    let d = `M ${pts[0]!.x.toFixed(1)},${pts[0]!.y.toFixed(1)}`
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1]!
+      const curr = pts[i]!
+      const cpX = ((prev.x + curr.x) / 2).toFixed(1)
+      d += ` C ${cpX},${prev.y.toFixed(1)} ${cpX},${curr.y.toFixed(1)} ${curr.x.toFixed(1)},${curr.y.toFixed(1)}`
+    }
+    return d
+  }
 
   // grid horizontais (escala de barras — eixo esquerdo)
   const gridLines = [0, 0.25, 0.5, 0.75, 1].map((t) => ({
@@ -219,14 +235,13 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
           )
         })}
 
-        {/* linha dias médios */}
-        {linePoints.length >= 2 && (
-          <polyline
-            points={linePoints.join(' ')}
+        {/* linha dias médios — curva bezier suavizada */}
+        {linePts.length >= 2 && (
+          <path
+            d={buildSmoothPath(linePts)}
             fill="none"
             stroke="#f59e0b"
             strokeWidth="2"
-            strokeLinejoin="round"
             strokeLinecap="round"
             opacity="0.85"
           />
