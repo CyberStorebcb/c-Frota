@@ -31,6 +31,7 @@ import { CollapsedNavMark } from '../branding/CollapsedNavMark'
 import { CHECKLIST_SCHEMAS, SCHEMA_MAP } from '../data/checklistSchemas'
 import type { ChecklistSchemaDef } from '../data/checklistSchemas'
 import { formatPlaca, getDisplayedFleetVehicles, normalizePlaca } from '../frota/vehicleRegistry'
+import { useFleet } from '../frota/FleetContext'
 import { compressChecklistImageIfNeeded } from '../utils/compressChecklistImage'
 import { buildWhatsappLink, getSupervisorWhatsapp, isSupervisorReconhecido, SUPERVISOR_WHATSAPP } from '../data/supervisorContatos'
 import { usePwaUpdate } from '../pwa/usePwaUpdate'
@@ -1348,18 +1349,21 @@ function FormularioChecklist({
     'empilhadeira': [],
   }
 
-  // Opções dinâmicas vindas do registro de veículos
+  // Opções dinâmicas vindas do registro de veículos (catálogo estático + Supabase)
   const opcoesVeiculo = useMemo(() => {
-    const todos = getDisplayedFleetVehicles().filter((v) => v.status === 'ATIVO')
+    const staticVehicles = getDisplayedFleetVehicles()
+    // Merge: Supabase sobrepõe estático pela placa
+    const byPlaca = new Map(staticVehicles.map((v) => [normalizePlaca(v.placa), v]))
+    for (const v of supabaseFleetVehicles) byPlaca.set(normalizePlaca(v.placa), v)
+    const todos = [...byPlaca.values()].filter((v) => v.status === 'ATIVO')
     const tipos = TIPO_MAP[schema.id] ?? []
     const filtrados = tipos.length > 0 ? todos.filter((v) => tipos.includes(v.tipo)) : todos
     return {
       placa:       [...new Set(filtrados.map((v) => formatPlaca(v.placa)).filter(Boolean))].sort(),
       marca_modelo:[...new Set(filtrados.map((v) => v.modelo).filter(Boolean))].sort(),
-      // Prefixos: lista completa da frota (sem filtro de tipo) para o usuario escolher qualquer prefixo
       prefixo:     [...new Set(todos.map((v) => v.prefixo).filter((p) => p && p !== 'N/A'))].sort(),
     }
-  }, [schema.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [schema.id, supabaseFleetVehicles]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const draft = demoMode?.enabled ? null : readFormDraft(schema.id)
 
@@ -1415,21 +1419,28 @@ function FormularioChecklist({
   const fileRef = useRef<HTMLInputElement>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const scrollTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const { vehicles: supabaseFleetVehicles } = useFleet()
   const [fleetTick, setFleetTick] = useState(0)
   const [placaSuggestOpen, setPlacaSuggestOpen] = useState(false)
   const [placaHighlightIdx, setPlacaHighlightIdx] = useState(0)
   const [prefixoSuggestOpen, setPrefixoSuggestOpen] = useState(false)
   const [prefixoHighlightIdx, setPrefixoHighlightIdx] = useState(0)
 
-  // Mapa de placa → veículo (precisa estar antes do efeito demo)
+  // Mapa de placa → veículo: catálogo estático + localStorage + veículos do Supabase
+  // (Supabase tem precedência para garantir que cadastros recentes sejam reconhecidos)
   const fleetByPlaca = useMemo(() => {
     void fleetTick
     const map = new Map<string, ReturnType<typeof getDisplayedFleetVehicles>[number]>()
+    // 1. catálogo estático + localStorage
     for (const v of getDisplayedFleetVehicles()) {
       map.set(normalizePlaca(v.placa), v)
     }
+    // 2. veículos do Supabase sobrepõem (inclui cadastros novos como GLP03)
+    for (const v of supabaseFleetVehicles) {
+      map.set(normalizePlaca(v.placa), v)
+    }
     return map
-  }, [fleetTick])
+  }, [fleetTick, supabaseFleetVehicles])
 
   // Refs estáveis para o player do demo — evita que re-renders do pai cancelem
   // o preenchimento automático em andamento. Effect usa deps [] e lê tudo via refs.

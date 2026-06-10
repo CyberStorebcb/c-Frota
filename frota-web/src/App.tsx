@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom'
 import { RequireAuth } from './components/auth/RequireAuth'
 import { RequireAdmin, RequireSuperAdmin } from './components/auth/RequireAdmin'
 import { AppShell } from './components/layout/AppShell'
@@ -9,6 +9,11 @@ import { ApontamentosProvider } from './apontamentos/ApontamentosContext'
 import { TourProvider } from './tour/TourContext'
 import { TourOverlay } from './tour/TourOverlay'
 import { TourLauncher } from './tour/TourLauncher'
+import { FleetProvider } from './frota/FleetContext'
+
+function FleetLayout() {
+  return <FleetProvider><Outlet /></FleetProvider>
+}
 
 function AuthedShellWithTour() {
   return (
@@ -94,10 +99,12 @@ export default function App() {
         <Route path="/privacidade" element={<PrivacyPage />} />
         <Route path="/registro-especial" element={<RegistroEspecialPage />} />
         <Route path="/registro" element={<LazyRegistroRoute />} />
-        {/* Checklist público — rotas mais específicas primeiro */}
-        <Route path="/checklist/demo" element={<ChecklistPublicoPage forceDemo />} />
-        <Route path="/checklist/:tipo" element={<ChecklistTipoRedirect />} />
-        <Route path="/checklist" element={<ChecklistPublicoPage />} />
+        {/* Checklist público — FleetLayout carrega veículos do Supabase para validar a placa */}
+        <Route element={<FleetLayout />}>
+          <Route path="/checklist/demo" element={<ChecklistPublicoPage forceDemo />} />
+          <Route path="/checklist/:tipo" element={<ChecklistTipoRedirect />} />
+          <Route path="/checklist" element={<ChecklistPublicoPage />} />
+        </Route>
 
         {/* Troca de senha — pública para suportar o fluxo de recovery via link de e-mail */}
         <Route path="/trocar-senha" element={<TrocarSenhaPage />} />
