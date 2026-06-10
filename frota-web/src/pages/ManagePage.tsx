@@ -193,7 +193,7 @@ function StatPill({
   label: string
   value: string
   icon: React.ReactNode
-  tone: 'slate' | 'emerald' | 'rose' | 'sky'
+  tone: 'slate' | 'emerald' | 'rose' | 'sky' | 'amber'
   selected?: boolean
   onClick?: () => void
 }) {
@@ -204,7 +204,9 @@ function StatPill({
         ? 'border-rose-200/80 bg-rose-50 text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100'
         : tone === 'sky'
           ? 'border-sky-200/80 bg-sky-50 text-sky-950 dark:border-sky-900/45 dark:bg-sky-950/35 dark:text-sky-100'
-          : 'border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
+          : tone === 'amber'
+            ? 'border-amber-200/80 bg-amber-50 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100'
+            : 'border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
 
   const Tag = onClick ? 'button' : 'div'
 
@@ -240,8 +242,8 @@ export function ManagePage() {
 
   const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
   const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* noop */ } }
-  const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes'>(
-    () => (lsGet('frota.manage.visao', 'apontamentos') as 'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes')
+  const [visao, setVisao] = useState<'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes' | 'justificados'>(
+    () => (lsGet('frota.manage.visao', 'apontamentos') as 'apontamentos' | 'pendentes' | 'resolvidos' | 'entrantes' | 'justificados')
   )
   const [severidade, setSeveridade] = useState<'todos' | 'imperativo' | 'atencao'>(
     () => (lsGet('frota.manage.severidade', 'todos') as 'todos' | 'imperativo' | 'atencao')
@@ -438,6 +440,7 @@ export function ManagePage() {
     if (visao === 'pendentes') list = list.filter((r) => !r.resolvido)
     if (visao === 'resolvidos') list = list.filter((r) => r.resolvido)
     if (visao === 'entrantes') list = list.filter((r) => isDefeitoEntrante(r, nowMs))
+    if (visao === 'justificados') list = list.filter((r) => r.justificado && !r.resolvido)
     if (severidade === 'imperativo') list = list.filter((r) => r.imperativo)
     if (severidade === 'atencao') list = list.filter((r) => !r.imperativo)
     return list
@@ -452,7 +455,8 @@ export function ManagePage() {
     const pendentes = pendentesUnicas
     const resolvidos = rowsMatchingFiltros.filter((r) => r.resolvido).length
     const entrantes = rowsMatchingFiltros.filter((r) => isDefeitoEntrante(r, nowMs)).length
-    return { total: rowsMatchingFiltros.length, pendentes, resolvidos, entrantes }
+    const justificados = rowsMatchingFiltros.filter((r) => r.justificado && !r.resolvido).length
+    return { total: rowsMatchingFiltros.length, pendentes, resolvidos, entrantes, justificados }
   }, [rowsMatchingFiltros, nowMs])
 
   const severidadeStats = useMemo(() => {
@@ -1003,7 +1007,7 @@ export function ManagePage() {
         </div>
       </div>
 
-      <div data-tour="manage-stats" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-tour="manage-stats" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatPill
           label="Checklists realizados"
           value={String(filtrosAtivos ? new Set(rowsMatchingFiltros.map((r) => r.checklistId)).size : checklistsRealizadosTotal)}
@@ -1040,6 +1044,14 @@ export function ManagePage() {
             setPagina(1)
             tabelaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }}
+        />
+        <StatPill
+          label="Justificados"
+          value={String(stats.justificados)}
+          icon={<MessageSquareWarning size={18} />}
+          tone="amber"
+          selected={visao === 'justificados'}
+          onClick={() => { setVisao('justificados'); setPagina(1) }}
         />
       </div>
 
