@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState } from 'react'
+import { useMemo, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -6,12 +6,14 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Loader2,
+  RefreshCw,
   TrendingDown,
   TrendingUp,
   Trophy,
   Zap,
 } from 'lucide-react'
-import { useApontamentos, type Apontamento } from '../apontamentos/ApontamentosContext'
+import { useApontamentos, type Apontamento, type PeriodoCarregado } from '../apontamentos/ApontamentosContext'
 import { formatDefeitoParaExibicao } from '../apontamentos/defeitoExibicao'
 import {
   type EvolucaoFiltros,
@@ -44,6 +46,13 @@ const DATA_OPTS: SelectOption[] = [
   { value: '90', label: 'Últimos 90 dias (resolução)' },
   { value: '365', label: 'Últimos 12 meses (resolução)' },
   { value: 'ano', label: 'Ano atual (resolução)' },
+]
+
+const PERIODO_CARGA_OPTS: SelectOption[] = [
+  { value: '180d', label: '6 meses' },
+  { value: '1a',   label: '1 ano' },
+  { value: '2a',   label: '2 anos' },
+  { value: 'tudo', label: 'Todo histórico' },
 ]
 
 
@@ -487,7 +496,7 @@ function TaxaGauge({ resolvidos, total }: { resolvidos: number; total: number })
 }
 
 export function EvolucaoPage() {
-  const { rows } = useApontamentos()
+  const { rows, carregando, periodoCarregado, setPeriodoCarregado, recarregar } = useApontamentos()
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [wrapW, setWrapW] = useState(0)
   const [agregacao, setAgregacao] = useState<'semana' | 'mes'>('semana')
@@ -527,6 +536,11 @@ export function EvolucaoPage() {
     setWrapW(el.clientWidth)
     return () => ro.disconnect()
   }, [])
+
+  const handlePeriodoCarga = useCallback(async (p: string) => {
+    setPeriodoCarregado(p as PeriodoCarregado)
+    await recarregar()
+  }, [setPeriodoCarregado, recarregar])
 
   const optPrefixo = PREFIXO_FILTER_SELECT_OPTIONS
 
@@ -728,6 +742,15 @@ export function EvolucaoPage() {
           </Link>
           <button
             type="button"
+            onClick={() => recarregar()}
+            disabled={carregando}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+          >
+            <RefreshCw size={18} aria-hidden className={carregando ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
+          <button
+            type="button"
             onClick={exportarCsv}
             disabled={resolvidosFiltrados.length === 0}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-900 shadow-soft hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
@@ -752,12 +775,21 @@ export function EvolucaoPage() {
             <Select label="Supervisor" value={filtroSupervisor} options={SUPERVISOR_FILTER_SELECT_OPTIONS} onChange={setFiltroSupervisor} tone="dark" />
             <Select label="Base" value={filtroBase} options={BASE_FILTER_SELECT_OPTIONS} onChange={setFiltroBase} tone="dark" />
           </FilterPanelGroup>
-          <FilterPanelGroup title="Veículo e período" columns="sm:grid-cols-2">
+          <FilterPanelGroup title="Veículo e período" columns="sm:grid-cols-3">
             <Select label="Prefixo" value={filtroPrefixo} options={optPrefixo} onChange={setFiltroPrefixo} tone="dark" />
-            <Select label="Data" value={filtroData} options={DATA_OPTS} onChange={(v) => setFiltroData(v as EvolucaoFiltros['data'])} tone="dark" />
+            <Select label="Exibir" value={filtroData} options={DATA_OPTS} onChange={(v) => setFiltroData(v as EvolucaoFiltros['data'])} tone="dark" />
+            <Select label="Carregar do banco" value={periodoCarregado} options={PERIODO_CARGA_OPTS} onChange={handlePeriodoCarga} tone="dark" />
           </FilterPanelGroup>
         </div>
       </FilterPanel>
+
+      {/* ── Banner de carregamento ── */}
+      {carregando && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
+          <Loader2 size={15} className="animate-spin shrink-0" />
+          Sincronizando com o banco de dados…
+        </div>
+      )}
 
       {/* ── KPIs principais ── */}
       <div data-tour="evolucao-kpis" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
