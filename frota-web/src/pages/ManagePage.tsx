@@ -235,6 +235,7 @@ export function ManagePage() {
   const { user } = useAuth()
   const canMarkResolved = hasPermission(user, 'resolve_apontamentos')
   const canJustify = user?.canJustify ?? false
+  const isSuperAdmin = user?.role === 'super_admin'
   const [searchParams, setSearchParams] = useSearchParams()
 
   const lsGet = (k: string, fb: string) => { try { return localStorage.getItem(k) ?? fb } catch { return fb } }
@@ -556,6 +557,36 @@ export function ManagePage() {
     const t = new Date(prazoIso + 'T23:59:59').getTime()
     return nowMs > t
   }
+
+  // ── Editor de data de resolução (superadmin) ───────────────────────────────
+  const [editDataOpen, setEditDataOpen] = useState(false)
+  const [editDataValue, setEditDataValue] = useState('')
+  const [editDataSalvando, setEditDataSalvando] = useState(false)
+
+  const abrirEditData = () => {
+    if (!detailApontamento) return
+    setEditDataValue(detailApontamento.dataResolvido ?? new Date().toISOString().slice(0, 10))
+    setEditDataOpen(true)
+  }
+
+  const confirmarEditData = async () => {
+    if (!detailApontamento || !editDataValue) return
+    setEditDataSalvando(true)
+    await marcarResolvido(
+      detailApontamento.id,
+      {
+        valor: detailApontamento.reparoValor,
+        descricao: detailApontamento.reparoDescricao,
+        imagens: detailApontamento.reparoImagens,
+        osArquivo: detailApontamento.osArquivo,
+        dataResolvido: editDataValue,
+      },
+      user?.email ?? undefined,
+    )
+    setEditDataOpen(false)
+    setEditDataSalvando(false)
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [resolveOpen, setResolveOpen] = useState(false)
   const [resolveId, setResolveId] = useState<string | null>(null)
@@ -1479,7 +1510,7 @@ export function ManagePage() {
           <button
             type="button"
             className="fixed inset-0 z-[9998] bg-black/60"
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDetailApontamento(null) }}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDetailApontamento(null); setEditDataOpen(false) }}
             aria-label="Fechar"
           />
           <div className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain">
@@ -1616,12 +1647,55 @@ export function ManagePage() {
                   {/* Resolução */}
                   {detailApontamento.resolvido && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Resolvido em</p>
-                      <p className="font-bold text-slate-800 dark:text-slate-200">
-                        {detailApontamento.dataResolvido
-                          ? new Date(detailApontamento.dataResolvido + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
-                          : '—'}
-                      </p>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Resolvido em</p>
+                        {isSuperAdmin && !editDataOpen && (
+                          <button
+                            type="button"
+                            onClick={abrirEditData}
+                            title="Alterar data de resolução"
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950"
+                          >
+                            <Settings2 size={11} /> Editar
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Editor inline de data (superadmin) */}
+                      {isSuperAdmin && editDataOpen ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            value={editDataValue}
+                            onChange={(e) => setEditDataValue(e.target.value)}
+                            max={new Date().toISOString().slice(0, 10)}
+                            className="flex-1 rounded-lg border border-emerald-300 bg-white px-2 py-1 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-emerald-700 dark:bg-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+                          />
+                          <button
+                            type="button"
+                            onClick={confirmarEditData}
+                            disabled={editDataSalvando || !editDataValue}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {editDataSalvando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            Salvar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditDataOpen(false)}
+                            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="font-bold text-slate-800 dark:text-slate-200">
+                          {detailApontamento.dataResolvido
+                            ? new Date(detailApontamento.dataResolvido + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+                            : '—'}
+                        </p>
+                      )}
+
                       {detailApontamento.reparoDescricao && (
                         <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{detailApontamento.reparoDescricao}</p>
                       )}
