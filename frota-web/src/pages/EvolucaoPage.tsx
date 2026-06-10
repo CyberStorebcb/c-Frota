@@ -251,7 +251,7 @@ function BarLineChart({ data, agregacao }: { data: BarChartDatum[]; agregacao: '
           const cx = barCx(i)
           const cy = yLine(d.diasMedios)
           const isHov = hov === i
-          const labelVal = d.diasMedios % 1 === 0 ? `${d.diasMedios}d` : `${d.diasMedios}d`
+          const labelVal = `${d.diasMedios}d`
           // posiciona label acima do ponto, sem sair do topo
           const labelY = Math.max(padTop - 4, cy - 7)
           return (
