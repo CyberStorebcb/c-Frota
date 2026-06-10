@@ -10,8 +10,9 @@ type Props = {
   placa: string
   motivoAtual?: ChecklistAusenciaMotivo | null
   placaReservaAtual?: string | null
+  obsAtual?: string
   saving?: boolean
-  onSelect: (motivo: ChecklistAusenciaMotivo, placaReserva?: string) => void
+  onSelect: (motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => void
 }
 
 function ReservaPlacaForm({
@@ -265,18 +266,68 @@ function FeitoFotoForm({
   )
 }
 
+const NAO_RODOU_SUBS = ['Folga', 'Feriado', 'Sem operador', 'Outro'] as const
+const OFICINA_SUBS = ['Preventiva', 'Corretiva', 'Revisão'] as const
+
+function SubMotivoDropdown({
+  titulo,
+  opcoes,
+  saving,
+  onConfirm,
+  onCancel,
+}: {
+  titulo: string
+  opcoes: readonly string[]
+  saving?: boolean
+  onConfirm: (obs: string) => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="w-full min-w-[220px] rounded-xl border border-amber-200 bg-amber-50/90 p-2.5 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+      <p className="text-[10px] font-black uppercase tracking-wide text-amber-900 dark:text-amber-100">
+        {titulo}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {opcoes.map((sub) => (
+          <button
+            key={sub}
+            type="button"
+            disabled={saving}
+            onClick={() => onConfirm(sub)}
+            className="rounded-lg border border-amber-300/80 bg-white px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-amber-900 transition hover:border-amber-400 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-slate-950 dark:text-amber-100 dark:hover:bg-amber-950/40"
+          >
+            {sub}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={onCancel}
+        className="mt-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+      >
+        Cancelar
+      </button>
+    </div>
+  )
+}
+
 function motivoClickHandler(
   motivo: ChecklistAusenciaMotivo,
   abrirReserva: () => void,
   abrirDesmobilizar: () => void,
   abrirFeito: () => void,
   abrirFerias: () => void,
+  abrirNaoRodou: () => void,
+  abrirOficina: () => void,
   onSelect: (motivo: ChecklistAusenciaMotivo) => void,
 ) {
   if (motivo === 'FEITO') return abrirFeito()
   if (motivo === 'RESERVA') return abrirReserva()
   if (motivo === 'DESMOBILIZADO') return abrirDesmobilizar()
   if (motivo === 'FÉRIAS') return abrirFerias()
+  if (motivo === 'NÃO RODOU') return abrirNaoRodou()
+  if (motivo === 'OFICINA') return abrirOficina()
   return onSelect(motivo)
 }
 
@@ -305,6 +356,7 @@ export function ChecklistAusenciaJustificar({
   placa,
   motivoAtual,
   placaReservaAtual,
+  obsAtual,
   saving,
   onSelect,
 }: Props) {
@@ -312,6 +364,8 @@ export function ChecklistAusenciaJustificar({
   const [desmobilizarOpen, setDesmobilizarOpen] = useState(false)
   const [feitoOpen, setFeitoOpen] = useState(false)
   const [feriasOpen, setFeriasOpen] = useState(false)
+  const [naoRodouOpen, setNaoRodouOpen] = useState(false)
+  const [oficinaOpen, setOficinaOpen] = useState(false)
   const btnBase =
     'rounded-lg border px-2 py-1.5 text-[10px] font-black uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50'
 
@@ -323,6 +377,10 @@ export function ChecklistAusenciaJustificar({
   const fecharFeito = () => setFeitoOpen(false)
   const abrirFerias = () => setFeriasOpen(true)
   const fecharFerias = () => setFeriasOpen(false)
+  const abrirNaoRodou = () => setNaoRodouOpen(true)
+  const fecharNaoRodou = () => setNaoRodouOpen(false)
+  const abrirOficina = () => setOficinaOpen(true)
+  const fecharOficina = () => setOficinaOpen(false)
 
   if (feitoOpen) {
     return (
@@ -381,6 +439,36 @@ export function ChecklistAusenciaJustificar({
     )
   }
 
+  if (naoRodouOpen) {
+    return (
+      <SubMotivoDropdown
+        titulo="Motivo — Não rodou"
+        opcoes={NAO_RODOU_SUBS}
+        saving={saving}
+        onCancel={fecharNaoRodou}
+        onConfirm={(obs) => {
+          onSelect('NÃO RODOU', undefined, obs)
+          fecharNaoRodou()
+        }}
+      />
+    )
+  }
+
+  if (oficinaOpen) {
+    return (
+      <SubMotivoDropdown
+        titulo="Tipo de serviço — Oficina"
+        opcoes={OFICINA_SUBS}
+        saving={saving}
+        onCancel={fecharOficina}
+        onConfirm={(obs) => {
+          onSelect('OFICINA', undefined, obs)
+          fecharOficina()
+        }}
+      />
+    )
+  }
+
   if (motivoAtual) {
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -400,6 +488,9 @@ export function ChecklistAusenciaJustificar({
         >
           <MessageSquareWarning size={11} aria-hidden />
           {motivoAtual}
+          {obsAtual ? (
+            <span className="font-bold normal-case tracking-normal opacity-80">· {obsAtual}</span>
+          ) : null}
           {motivoAtual === 'RESERVA' && placaReservaAtual ? (
             <span className="font-bold normal-case tracking-normal text-amber-900/90 dark:text-amber-100">
               · {formatPlaca(placaReservaAtual)}
@@ -422,7 +513,7 @@ export function ChecklistAusenciaJustificar({
             key={motivo}
             type="button"
             disabled={saving}
-            onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, abrirFerias, onSelect)}
+            onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, abrirFerias, abrirNaoRodou, abrirOficina, onSelect)}
             className={motivoBtnClass(motivo, btnBase, 'alt')}
             title={`Alterar justificativa de ${placa} para ${motivo}`}
           >
@@ -444,7 +535,7 @@ export function ChecklistAusenciaJustificar({
           key={motivo}
           type="button"
           disabled={saving}
-          onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, abrirFerias, onSelect)}
+          onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, abrirFerias, abrirNaoRodou, abrirOficina, onSelect)}
           className={motivoBtnClass(motivo, btnBase, 'default')}
           title={
             motivo === 'FEITO'
@@ -455,7 +546,11 @@ export function ChecklistAusenciaJustificar({
                   ? `Desmobilizar ${placa} — remove da frota ativa`
                   : motivo === 'FÉRIAS'
                     ? `Marcar ${placa} como FÉRIAS — justificado indefinidamente até revertido`
-                    : `Justificar ${placa} como ${motivo}`
+                    : motivo === 'NÃO RODOU'
+                      ? `Justificar ${placa} como Não rodou — escolha o motivo`
+                      : motivo === 'OFICINA'
+                        ? `Justificar ${placa} como Oficina — escolha o tipo de serviço`
+                        : `Justificar ${placa} como ${motivo}`
           }
         >
           {saving ? '…' : motivo}

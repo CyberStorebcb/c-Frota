@@ -7,12 +7,14 @@ export type ChecklistAusenciaMotivo = (typeof CHECKLIST_AUSENCIA_MOTIVOS)[number
 export type ChecklistAusenciaJustificativaEntry = {
   motivo: ChecklistAusenciaMotivo
   placaReserva?: string
+  obs?: string
 }
 
 export type ChecklistAusenciaJustificativa = {
   placa: string
   motivo: ChecklistAusenciaMotivo
   placaReserva?: string
+  obs?: string
   periodoInicio: string
   periodoFim: string
   setor: string
@@ -78,6 +80,7 @@ function rowToJustificativa(row: {
   placa: string
   motivo: string
   placa_reserva?: string | null
+  obs?: string | null
   periodo_inicio: string
   periodo_fim: string
   setor: string
@@ -90,6 +93,7 @@ function rowToJustificativa(row: {
     placa: normalizePlaca(row.placa),
     motivo,
     placaReserva: placaReserva || undefined,
+    obs: row.obs || undefined,
     periodoInicio: String(row.periodo_inicio).slice(0, 10),
     periodoFim: String(row.periodo_fim).slice(0, 10),
     setor: row.setor,
@@ -137,7 +141,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
 
   const { data, error } = await supabase
     .from('checklist_ausencia_justificativas')
-    .select('placa, motivo, placa_reserva, periodo_inicio, periodo_fim, setor, updated_at')
+    .select('placa, motivo, placa_reserva, obs, periodo_inicio, periodo_fim, setor, updated_at')
     .eq('setor', setor)
     .eq('periodo_inicio', periodoInicio)
     .eq('periodo_fim', periodoFim)
@@ -152,6 +156,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
       placa: string
       motivo: string
       placa_reserva?: string | null
+      obs?: string | null
       periodo_inicio: string
       periodo_fim: string
       setor: string
@@ -161,6 +166,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
       map.set(parsed.placa, {
         motivo: parsed.motivo,
         placaReserva: parsed.placaReserva,
+        obs: parsed.obs,
       })
     }
   }
@@ -172,6 +178,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
   placa: string
   motivo: ChecklistAusenciaMotivo
   placaReserva?: string
+  obs?: string
   periodoInicio: string
   periodoFim: string
   setor: string
@@ -203,6 +210,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
     placa,
     motivo: params.motivo,
     placaReserva: reservaCheck.placaReserva,
+    obs: params.obs || undefined,
     periodoInicio: params.periodoInicio,
     periodoFim: params.periodoFim,
     setor: params.setor,
@@ -220,6 +228,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
       placa,
       motivo: params.motivo,
       placa_reserva: reservaCheck.placaReserva ?? null,
+      obs: params.obs ?? '',
       periodo_inicio: params.periodoInicio,
       periodo_fim: params.periodoFim,
       setor: params.setor,
