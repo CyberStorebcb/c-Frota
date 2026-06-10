@@ -1025,6 +1025,14 @@ export function ManagePage() {
           onClick={() => { setVisao('pendentes'); setPagina(1) }}
         />
         <StatPill
+          label="Justificados"
+          value={String(stats.justificados)}
+          icon={<MessageSquareWarning size={18} />}
+          tone="amber"
+          selected={visao === 'justificados'}
+          onClick={() => { setVisao('justificados'); setPagina(1) }}
+        />
+        <StatPill
           label="Resolvidos"
           value={String(stats.resolvidos)}
           icon={<CheckCircle2 size={18} />}
@@ -1044,14 +1052,6 @@ export function ManagePage() {
             setPagina(1)
             tabelaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }}
-        />
-        <StatPill
-          label="Justificados"
-          value={String(stats.justificados)}
-          icon={<MessageSquareWarning size={18} />}
-          tone="amber"
-          selected={visao === 'justificados'}
-          onClick={() => { setVisao('justificados'); setPagina(1) }}
         />
       </div>
 
