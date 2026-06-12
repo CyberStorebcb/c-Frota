@@ -8,6 +8,7 @@ export type ChecklistAusenciaJustificativaEntry = {
   motivo: ChecklistAusenciaMotivo
   placaReserva?: string
   obs?: string
+  km_ultimo?: number
 }
 
 export type ChecklistAusenciaJustificativa = {
@@ -15,6 +16,7 @@ export type ChecklistAusenciaJustificativa = {
   motivo: ChecklistAusenciaMotivo
   placaReserva?: string
   obs?: string
+  km_ultimo?: number
   periodoInicio: string
   periodoFim: string
   setor: string
@@ -81,6 +83,7 @@ function rowToJustificativa(row: {
   motivo: string
   placa_reserva?: string | null
   obs?: string | null
+  km_ultimo?: number | null
   periodo_inicio: string
   periodo_fim: string
   setor: string
@@ -94,6 +97,7 @@ function rowToJustificativa(row: {
     motivo,
     placaReserva: placaReserva || undefined,
     obs: row.obs || undefined,
+    km_ultimo: row.km_ultimo ?? undefined,
     periodoInicio: String(row.periodo_inicio).slice(0, 10),
     periodoFim: String(row.periodo_fim).slice(0, 10),
     setor: row.setor,
@@ -141,7 +145,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
 
   const { data, error } = await supabase
     .from('checklist_ausencia_justificativas')
-    .select('placa, motivo, placa_reserva, obs, periodo_inicio, periodo_fim, setor, updated_at')
+    .select('placa, motivo, placa_reserva, obs, km_ultimo, periodo_inicio, periodo_fim, setor, updated_at')
     .eq('setor', setor)
     .eq('periodo_inicio', periodoInicio)
     .eq('periodo_fim', periodoFim)
@@ -157,6 +161,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
       motivo: string
       placa_reserva?: string | null
       obs?: string | null
+      km_ultimo?: number | null
       periodo_inicio: string
       periodo_fim: string
       setor: string
@@ -167,6 +172,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
         motivo: parsed.motivo,
         placaReserva: parsed.placaReserva,
         obs: parsed.obs,
+        km_ultimo: parsed.km_ultimo,
       })
     }
   }
@@ -179,6 +185,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
   motivo: ChecklistAusenciaMotivo
   placaReserva?: string
   obs?: string
+  km_ultimo?: number
   periodoInicio: string
   periodoFim: string
   setor: string
@@ -211,6 +218,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
     motivo: params.motivo,
     placaReserva: reservaCheck.placaReserva,
     obs: params.obs || undefined,
+    km_ultimo: params.km_ultimo,
     periodoInicio: params.periodoInicio,
     periodoFim: params.periodoFim,
     setor: params.setor,
@@ -229,6 +237,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
       motivo: params.motivo,
       placa_reserva: reservaCheck.placaReserva ?? null,
       obs: params.obs ?? '',
+      km_ultimo: params.km_ultimo ?? null,
       periodo_inicio: params.periodoInicio,
       periodo_fim: params.periodoFim,
       setor: params.setor,
@@ -287,4 +296,18 @@ export async function removeChecklistAusenciaJustificativa(params: {
   }
 
   return { ok: true }
+}
+
+export async function fetchLastKmPorPlacas(placas: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  if (!supabaseConfigured || placas.length === 0) return map
+
+  const { data, error } = await supabase.rpc('get_last_km_por_placas', { placas })
+  if (error || !data) return map
+
+  for (const row of data as { placa: string; km_atual: string }[]) {
+    const km = parseInt(row.km_atual, 10)
+    if (!isNaN(km) && km > 0) map.set(normalizePlaca(row.placa), km)
+  }
+  return map
 }

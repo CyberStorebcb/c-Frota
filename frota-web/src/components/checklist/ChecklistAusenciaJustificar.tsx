@@ -11,6 +11,7 @@ type Props = {
   motivoAtual?: ChecklistAusenciaMotivo | null
   placaReservaAtual?: string | null
   obsAtual?: string
+  kmUltimo?: number
   saving?: boolean
   onSelect: (motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => void
 }
@@ -357,6 +358,7 @@ export function ChecklistAusenciaJustificar({
   motivoAtual,
   placaReservaAtual,
   obsAtual,
+  kmUltimo,
   saving,
   onSelect,
 }: Props) {
@@ -472,6 +474,11 @@ export function ChecklistAusenciaJustificar({
   if (motivoAtual) {
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {kmUltimo !== undefined ? (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            {kmUltimo.toLocaleString('pt-BR')} km
+          </span>
+        ) : null}
         <span
           className={`inline-flex max-w-full flex-wrap items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ring-1 ${
             motivoAtual === 'DESMOBILIZADO'
@@ -530,6 +537,11 @@ export function ChecklistAusenciaJustificar({
       role="group"
       aria-label={`Justificar ausência do checklist — ${placa}`}
     >
+      {kmUltimo !== undefined ? (
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          {kmUltimo.toLocaleString('pt-BR')} km
+        </span>
+      ) : null}
       {CHECKLIST_AUSENCIA_MOTIVOS.map((motivo) => (
         <button
           key={motivo}

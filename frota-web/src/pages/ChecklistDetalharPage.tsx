@@ -62,6 +62,7 @@ import {
   loadChecklistAusenciaJustificativas,
   removeChecklistAusenciaJustificativa,
   saveChecklistAusenciaJustificativa,
+  fetchLastKmPorPlacas,
   type ChecklistAusenciaJustificativaEntry,
   type ChecklistAusenciaMotivo,
 } from '../checklists/checklistAusenciaJustificativa'
@@ -296,9 +297,9 @@ function matchesDetalharBusca(blob: string, query: string): boolean {
   return blob.includes(query)
 }
 
-type JustificadoRow = VeiculoRow & { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string }
+type JustificadoRow = VeiculoRow & { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string; km_ultimo?: number }
 
-function JustificadoMotivoBadge({ motivo, placaReserva, obs }: { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string }) {
+function JustificadoMotivoBadge({ motivo, placaReserva, obs, km_ultimo }: { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string; km_ultimo?: number }) {
   return (
     <span className={`inline-flex flex-wrap items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
       motivo === 'FÉRIAS'
@@ -311,6 +312,9 @@ function JustificadoMotivoBadge({ motivo, placaReserva, obs }: { motivo: Checkli
         <span className="font-bold normal-case tracking-normal text-amber-900/90 dark:text-amber-100">
           · {formatPlaca(placaReserva)}
         </span>
+      ) : null}
+      {km_ultimo !== undefined ? (
+        <span className="font-bold normal-case tracking-normal opacity-70">· {km_ultimo.toLocaleString('pt-BR')} km</span>
       ) : null}
     </span>
   )
@@ -353,7 +357,7 @@ function ListaJustificados({
             >
               <td className="px-3 py-2 text-xs font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</td>
               <td className="px-3 py-2">
-                <JustificadoMotivoBadge motivo={v.motivo} placaReserva={v.placaReserva} obs={v.obs} />
+                <JustificadoMotivoBadge motivo={v.motivo} placaReserva={v.placaReserva} obs={v.obs} km_ultimo={v.km_ultimo} />
               </td>
               <td className="px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">
                 {v.motivo === 'RESERVA' && v.placaReserva ? formatPlaca(v.placaReserva) : '—'}
@@ -371,6 +375,7 @@ function ListaJustificados({
                       motivoAtual={v.motivo}
                       placaReservaAtual={v.placaReserva}
                       obsAtual={v.obs}
+                      kmUltimo={v.km_ultimo}
                       saving={savingPlaca === v.placa}
                       onSelect={(motivo, placaReserva, obs) => onAlterarMotivo?.(v.placa, motivo, placaReserva, obs)}
                     />
@@ -489,7 +494,7 @@ function JustificadosPanel({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</span>
-                    <JustificadoMotivoBadge motivo={v.motivo} obs={v.obs} />
+                    <JustificadoMotivoBadge motivo={v.motivo} obs={v.obs} km_ultimo={v.km_ultimo} />
                     {v.motivo === 'RESERVA' && v.placaReserva ? (
                       <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
                         Reserva {formatPlaca(v.placaReserva)}
@@ -513,6 +518,7 @@ function JustificadosPanel({
                       motivoAtual={v.motivo}
                       placaReservaAtual={v.placaReserva}
                       obsAtual={v.obs}
+                      kmUltimo={v.km_ultimo}
                       saving={savingPlaca === v.placa}
                       onSelect={(motivo, placaReserva, obs) => onAlterarMotivo?.(v.placa, motivo, placaReserva, obs)}
                     />
@@ -543,6 +549,7 @@ function ListaNaoRealizaram({
   showJustificar,
   justificativas,
   savingPlaca,
+  kmPorPlaca,
   onJustificar,
 }: {
   items: VeiculoRow[]
@@ -550,6 +557,7 @@ function ListaNaoRealizaram({
   showJustificar?: boolean
   justificativas?: Map<string, ChecklistAusenciaJustificativaEntry>
   savingPlaca?: string | null
+  kmPorPlaca?: Map<string, number>
   onJustificar?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => void
 }) {
   return (
@@ -590,6 +598,8 @@ function ListaNaoRealizaram({
                     placa={v.placa}
                     motivoAtual={justificativas?.get(v.placa)?.motivo ?? null}
                     placaReservaAtual={justificativas?.get(v.placa)?.placaReserva}
+                    obsAtual={justificativas?.get(v.placa)?.obs}
+                    kmUltimo={kmPorPlaca?.get(v.placa)}
                     saving={savingPlaca === v.placa}
                     onSelect={(motivo, placaReserva, obs) => onJustificar?.(v.placa, motivo, placaReserva, obs)}
                   />
@@ -784,6 +794,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     [periodo, customDesde, customAte],
   )
 
+  const [kmPorPlaca, setKmPorPlaca] = useState(new Map<string, number>())
+
   const showJustificarNaoRealizaram = canJustify && focusedSide === 'nao'
 
   useEffect(() => {
@@ -811,6 +823,12 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     }
   }, [limites.ini, limites.fim, setorVeiculo])
 
+  useEffect(() => {
+    if (!canJustify) return
+    const placas = placasNaoRealizaramLista.map((v) => v.placa)
+    fetchLastKmPorPlacas(placas).then(setKmPorPlaca)
+  }, [placasNaoRealizaramLista, canJustify])
+
   const salvarJustificativa = useCallback(
     async (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => {
       setJustificativaSavingPlaca(placa)
@@ -829,11 +847,13 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         return   // ← não cria justificativa: veículo saiu da frota de vez
       }
 
+      const km_ultimo = kmPorPlaca.get(placa)
       const res = await saveChecklistAusenciaJustificativa({
         placa,
         motivo,
         placaReserva,
         obs,
+        km_ultimo,
         periodoInicio: limites.ini,
         periodoFim: limites.fim,
         setor: setorVeiculo,
@@ -845,11 +865,11 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       }
       setJustificativas((prev) => {
         const next = new Map(prev)
-        next.set(placa, { motivo, placaReserva: motivo === 'RESERVA' ? placaReserva : undefined, obs })
+        next.set(placa, { motivo, placaReserva: motivo === 'RESERVA' ? placaReserva : undefined, obs, km_ultimo })
         return next
       })
     },
-    [limites.ini, limites.fim, setorVeiculo],
+    [limites.ini, limites.fim, setorVeiculo, kmPorPlaca],
   )
 
   const removerJustificativa = useCallback(
@@ -1174,6 +1194,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             motivo: entry.motivo,
             placaReserva: entry.placaReserva,
             obs: entry.obs,
+            km_ultimo: entry.km_ultimo,
             diasRealizados: 0,
             diasNoPeriodo: diasNoPeriodo,
           }
@@ -1977,6 +1998,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                 showJustificar={showJustificarNaoRealizaram}
                 justificativas={justificativas}
                 savingPlaca={justificativaSavingPlaca}
+                kmPorPlaca={kmPorPlaca}
                 onJustificar={(placa, motivo, placaReserva, obs) => void salvarJustificativa(placa, motivo, placaReserva, obs)}
               />
             ) : (
@@ -2012,6 +2034,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                           placa={v.placa}
                           motivoAtual={justificativas.get(v.placa)?.motivo ?? null}
                           placaReservaAtual={justificativas.get(v.placa)?.placaReserva}
+                          obsAtual={justificativas.get(v.placa)?.obs}
+                          kmUltimo={kmPorPlaca.get(v.placa)}
                           saving={justificativaSavingPlaca === v.placa}
                           onSelect={(motivo, placaReserva, obs) => void salvarJustificativa(v.placa, motivo, placaReserva, obs)}
                         />
