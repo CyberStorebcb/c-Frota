@@ -9,6 +9,7 @@ export type ChecklistAusenciaJustificativaEntry = {
   placaReserva?: string
   obs?: string
   km_ultimo?: number
+  foto_url?: string
 }
 
 export type ChecklistAusenciaJustificativa = {
@@ -17,6 +18,7 @@ export type ChecklistAusenciaJustificativa = {
   placaReserva?: string
   obs?: string
   km_ultimo?: number
+  foto_url?: string
   periodoInicio: string
   periodoFim: string
   setor: string
@@ -84,6 +86,7 @@ function rowToJustificativa(row: {
   placa_reserva?: string | null
   obs?: string | null
   km_ultimo?: number | null
+  foto_url?: string | null
   periodo_inicio: string
   periodo_fim: string
   setor: string
@@ -98,6 +101,7 @@ function rowToJustificativa(row: {
     placaReserva: placaReserva || undefined,
     obs: row.obs || undefined,
     km_ultimo: row.km_ultimo ?? undefined,
+    foto_url: row.foto_url || undefined,
     periodoInicio: String(row.periodo_inicio).slice(0, 10),
     periodoFim: String(row.periodo_fim).slice(0, 10),
     setor: row.setor,
@@ -145,7 +149,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
 
   const { data, error } = await supabase
     .from('checklist_ausencia_justificativas')
-    .select('placa, motivo, placa_reserva, obs, km_ultimo, periodo_inicio, periodo_fim, setor, updated_at')
+    .select('placa, motivo, placa_reserva, obs, km_ultimo, foto_url, periodo_inicio, periodo_fim, setor, updated_at')
     .eq('setor', setor)
     .eq('periodo_inicio', periodoInicio)
     .eq('periodo_fim', periodoFim)
@@ -162,6 +166,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
       placa_reserva?: string | null
       obs?: string | null
       km_ultimo?: number | null
+      foto_url?: string | null
       periodo_inicio: string
       periodo_fim: string
       setor: string
@@ -173,6 +178,7 @@ export async function loadChecklistAusenciaJustificativas(params: {
         placaReserva: parsed.placaReserva,
         obs: parsed.obs,
         km_ultimo: parsed.km_ultimo,
+        foto_url: parsed.foto_url,
       })
     }
   }
@@ -186,6 +192,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
   placaReserva?: string
   obs?: string
   km_ultimo?: number
+  foto_url?: string
   periodoInicio: string
   periodoFim: string
   setor: string
@@ -197,7 +204,12 @@ export async function saveChecklistAusenciaJustificativa(params: {
   if (params.motivo === 'FÉRIAS') {
     if (!supabaseConfigured) return { ok: true }
     const { error } = await supabase.from('vehicle_ferias').upsert(
-      { placa, setor: params.setor, created_by: (await supabase.auth.getUser()).data.user?.id ?? null },
+      {
+        placa,
+        setor: params.setor,
+        foto_url: params.foto_url ?? null,
+        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+      },
       { onConflict: 'placa,setor' },
     )
     if (error) return { ok: false, message: error.message }
@@ -219,6 +231,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
     placaReserva: reservaCheck.placaReserva,
     obs: params.obs || undefined,
     km_ultimo: params.km_ultimo,
+    foto_url: params.foto_url,
     periodoInicio: params.periodoInicio,
     periodoFim: params.periodoFim,
     setor: params.setor,
@@ -238,6 +251,7 @@ export async function saveChecklistAusenciaJustificativa(params: {
       placa_reserva: reservaCheck.placaReserva ?? null,
       obs: params.obs ?? '',
       km_ultimo: params.km_ultimo ?? null,
+      foto_url: params.foto_url ?? null,
       periodo_inicio: params.periodoInicio,
       periodo_fim: params.periodoFim,
       setor: params.setor,

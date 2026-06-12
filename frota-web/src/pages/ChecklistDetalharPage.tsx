@@ -297,9 +297,9 @@ function matchesDetalharBusca(blob: string, query: string): boolean {
   return blob.includes(query)
 }
 
-type JustificadoRow = VeiculoRow & { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string; km_ultimo?: number }
+type JustificadoRow = VeiculoRow & { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string; km_ultimo?: number; foto_url?: string }
 
-function JustificadoMotivoBadge({ motivo, placaReserva, obs, km_ultimo }: { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string; km_ultimo?: number }) {
+function JustificadoMotivoBadge({ motivo, placaReserva, obs, km_ultimo, foto_url }: { motivo: ChecklistAusenciaMotivo; placaReserva?: string; obs?: string; km_ultimo?: number; foto_url?: string }) {
   return (
     <span className={`inline-flex flex-wrap items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
       motivo === 'FÉRIAS'
@@ -316,6 +316,18 @@ function JustificadoMotivoBadge({ motivo, placaReserva, obs, km_ultimo }: { moti
       {km_ultimo !== undefined ? (
         <span className="font-bold normal-case tracking-normal opacity-70">· {km_ultimo.toLocaleString('pt-BR')} km</span>
       ) : null}
+      {foto_url ? (
+        <a
+          href={foto_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title="Ver foto de evidência"
+          className="opacity-70 hover:opacity-100"
+        >
+          <Camera size={10} />
+        </a>
+      ) : null}
     </span>
   )
 }
@@ -330,7 +342,7 @@ function ListaJustificados({
   items: JustificadoRow[]
   isAdmin?: boolean
   savingPlaca?: string | null
-  onAlterarMotivo?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => void
+  onAlterarMotivo?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string, fotoUrl?: string) => void
   onRemover?: (placa: string) => void
 }) {
   return (
@@ -357,7 +369,7 @@ function ListaJustificados({
             >
               <td className="px-3 py-2 text-xs font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</td>
               <td className="px-3 py-2">
-                <JustificadoMotivoBadge motivo={v.motivo} placaReserva={v.placaReserva} obs={v.obs} km_ultimo={v.km_ultimo} />
+                <JustificadoMotivoBadge motivo={v.motivo} placaReserva={v.placaReserva} obs={v.obs} km_ultimo={v.km_ultimo} foto_url={v.foto_url} />
               </td>
               <td className="px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">
                 {v.motivo === 'RESERVA' && v.placaReserva ? formatPlaca(v.placaReserva) : '—'}
@@ -377,7 +389,7 @@ function ListaJustificados({
                       obsAtual={v.obs}
                       kmUltimo={v.km_ultimo}
                       saving={savingPlaca === v.placa}
-                      onSelect={(motivo, placaReserva, obs) => onAlterarMotivo?.(v.placa, motivo, placaReserva, obs)}
+                      onSelect={(motivo, placaReserva, obs, fotoUrl) => onAlterarMotivo?.(v.placa, motivo, placaReserva, obs, fotoUrl)}
                     />
                     <button
                       type="button"
@@ -419,7 +431,7 @@ function JustificadosPanel({
   isAdmin?: boolean
   isFullscreen?: boolean
   savingPlaca?: string | null
-  onAlterarMotivo?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => void
+  onAlterarMotivo?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string, fotoUrl?: string) => void
   onRemover?: (placa: string) => void
   emptyMessage: string
   expanded?: boolean
@@ -494,7 +506,7 @@ function JustificadosPanel({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-black tracking-wide text-slate-950 dark:text-white">{v.placa}</span>
-                    <JustificadoMotivoBadge motivo={v.motivo} obs={v.obs} km_ultimo={v.km_ultimo} />
+                    <JustificadoMotivoBadge motivo={v.motivo} obs={v.obs} km_ultimo={v.km_ultimo} foto_url={v.foto_url} />
                     {v.motivo === 'RESERVA' && v.placaReserva ? (
                       <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
                         Reserva {formatPlaca(v.placaReserva)}
@@ -520,7 +532,7 @@ function JustificadosPanel({
                       obsAtual={v.obs}
                       kmUltimo={v.km_ultimo}
                       saving={savingPlaca === v.placa}
-                      onSelect={(motivo, placaReserva, obs) => onAlterarMotivo?.(v.placa, motivo, placaReserva, obs)}
+                      onSelect={(motivo, placaReserva, obs, fotoUrl) => onAlterarMotivo?.(v.placa, motivo, placaReserva, obs, fotoUrl)}
                     />
                     <button
                       type="button"
@@ -558,7 +570,7 @@ function ListaNaoRealizaram({
   justificativas?: Map<string, ChecklistAusenciaJustificativaEntry>
   savingPlaca?: string | null
   kmPorPlaca?: Map<string, number>
-  onJustificar?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => void
+  onJustificar?: (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string, fotoUrl?: string) => void
 }) {
   return (
     <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
@@ -601,7 +613,7 @@ function ListaNaoRealizaram({
                     obsAtual={justificativas?.get(v.placa)?.obs}
                     kmUltimo={kmPorPlaca?.get(v.placa)}
                     saving={savingPlaca === v.placa}
-                    onSelect={(motivo, placaReserva, obs) => onJustificar?.(v.placa, motivo, placaReserva, obs)}
+                    onSelect={(motivo, placaReserva, obs, fotoUrl) => onJustificar?.(v.placa, motivo, placaReserva, obs, fotoUrl)}
                   />
                 </td>
               ) : null}
@@ -824,7 +836,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
   }, [limites.ini, limites.fim, setorVeiculo])
 
   const salvarJustificativa = useCallback(
-    async (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => {
+    async (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string, fotoUrl?: string) => {
       setJustificativaSavingPlaca(placa)
 
       if (motivo === 'DESMOBILIZADO') {
@@ -848,6 +860,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         placaReserva,
         obs,
         km_ultimo,
+        foto_url: fotoUrl,
         periodoInicio: limites.ini,
         periodoFim: limites.fim,
         setor: setorVeiculo,
@@ -859,7 +872,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       }
       setJustificativas((prev) => {
         const next = new Map(prev)
-        next.set(placa, { motivo, placaReserva: motivo === 'RESERVA' ? placaReserva : undefined, obs, km_ultimo })
+        next.set(placa, { motivo, placaReserva: motivo === 'RESERVA' ? placaReserva : undefined, obs, km_ultimo, foto_url: fotoUrl })
         return next
       })
     },
@@ -1195,6 +1208,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             placaReserva: entry.placaReserva,
             obs: entry.obs,
             km_ultimo: entry.km_ultimo,
+            foto_url: entry.foto_url,
             diasRealizados: 0,
             diasNoPeriodo: diasNoPeriodo,
           }
@@ -1940,7 +1954,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             isAdmin={canJustify}
             isFullscreen={isFullscreen}
             savingPlaca={justificativaSavingPlaca}
-            onAlterarMotivo={(placa, motivo, placaReserva, obs) => void salvarJustificativa(placa, motivo, placaReserva, obs)}
+            onAlterarMotivo={(placa, motivo, placaReserva, obs, fotoUrl) => void salvarJustificativa(placa, motivo, placaReserva, obs, fotoUrl)}
             onRemover={(placa) => void removerJustificativa(placa)}
             emptyMessage={q ? 'Nenhum justificado corresponde à busca.' : 'Nenhum veículo justificado neste período.'}
             expanded
@@ -1999,7 +2013,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                 justificativas={justificativas}
                 savingPlaca={justificativaSavingPlaca}
                 kmPorPlaca={kmPorPlaca}
-                onJustificar={(placa, motivo, placaReserva, obs) => void salvarJustificativa(placa, motivo, placaReserva, obs)}
+                onJustificar={(placa, motivo, placaReserva, obs, fotoUrl) => void salvarJustificativa(placa, motivo, placaReserva, obs, fotoUrl)}
               />
             ) : (
               <div className={`custom-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-3`}>
@@ -2037,7 +2051,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
                           obsAtual={justificativas.get(v.placa)?.obs}
                           kmUltimo={kmPorPlaca.get(v.placa)}
                           saving={justificativaSavingPlaca === v.placa}
-                          onSelect={(motivo, placaReserva, obs) => void salvarJustificativa(v.placa, motivo, placaReserva, obs)}
+                          onSelect={(motivo, placaReserva, obs, fotoUrl) => void salvarJustificativa(v.placa, motivo, placaReserva, obs, fotoUrl)}
                         />
                       ) : null}
                     </div>
@@ -2164,7 +2178,7 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
             isAdmin={canJustify}
             isFullscreen={isFullscreen}
             savingPlaca={justificativaSavingPlaca}
-            onAlterarMotivo={(placa, motivo, placaReserva, obs) => void salvarJustificativa(placa, motivo, placaReserva, obs)}
+            onAlterarMotivo={(placa, motivo, placaReserva, obs, fotoUrl) => void salvarJustificativa(placa, motivo, placaReserva, obs, fotoUrl)}
             onRemover={(placa) => void removerJustificativa(placa)}
             emptyMessage={q ? 'Nenhum justificado corresponde à busca.' : 'Nenhum veículo justificado.'}
           />

@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
-import { Camera, CheckCircle2, MessageSquareWarning, X } from 'lucide-react'
+import { Camera, CheckCircle2, Loader2, MessageSquareWarning, X } from 'lucide-react'
 import {
   CHECKLIST_AUSENCIA_MOTIVOS,
   type ChecklistAusenciaMotivo,
 } from '../../checklists/checklistAusenciaJustificativa'
+import { uploadChecklistEvidenceFile } from '../../lib/checklistEvidenceUpload'
 import { formatPlaca, normalizePlaca } from '../../frota/vehicleRegistry'
 
 type Props = {
@@ -13,8 +14,16 @@ type Props = {
   obsAtual?: string
   kmUltimo?: number
   saving?: boolean
-  onSelect: (motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => void
+  onSelect: (motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string, fotoUrl?: string) => void
 }
+
+type PendingMotivo = {
+  motivo: ChecklistAusenciaMotivo
+  placaReserva?: string
+  obs?: string
+}
+
+// ─── Formulário de placa reserva ─────────────────────────────────────────────
 
 function ReservaPlacaForm({
   placaOriginal,
@@ -61,10 +70,7 @@ function ReservaPlacaForm({
             if (erro) setErro('')
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              confirmar()
-            }
+            if (e.key === 'Enter') { e.preventDefault(); confirmar() }
             if (e.key === 'Escape') onCancel()
           }}
           placeholder="ABC-1234"
@@ -92,6 +98,8 @@ function ReservaPlacaForm({
     </div>
   )
 }
+
+// ─── Diálogo de confirmação de desmobilização ─────────────────────────────────
 
 function DesmobilizarConfirmDialog({
   placa,
@@ -134,6 +142,8 @@ function DesmobilizarConfirmDialog({
   )
 }
 
+// ─── Diálogo de confirmação de férias ────────────────────────────────────────
+
 function FeriasConfirmDialog({
   placa,
   saving,
@@ -175,97 +185,7 @@ function FeriasConfirmDialog({
   )
 }
 
-function FeitoFotoForm({
-  placa,
-  saving,
-  onConfirm,
-  onCancel,
-}: {
-  placa: string
-  saving?: boolean
-  onConfirm: () => void
-  onCancel: () => void
-}) {
-  const [preview, setPreview] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setPreview(reader.result as string)
-    reader.readAsDataURL(file)
-  }
-
-  return (
-    <div className="w-full min-w-[220px] rounded-xl border border-emerald-200 bg-emerald-50/90 p-2.5 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/40">
-      <p className="text-[10px] font-black uppercase tracking-wide text-emerald-900 dark:text-emerald-100">
-        Foto de confirmação — {placa}
-      </p>
-      <p className="mt-0.5 text-[10px] text-emerald-800/80 dark:text-emerald-200/70">
-        Tire uma foto do checklist físico como comprovante.
-      </p>
-
-      <div className="mt-2 flex flex-col gap-2">
-        {preview ? (
-          <div className="relative">
-            <img
-              src={preview}
-              alt="Prévia da foto"
-              className="h-24 w-full rounded-lg object-cover ring-2 ring-emerald-400/60"
-            />
-            <button
-              type="button"
-              onClick={() => { setPreview(null); if (inputRef.current) inputRef.current.value = '' }}
-              className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-slate-900/70 text-white hover:bg-slate-900"
-            >
-              <X size={10} />
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => inputRef.current?.click()}
-            className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-emerald-300 bg-white py-3 text-[10px] font-bold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/40"
-          >
-            <Camera size={14} />
-            Tirar / Selecionar foto
-          </button>
-        )}
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={handleFile}
-        />
-
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            disabled={saving || !preview}
-            onClick={onConfirm}
-            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-50"
-          >
-            <CheckCircle2 size={12} />
-            {saving ? '…' : 'Confirmar FEITO'}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onCancel}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+// ─── Dropdown de sub-motivo ──────────────────────────────────────────────────
 
 const NAO_RODOU_SUBS = ['Folga', 'Feriado', 'Sem operador', 'Outro'] as const
 const OFICINA_SUBS = ['Preventiva', 'Corretiva', 'Revisão'] as const
@@ -313,24 +233,119 @@ function SubMotivoDropdown({
   )
 }
 
-function motivoClickHandler(
-  motivo: ChecklistAusenciaMotivo,
-  abrirReserva: () => void,
-  abrirDesmobilizar: () => void,
-  abrirFeito: () => void,
-  abrirFerias: () => void,
-  abrirNaoRodou: () => void,
-  abrirOficina: () => void,
-  onSelect: (motivo: ChecklistAusenciaMotivo) => void,
-) {
-  if (motivo === 'FEITO') return abrirFeito()
-  if (motivo === 'RESERVA') return abrirReserva()
-  if (motivo === 'DESMOBILIZADO') return abrirDesmobilizar()
-  if (motivo === 'FÉRIAS') return abrirFerias()
-  if (motivo === 'NÃO RODOU') return abrirNaoRodou()
-  if (motivo === 'OFICINA') return abrirOficina()
-  return onSelect(motivo)
+// ─── Formulário de foto de evidência ─────────────────────────────────────────
+
+function FotoEvidenciaForm({
+  placa,
+  titulo,
+  descricao,
+  saving,
+  onConfirm,
+  onCancel,
+}: {
+  placa: string
+  titulo: string
+  descricao?: string
+  saving?: boolean
+  onConfirm: (fotoUrl?: string) => void
+  onCancel: () => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    const reader = new FileReader()
+    reader.onload = () => setPreview(reader.result as string)
+    reader.readAsDataURL(f)
+  }
+
+  const handleConfirm = async () => {
+    if (!file) return
+    setUploading(true)
+    const key = `justificativas/${normalizePlaca(placa)}/${crypto.randomUUID()}.jpg`
+    const url = await uploadChecklistEvidenceFile(file, key)
+    setUploading(false)
+    onConfirm(url ?? undefined)
+  }
+
+  const busy = saving || uploading
+
+  return (
+    <div className="w-full min-w-[220px] rounded-xl border border-amber-200 bg-amber-50/90 p-2.5 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+      <p className="text-[10px] font-black uppercase tracking-wide text-amber-900 dark:text-amber-100">
+        {titulo}
+      </p>
+      {descricao ? (
+        <p className="mt-0.5 text-[10px] text-amber-800/80 dark:text-amber-200/70">{descricao}</p>
+      ) : null}
+
+      <div className="mt-2 flex flex-col gap-2">
+        {preview ? (
+          <div className="relative">
+            <img
+              src={preview}
+              alt="Prévia da foto"
+              className="h-24 w-full rounded-lg object-cover ring-2 ring-amber-400/60"
+            />
+            <button
+              type="button"
+              onClick={() => { setPreview(null); setFile(null); if (inputRef.current) inputRef.current.value = '' }}
+              className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-slate-900/70 text-white hover:bg-slate-900"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+            className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-amber-300 bg-white py-3 text-[10px] font-bold text-amber-700 transition hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:border-amber-700 dark:hover:bg-amber-950/40"
+          >
+            <Camera size={14} />
+            Tirar / Selecionar foto
+          </button>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFile}
+        />
+
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            disabled={busy || !file}
+            onClick={handleConfirm}
+            className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-amber-700 disabled:opacity-50"
+          >
+            {uploading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            {uploading ? 'Enviando…' : busy ? '…' : 'Confirmar'}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onCancel}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
+
+// ─── Helpers de estilo ────────────────────────────────────────────────────────
 
 function motivoBtnClass(motivo: ChecklistAusenciaMotivo, base: string, variant: 'default' | 'alt') {
   if (motivo === 'FEITO') {
@@ -353,6 +368,19 @@ function motivoBtnClass(motivo: ChecklistAusenciaMotivo, base: string, variant: 
     : `${base} border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-amber-800 dark:hover:bg-amber-950/40 dark:hover:text-amber-200`
 }
 
+function tituloFoto(motivo: ChecklistAusenciaMotivo, obs?: string): string {
+  if (motivo === 'FEITO') return 'Foto do checklist físico'
+  if (obs) return `Evidência — ${motivo} · ${obs}`
+  return `Evidência — ${motivo}`
+}
+
+function descricaoFoto(motivo: ChecklistAusenciaMotivo): string | undefined {
+  if (motivo === 'FEITO') return 'Tire uma foto do checklist físico como comprovante.'
+  return 'Tire uma foto como evidência da justificativa.'
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+
 export function ChecklistAusenciaJustificar({
   placa,
   motivoAtual,
@@ -364,39 +392,39 @@ export function ChecklistAusenciaJustificar({
 }: Props) {
   const [reservaOpen, setReservaOpen] = useState(false)
   const [desmobilizarOpen, setDesmobilizarOpen] = useState(false)
-  const [feitoOpen, setFeitoOpen] = useState(false)
   const [feriasOpen, setFeriasOpen] = useState(false)
   const [naoRodouOpen, setNaoRodouOpen] = useState(false)
   const [oficinaOpen, setOficinaOpen] = useState(false)
+  const [pendingMotivo, setPendingMotivo] = useState<PendingMotivo | null>(null)
+
   const btnBase =
     'rounded-lg border px-2 py-1.5 text-[10px] font-black uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50'
 
-  const abrirReserva = () => setReservaOpen(true)
-  const fecharReserva = () => setReservaOpen(false)
-  const abrirDesmobilizar = () => setDesmobilizarOpen(true)
-  const fecharDesmobilizar = () => setDesmobilizarOpen(false)
-  const abrirFeito = () => setFeitoOpen(true)
-  const fecharFeito = () => setFeitoOpen(false)
-  const abrirFerias = () => setFeriasOpen(true)
-  const fecharFerias = () => setFeriasOpen(false)
-  const abrirNaoRodou = () => setNaoRodouOpen(true)
-  const fecharNaoRodou = () => setNaoRodouOpen(false)
-  const abrirOficina = () => setOficinaOpen(true)
-  const fecharOficina = () => setOficinaOpen(false)
+  const kmChip = kmUltimo !== undefined ? (
+    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+      {kmUltimo.toLocaleString('pt-BR')} km
+    </span>
+  ) : null
 
-  if (feitoOpen) {
+  // ── Foto de evidência (etapa final de todos os motivos, exceto DESMOBILIZADO) ─
+
+  if (pendingMotivo) {
     return (
-      <FeitoFotoForm
+      <FotoEvidenciaForm
         placa={placa}
+        titulo={tituloFoto(pendingMotivo.motivo, pendingMotivo.obs)}
+        descricao={descricaoFoto(pendingMotivo.motivo)}
         saving={saving}
-        onCancel={fecharFeito}
-        onConfirm={() => {
-          onSelect('FEITO')
-          fecharFeito()
+        onCancel={() => setPendingMotivo(null)}
+        onConfirm={(fotoUrl) => {
+          onSelect(pendingMotivo.motivo, pendingMotivo.placaReserva, pendingMotivo.obs, fotoUrl)
+          setPendingMotivo(null)
         }}
       />
     )
   }
+
+  // ── Fluxos intermediários ─────────────────────────────────────────────────
 
   if (reservaOpen) {
     return (
@@ -404,10 +432,10 @@ export function ChecklistAusenciaJustificar({
         placaOriginal={placa}
         initialPlacaReserva={motivoAtual === 'RESERVA' ? placaReservaAtual ?? '' : ''}
         saving={saving}
-        onCancel={fecharReserva}
+        onCancel={() => setReservaOpen(false)}
         onConfirm={(placaReserva) => {
-          onSelect('RESERVA', placaReserva)
-          fecharReserva()
+          setReservaOpen(false)
+          setPendingMotivo({ motivo: 'RESERVA', placaReserva })
         }}
       />
     )
@@ -418,10 +446,10 @@ export function ChecklistAusenciaJustificar({
       <DesmobilizarConfirmDialog
         placa={placa}
         saving={saving}
-        onCancel={fecharDesmobilizar}
+        onCancel={() => setDesmobilizarOpen(false)}
         onConfirm={() => {
           onSelect('DESMOBILIZADO')
-          fecharDesmobilizar()
+          setDesmobilizarOpen(false)
         }}
       />
     )
@@ -432,10 +460,10 @@ export function ChecklistAusenciaJustificar({
       <FeriasConfirmDialog
         placa={placa}
         saving={saving}
-        onCancel={fecharFerias}
+        onCancel={() => setFeriasOpen(false)}
         onConfirm={() => {
-          onSelect('FÉRIAS')
-          fecharFerias()
+          setFeriasOpen(false)
+          setPendingMotivo({ motivo: 'FÉRIAS' })
         }}
       />
     )
@@ -447,10 +475,10 @@ export function ChecklistAusenciaJustificar({
         titulo="Motivo — Não rodou"
         opcoes={NAO_RODOU_SUBS}
         saving={saving}
-        onCancel={fecharNaoRodou}
+        onCancel={() => setNaoRodouOpen(false)}
         onConfirm={(obs) => {
-          onSelect('NÃO RODOU', undefined, obs)
-          fecharNaoRodou()
+          setNaoRodouOpen(false)
+          setPendingMotivo({ motivo: 'NÃO RODOU', obs })
         }}
       />
     )
@@ -462,23 +490,32 @@ export function ChecklistAusenciaJustificar({
         titulo="Tipo de serviço — Oficina"
         opcoes={OFICINA_SUBS}
         saving={saving}
-        onCancel={fecharOficina}
+        onCancel={() => setOficinaOpen(false)}
         onConfirm={(obs) => {
-          onSelect('OFICINA', undefined, obs)
-          fecharOficina()
+          setOficinaOpen(false)
+          setPendingMotivo({ motivo: 'OFICINA', obs })
         }}
       />
     )
   }
 
+  // ── Click handler ─────────────────────────────────────────────────────────
+
+  const handleMotivoClick = (motivo: ChecklistAusenciaMotivo) => {
+    if (motivo === 'FEITO') return setPendingMotivo({ motivo: 'FEITO' })
+    if (motivo === 'RESERVA') return setReservaOpen(true)
+    if (motivo === 'DESMOBILIZADO') return setDesmobilizarOpen(true)
+    if (motivo === 'FÉRIAS') return setFeriasOpen(true)
+    if (motivo === 'NÃO RODOU') return setNaoRodouOpen(true)
+    if (motivo === 'OFICINA') return setOficinaOpen(true)
+  }
+
+  // ── Estado: já justificado ────────────────────────────────────────────────
+
   if (motivoAtual) {
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5">
-        {kmUltimo !== undefined ? (
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            {kmUltimo.toLocaleString('pt-BR')} km
-          </span>
-        ) : null}
+        {kmChip}
         <span
           className={`inline-flex max-w-full flex-wrap items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ring-1 ${
             motivoAtual === 'DESMOBILIZADO'
@@ -508,7 +545,7 @@ export function ChecklistAusenciaJustificar({
           <button
             type="button"
             disabled={saving}
-            onClick={abrirReserva}
+            onClick={() => setReservaOpen(true)}
             className={`${btnBase} border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-amber-800 dark:hover:bg-amber-950/40 dark:hover:text-amber-200`}
             title={`Alterar placa reserva de ${placa}`}
           >
@@ -520,7 +557,7 @@ export function ChecklistAusenciaJustificar({
             key={motivo}
             type="button"
             disabled={saving}
-            onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, abrirFerias, abrirNaoRodou, abrirOficina, onSelect)}
+            onClick={() => handleMotivoClick(motivo)}
             className={motivoBtnClass(motivo, btnBase, 'alt')}
             title={`Alterar justificativa de ${placa} para ${motivo}`}
           >
@@ -531,23 +568,21 @@ export function ChecklistAusenciaJustificar({
     )
   }
 
+  // ── Estado: sem justificativa ─────────────────────────────────────────────
+
   return (
     <div
       className="flex flex-wrap items-center justify-end gap-1.5"
       role="group"
       aria-label={`Justificar ausência do checklist — ${placa}`}
     >
-      {kmUltimo !== undefined ? (
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-          {kmUltimo.toLocaleString('pt-BR')} km
-        </span>
-      ) : null}
+      {kmChip}
       {CHECKLIST_AUSENCIA_MOTIVOS.map((motivo) => (
         <button
           key={motivo}
           type="button"
           disabled={saving}
-          onClick={() => motivoClickHandler(motivo, abrirReserva, abrirDesmobilizar, abrirFeito, abrirFerias, abrirNaoRodou, abrirOficina, onSelect)}
+          onClick={() => handleMotivoClick(motivo)}
           className={motivoBtnClass(motivo, btnBase, 'default')}
           title={
             motivo === 'FEITO'
