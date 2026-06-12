@@ -823,12 +823,6 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
     }
   }, [limites.ini, limites.fim, setorVeiculo])
 
-  useEffect(() => {
-    if (!canJustify) return
-    const placas = placasNaoRealizaramLista.map((v) => v.placa)
-    fetchLastKmPorPlacas(placas).then(setKmPorPlaca)
-  }, [placasNaoRealizaramLista, canJustify])
-
   const salvarJustificativa = useCallback(
     async (placa: string, motivo: ChecklistAusenciaMotivo, placaReserva?: string, obs?: string) => {
       setJustificativaSavingPlaca(placa)
@@ -1152,6 +1146,12 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       })),
     [frotaMap, placasRealizaramSet, justificativas, passaFiltros, diasNoPeriodo, setorPlacasSet, desmobilizadasLocais],
   )
+
+  useEffect(() => {
+    if (!canJustify) return
+    const placas = placasNaoRealizaramLista.map((v) => v.placa)
+    fetchLastKmPorPlacas(placas).then(setKmPorPlaca)
+  }, [placasNaoRealizaramLista, canJustify])
 
   const frotaFiltrada = useMemo(
     () => Array.from(frotaMap.values()).filter(passaFiltros).filter((v) => !desmobilizadasLocais.has(v.placa)),
