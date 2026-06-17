@@ -331,15 +331,39 @@ export function ChecklistTop10Section({
 }) {
   const groupLabel = CHECKLIST_TOP10_GROUP_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Base'
 
-  const melhorAderencia = useMemo(
-    () => buildChecklistAdherenceRanking(frota, completions, periodDays, groupBy, 'best', 10, minVeiculos),
+  // Ranking completo (melhor → pior). Dividimos ao meio para que cada grupo
+  // apareça em apenas um painel — nunca campeão e crítico ao mesmo tempo.
+  // Em contagem ímpar, o grupo do meio fica com o Hall da Fama (Math.ceil).
+  const rankingCompleto = useMemo(
+    () =>
+      buildChecklistAdherenceRanking(
+        frota,
+        completions,
+        periodDays,
+        groupBy,
+        'best',
+        Number.MAX_SAFE_INTEGER,
+        minVeiculos,
+      ),
     [frota, completions, periodDays, groupBy, minVeiculos],
   )
 
-  const piorAderencia = useMemo(
-    () => buildChecklistAdherenceRanking(frota, completions, periodDays, groupBy, 'worst', 10, minVeiculos),
-    [frota, completions, periodDays, groupBy, minVeiculos],
-  )
+  const { melhorAderencia, piorAderencia } = useMemo(() => {
+    const meio = Math.ceil(rankingCompleto.length / 2)
+    // Zona Crítica = metade inferior que ainda tem pendência. Quem está 100%
+    // nunca é crítico. Pior primeiro, limitado ao Top 10.
+    const piores = rankingCompleto
+      .slice(meio)
+      .filter((e) => e.realizados < e.esperados)
+      .sort((a, b) => (a.pct !== b.pct ? a.pct - b.pct : a.label.localeCompare(b.label, 'pt-BR')))
+      .slice(0, 10)
+    // Hall da Fama = todos os demais (melhor primeiro), limitado ao Top 10.
+    // Inclui quem bateu 100% mesmo na metade inferior, para nenhum grupo
+    // perfeito desaparecer dos painéis.
+    const criticos = new Set(piores.map((e) => e.label))
+    const melhores = rankingCompleto.filter((e) => !criticos.has(e.label)).slice(0, 10)
+    return { melhorAderencia: melhores, piorAderencia: piores }
+  }, [rankingCompleto])
 
   return (
     <div className={`rank-arena flex min-h-0 flex-col gap-4 ${fullscreen ? 'min-h-0 flex-1' : ''}`}>
