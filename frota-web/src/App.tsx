@@ -144,9 +144,9 @@ export default function App() {
             <Route
               path="/admin/frota"
               element={
-                <RequireSuperAdmin>
+                <RequireAdmin>
                   <FrotaEditorPage />
-                </RequireSuperAdmin>
+                </RequireAdmin>
               }
             />
           </Route>
