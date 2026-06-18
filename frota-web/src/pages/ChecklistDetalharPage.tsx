@@ -1492,6 +1492,24 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
       if (filtroPrefixo      && filtroPrefixo      !== 'todos') partesFiltro.push(`Prefixo: ${filtroPrefixo.toUpperCase()}`)
       const filtrosAtivos = partesFiltro.length > 0 ? partesFiltro.join(' · ') : undefined
 
+      const rankingCompleto = buildChecklistAdherenceRanking(
+        frotaFiltradaSetor,
+        completionsComCredito,
+        periodDays,
+        rankingGroupBy,
+        'best',
+        Number.MAX_SAFE_INTEGER,
+        rankingMinVeiculos,
+      )
+      const meio = Math.ceil(rankingCompleto.length / 2)
+      const piores = rankingCompleto
+        .slice(meio)
+        .filter((e) => e.realizados < e.esperados)
+        .sort((a, b) => (a.pct !== b.pct ? a.pct - b.pct : a.label.localeCompare(b.label, 'pt-BR')))
+        .slice(0, 10)
+      const criticos = new Set(piores.map((e) => e.label))
+      const melhores = rankingCompleto.filter((e) => !criticos.has(e.label)).slice(0, 10)
+
       const dataUrl = generateRankingScreenshot({
         periodoLabel,
         periodoResumo,
@@ -1499,24 +1517,8 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         groupLabel,
         minVeiculos: rankingMinVeiculos > 1 ? rankingMinVeiculos : undefined,
         filtrosAtivos,
-        pior: buildChecklistAdherenceRanking(
-          frotaFiltradaSetor,
-          completionsComCredito,
-          periodDays,
-          rankingGroupBy,
-          'worst',
-          10,
-          rankingMinVeiculos,
-        ),
-        melhor: buildChecklistAdherenceRanking(
-          frotaFiltradaSetor,
-          completionsComCredito,
-          periodDays,
-          rankingGroupBy,
-          'best',
-          10,
-          rankingMinVeiculos,
-        ),
+        pior: piores,
+        melhor: melhores,
       })
       downloadDataUrl(dataUrl, `ranking-checklist-${limites.ini}-${limites.fim}.png`)
     } catch {
