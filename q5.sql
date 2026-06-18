@@ -1,0 +1,16 @@
+﻿-- Total operacional: veiculos ATIVO por status do prefixo (RESERVA, TRANSPORTE, etc.)
+SELECT
+  CASE
+    WHEN UPPER(prefixo) LIKE '%RESERVA%' THEN 'RESERVA'
+    WHEN UPPER(prefixo) LIKE '%TRANSPORT%' THEN 'TRANSPORTE'
+    WHEN UPPER(prefixo) LIKE '%DESMOB%' THEN 'DESMOBILIZADO'
+    WHEN UPPER(prefixo) LIKE '%AGUARDANDO%' THEN 'AGUARDANDO'
+    WHEN UPPER(prefixo) LIKE '%AVARIADO%' THEN 'AVARIADO'
+    WHEN UPPER(prefixo) LIKE '%MOB%' THEN 'EM MOBILIZACAO'
+    WHEN prefixo IS NULL OR prefixo = '' THEN 'SEM PREFIXO'
+    ELSE 'OPERACIONAL'
+  END AS categoria,
+  COUNT(*) AS total
+FROM vehicles
+WHERE deleted_at IS NULL AND status = 'ATIVO'
+GROUP BY 1 ORDER BY 2 DESC;

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup — Carimbo de Resolução</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f172a; font-family: 'Inter', system-ui, sans-serif; }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+  /* Carimbo estilo borracha */
+  .stamp {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    border: 2.5px double #16a34a;
+    border-radius: 4px;
+    padding: 2px 6px;
+    transform: rotate(-3deg);
+    color: #16a34a;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.3;
+    opacity: 0.85;
+    gap: 0px;
+    position: relative;
+  }
+  .stamp::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border: 1px solid #16a34a33;
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .stamp-dark {
+    border-color: #4ade80;
+    color: #4ade80;
+  }
+  .stamp-dark::before {
+    border-color: #4ade8033;
+  }
+</style>
+</head>
+<body class="p-8">
+
+<h2 class="text-slate-300 text-sm font-bold mb-6 uppercase tracking-widest">Mockup — Carimbo de Resolução</h2>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- Tabela dark (modo padrão do sistema)                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="mb-10">
+  <p class="text-slate-500 text-xs mb-3 uppercase tracking-widest font-semibold">Modo escuro (padrão do sistema)</p>
+  <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-800 text-slate-500 text-[10px] uppercase tracking-wider">
+          <th class="px-3 py-2 text-left">Veículo</th>
+          <th class="px-3 py-2 text-center">Tipo</th>
+          <th class="px-3 py-2 text-left">Base</th>
+          <th class="px-3 py-2 text-left">Coordenador</th>
+          <th class="px-3 py-2 text-center">Defeito</th>
+          <th class="px-3 py-2 text-center">Apontado</th>
+          <th class="px-3 py-2 text-center">Prazo</th>
+          <th class="px-3 py-2 text-center">Resolução</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Linha 1: Pendente -->
+        <tr class="border-b border-slate-800/80 hover:bg-slate-900/40">
+          <td class="px-3 py-2.5">
+            <span class="inline-flex items-center gap-2">
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900/60 text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect width="13" height="8" x="8" y="13" rx="1"/></svg>
+              </span>
+              <span class="font-mono text-xs font-black tracking-tight text-slate-100">ITM304 · PDY-2583</span>
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-900/30 px-2 py-0.5 text-[10px] font-extrabold text-amber-300">
+              📋 Checklist NC
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">ITM</td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">RICARDO</td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-200">
+            <span class="inline-flex items-center gap-1">⚠️ Adesivo IDT (CGB, Fone, Frota, tag)</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-300">
+            20 de mai. de 2026<br><span class="text-[11px] text-slate-500">06:59</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-rose-400 font-black">
+            27 de mai. de 2026
+            <br><span class="text-[9px] font-extrabold uppercase rounded-full bg-rose-950/40 text-rose-300 px-1.5 py-0.5">Atrasado</span>
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <!-- Pendente: sem carimbo -->
+            <span class="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-400">
+              Pendente
+            </span>
+          </td>
+        </tr>
+
+        <!-- Linha 2: Resolvido COM carimbo -->
+        <tr class="border-b border-slate-800/80 hover:bg-slate-900/40 bg-emerald-950/10">
+          <td class="px-3 py-2.5">
+            <span class="inline-flex items-center gap-2">
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900/60 text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect width="13" height="8" x="8" y="13" rx="1"/></svg>
+              </span>
+              <span class="font-mono text-xs font-black tracking-tight text-slate-100">ITM304 · PDY-2583</span>
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-900/30 px-2 py-0.5 text-[10px] font-extrabold text-amber-300">
+              📋 Checklist NC
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">ITM</td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">RICARDO</td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-200">
+            <span class="inline-flex items-center gap-1">🚫 Faróis, piscas, lanternas e luz do freio</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-300">
+            20 de mai. de 2026<br><span class="text-[11px] text-slate-500">06:59</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-300">
+            27 de mai. de 2026
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <div class="flex flex-col items-center gap-1.5">
+              <!-- Badge "Sim" existente -->
+              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-950/50 px-2.5 py-1 text-xs font-extrabold text-emerald-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Sim
+              </span>
+              <!-- CARIMBO NOVO -->
+              <span class="stamp stamp-dark fade-in">
+                <span>CLAUDIO</span>
+                <span style="font-size:8px;font-weight:700;letter-spacing:0.04em;opacity:0.8">27/mai · 14:32</span>
+              </span>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Linha 3: Resolvido com nome longo -->
+        <tr class="border-b border-slate-800/80 hover:bg-slate-900/40 bg-emerald-950/10">
+          <td class="px-3 py-2.5">
+            <span class="inline-flex items-center gap-2">
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900/60 text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect width="13" height="8" x="8" y="13" rx="1"/></svg>
+              </span>
+              <span class="font-mono text-xs font-black tracking-tight text-slate-100">CGB047 · ABC-1234</span>
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-900/30 px-2 py-0.5 text-[10px] font-extrabold text-amber-300">
+              📋 Checklist NC
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">CGB</td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">EDIVAN</td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-200">
+            <span class="inline-flex items-center gap-1">⚠️ Suspensão e molas</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-300">
+            20 de mai. de 2026<br><span class="text-[11px] text-slate-500">08:15</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-300">
+            27 de mai. de 2026
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <div class="flex flex-col items-center gap-1.5">
+              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-950/50 px-2.5 py-1 text-xs font-extrabold text-emerald-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Sim
+              </span>
+              <span class="stamp stamp-dark fade-in">
+                <span>MATHEUS A.</span>
+                <span style="font-size:8px;font-weight:700;letter-spacing:0.04em;opacity:0.8">01/jun · 09:10</span>
+              </span>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Linha 4: Justificado (sem carimbo de resolução) -->
+        <tr class="border-b border-slate-800/80 hover:bg-slate-900/40">
+          <td class="px-3 py-2.5">
+            <span class="inline-flex items-center gap-2">
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900/60 text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect width="13" height="8" x="8" y="13" rx="1"/></svg>
+              </span>
+              <span class="font-mono text-xs font-black tracking-tight text-slate-100">CGB031 · XYZ-9987</span>
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-900/30 px-2 py-0.5 text-[10px] font-extrabold text-amber-300">
+              📋 Checklist NC
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">CGB</td>
+          <td class="px-3 py-2.5 text-xs text-slate-300">CLAUDIO</td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-200">
+            <span class="inline-flex items-center gap-1">⚠️ Funcionamento do limpador</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-300">
+            20 de mai. de 2026<br><span class="text-[11px] text-slate-500">06:59</span>
+          </td>
+          <td class="px-3 py-2.5 text-center text-xs text-slate-300">27 de mai. de 2026</td>
+          <td class="px-3 py-2.5 text-center">
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-950/40 px-2 py-1 text-xs font-extrabold text-amber-200">
+              💬 Justificado
+            </span>
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- Zoom: variações do carimbo                            -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="mb-10">
+  <p class="text-slate-500 text-xs mb-4 uppercase tracking-widest font-semibold">Variações do carimbo (zoom)</p>
+  <div class="flex flex-wrap gap-8 items-start">
+
+    <!-- Opção A: Atual (borda dupla, rotacionado) -->
+    <div class="flex flex-col items-center gap-2">
+      <p class="text-slate-500 text-[10px] uppercase tracking-wider">Opção A — Borda dupla</p>
+      <div class="flex flex-col items-center gap-1.5">
+        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-950/50 px-3 py-1.5 text-sm font-extrabold text-emerald-200">
+          ✓ Sim
+        </span>
+        <span class="stamp stamp-dark" style="transform:rotate(-3deg); font-size:11px; padding: 3px 8px;">
+          <span>CLAUDIO</span>
+          <span style="font-size:9.5px;font-weight:700;opacity:0.8">27/mai · 14:32</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Opção B: Pill com avatar de iniciais -->
+    <div class="flex flex-col items-center gap-2">
+      <p class="text-slate-500 text-[10px] uppercase tracking-wider">Opção B — Avatar + pill</p>
+      <div class="flex flex-col items-center gap-1.5">
+        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-950/50 px-3 py-1.5 text-sm font-extrabold text-emerald-200">
+          ✓ Sim
+        </span>
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-900/30 border border-emerald-700/40 px-2 py-1">
+          <span class="grid h-5 w-5 place-items-center rounded-full bg-emerald-700 text-[9px] font-black text-white shrink-0">CL</span>
+          <span class="text-[10px] font-bold text-emerald-300 uppercase tracking-wide">Claudio · 27/mai</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Opção C: Badge simples sem rotação -->
+    <div class="flex flex-col items-center gap-2">
+      <p class="text-slate-500 text-[10px] uppercase tracking-wider">Opção C — Badge simples</p>
+      <div class="flex flex-col items-center gap-1.5">
+        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-950/50 px-3 py-1.5 text-sm font-extrabold text-emerald-200">
+          ✓ Sim
+        </span>
+        <span class="inline-flex items-center gap-1 rounded bg-slate-800 border border-emerald-800/60 px-2 py-0.5 text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
+          <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Claudio · 27/mai · 14:32
+        </span>
+      </div>
+    </div>
+
+    <!-- Opção D: Somente tooltip (sem elemento extra) -->
+    <div class="flex flex-col items-center gap-2">
+      <p class="text-slate-500 text-[10px] uppercase tracking-wider">Opção D — Só badge (hover p/ ver)</p>
+      <div class="flex flex-col items-center gap-1.5">
+        <span class="group relative inline-flex items-center gap-1 rounded-full bg-emerald-950/50 px-3 py-1.5 text-sm font-extrabold text-emerald-200 cursor-default">
+          ✓ Sim
+          <!-- Tooltip ao hover -->
+          <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-[11px] font-semibold text-slate-100 opacity-0 group-hover:opacity-100 transition-opacity shadow-xl">
+            Resolvido por <strong class="text-emerald-300">Claudio</strong><br>
+            <span class="text-slate-400">27/mai/2026 às 14:32</span>
+          </span>
+        </span>
+        <span class="text-[9px] text-slate-600 italic">(passe o mouse)</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Nota de rodapé -->
+<p class="text-slate-600 text-[10px] mt-8">
+  O nome exibido vem do email do usuário logado (ex: <code class="text-slate-500">claudio.ferreira@cgbengenharia.com.br</code> → <strong class="text-slate-500">CLAUDIO</strong>)
+</p>
+
+</body>
+</html>

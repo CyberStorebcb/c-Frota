@@ -1,0 +1,1 @@
+﻿SELECT COUNT(DISTINCT dados_veiculo->>'placa') AS placas_unicas_hoje FROM checklists WHERE progresso = 100 AND data_inspecao = '2026-05-27';
