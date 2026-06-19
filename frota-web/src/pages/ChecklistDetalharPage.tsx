@@ -935,8 +935,14 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         if (p) op.add(p)
       }
     }
+    for (const v of allVehicles) {
+      if (v.setor?.trim().toUpperCase() === 'OPERACIONAL') {
+        const p = normPlaca(v.placa)
+        if (p) op.add(p)
+      }
+    }
     return op
-  }, [])
+  }, [allVehicles])
 
   const admPlacasSet = useMemo(() => {
     const adm = new Set<string>()
@@ -946,8 +952,14 @@ export function ChecklistDetalharPage({ setorVeiculo }: { setorVeiculo: SetorVei
         if (p) adm.add(p)
       }
     }
+    for (const v of allVehicles) {
+      if (v.setor?.trim().toUpperCase() === 'ADM') {
+        const p = normPlaca(v.placa)
+        if (p) adm.add(p)
+      }
+    }
     return adm
-  }, [])
+  }, [allVehicles])
 
   const setorPlacasSet = useMemo(
     () => (setorVeiculo === 'adm' ? admPlacasSet : operacionalPlacasSet),
