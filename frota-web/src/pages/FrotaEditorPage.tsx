@@ -63,7 +63,7 @@ const COLS: ColDef[] = [
   { key: 'supervisor',   label: 'SUPERVISOR',    width: 154, editable: true },
   { key: 'coordenador',  label: 'GERÊNCIA',      width: 120, editable: true },
   { key: 'base',         label: 'BASE',          width: 72,  editable: true },
-  { key: 'setor',        label: 'SETOR',         width: 128, editable: true },
+  { key: 'setor',        label: 'SETOR',         width: 128, editable: true, options: ['OPERACIONAL', 'ADM'] },
   { key: 'processo',     label: 'PROCESSO',      width: 104, editable: true },
   { key: 'status',       label: 'STATUS',        width: 136, editable: true, options: ['ATIVO','INATIVO','DESMOBILIZADO','TRANSPORTE'] },
 ]
@@ -231,6 +231,10 @@ export function FrotaEditorPage() {
     if (isNew && !row.placa.replace(NEW_PREFIX, '').trim() && true) {
       // placa is still the temp id — user hasn't typed the real plate yet
       setErrors((prev) => ({ ...prev, [row.placa]: 'Informe a placa antes de salvar.' }))
+      return
+    }
+    if (isNew && !row.setor.trim()) {
+      setErrors((prev) => ({ ...prev, [row.placa]: 'Informe o setor (OPERACIONAL ou ADM).' }))
       return
     }
 
