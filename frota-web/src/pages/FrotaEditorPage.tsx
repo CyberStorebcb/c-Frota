@@ -53,7 +53,7 @@ type ColDef = {
 // ── column definitions ─────────────────────────────────────────────────────
 
 const COLS: ColDef[] = [
-  { key: 'placa',        label: 'PLACA',        width: 106, editable: false },
+  { key: 'placa',        label: 'PLACA',        width: 106, editable: true },
   { key: 'ano',          label: 'ANO',           width: 64,  editable: true },
   { key: 'modelo',       label: 'MODELO',        width: 148, editable: true },
   { key: 'tipo',         label: 'TIPO',          width: 130, editable: true, options: ['MOTO','CARRO','CAMINHÃO','VAN','ÔNIBUS','MICRO-ÔNIBUS','CAMINHONETE','UTILITÁRIO'] },
@@ -125,13 +125,19 @@ export function FrotaEditorPage() {
 
   // original snapshot — used to detect dirty rows
   const originalRef = useRef<Map<string, VehicleRow>>(new Map())
+  // maps id → original placa (stable even when user edits the plate)
+  const originalPlacaByIdRef = useRef<Map<string, string>>(new Map())
 
   // ── load — usa cache de sessão para evitar egress ────────────────────────
 
   const applyRows = useCallback((loaded: VehicleRow[]) => {
     setRows(loaded)
     originalRef.current.clear()
-    loaded.forEach((r) => originalRef.current.set(r.placa, { ...r }))
+    originalPlacaByIdRef.current.clear()
+    loaded.forEach((r) => {
+      originalRef.current.set(r.placa, { ...r })
+      originalPlacaByIdRef.current.set(r.id, r.placa)
+    })
     setLoading(false)
     setErrors({})
   }, [])
@@ -202,12 +208,20 @@ export function FrotaEditorPage() {
 
   // ── dirty detection ──────────────────────────────────────────────────────
 
+  const getOriginal = useCallback((row: VehicleRow): VehicleRow | undefined => {
+    const direct = originalRef.current.get(row.placa)
+    if (direct) return direct
+    // placa may have changed — fall back to lookup by id
+    const origPlaca = originalPlacaByIdRef.current.get(row.id)
+    return origPlaca ? originalRef.current.get(origPlaca) : undefined
+  }, [])
+
   const isDirty = useCallback((row: VehicleRow): boolean => {
     if (isNewRow(row.placa)) return true
-    const orig = originalRef.current.get(row.placa)
+    const orig = getOriginal(row)
     if (!orig) return true
     return EDITABLE_KEYS.some((k) => row[k] !== orig[k])
-  }, [])
+  }, [getOriginal])
 
   const dirtyCount = useMemo(() => rows.filter(isDirty).length, [rows, isDirty])
 
@@ -226,11 +240,16 @@ export function FrotaEditorPage() {
 
   const saveRow = useCallback(async (row: VehicleRow) => {
     const isNew = isNewRow(row.placa)
+    const origPlaca = originalPlacaByIdRef.current.get(row.id)
+    const plateChanged = !isNew && origPlaca !== undefined && origPlaca !== row.placa
 
-    // validate placa for new rows
-    if (isNew && !row.placa.replace(NEW_PREFIX, '').trim() && true) {
-      // placa is still the temp id — user hasn't typed the real plate yet
+    // validate placa
+    if (isNew && !row.placa.replace(NEW_PREFIX, '').trim()) {
       setErrors((prev) => ({ ...prev, [row.placa]: 'Informe a placa antes de salvar.' }))
+      return
+    }
+    if (!isNew && !row.placa.trim()) {
+      setErrors((prev) => ({ ...prev, [row.placa]: 'A placa não pode ficar vazia.' }))
       return
     }
     if (isNew && !row.setor.trim()) {
@@ -241,7 +260,6 @@ export function FrotaEditorPage() {
     setSaving((prev) => new Set(prev).add(row.placa))
     setErrors((prev) => { const e = { ...prev }; delete e[row.placa]; return e })
 
-    // build upsert payload — strip id if new (let DB generate) and fix placa
     const payload: Omit<VehicleRow, 'id'> & { updated_at: string } = {
       placa:        row.placa,
       ano:          row.ano,
@@ -260,23 +278,40 @@ export function FrotaEditorPage() {
       updated_at:   new Date().toISOString(),
     }
 
-    const { error } = await supabase
-      .from('vehicles')
-      .upsert(payload, { onConflict: 'placa' })
+    let dbError: { message: string } | null = null
+
+    if (plateChanged && origPlaca) {
+      // placa mudou em linha existente — UPDATE pelo id para não criar duplicata
+      const { error } = await supabase.from('vehicles').update(payload).eq('id', row.id)
+      dbError = error
+      if (!error) {
+        originalRef.current.delete(origPlaca)
+        originalRef.current.set(row.placa, { ...row })
+        originalPlacaByIdRef.current.set(row.id, row.placa)
+        if (_sessionCache) {
+          const idx = _sessionCache.findIndex((r) => r.placa === origPlaca)
+          if (idx >= 0) _sessionCache[idx] = { ...row }
+        }
+      }
+    } else {
+      const { error } = await supabase.from('vehicles').upsert(payload, { onConflict: 'placa' })
+      dbError = error
+      if (!error) {
+        originalRef.current.set(row.placa, { ...row })
+        if (_sessionCache) {
+          const idx = _sessionCache.findIndex((r) => r.placa === row.placa)
+          if (idx >= 0) _sessionCache[idx] = { ...row }
+          else _sessionCache = [{ ...row }, ..._sessionCache]
+        }
+      }
+    }
 
     setSaving((prev) => { const s = new Set(prev); s.delete(row.placa); return s })
 
-    if (error) {
-      setErrors((prev) => ({ ...prev, [row.placa]: error.message }))
+    if (dbError) {
+      setErrors((prev) => ({ ...prev, [row.placa]: dbError!.message }))
     } else {
-      originalRef.current.set(row.placa, { ...row })
-      // atualiza cache de sessão com o valor salvo
-      if (_sessionCache) {
-        const idx = _sessionCache.findIndex((r) => r.placa === row.placa)
-        if (idx >= 0) _sessionCache[idx] = { ...row }
-        else _sessionCache = [{ ...row }, ..._sessionCache]
-      }
-      fleet.reload()  // atualiza o FleetContext para outras páginas refletirem a mudança
+      fleet.reload()
       setSaved((prev) => new Set(prev).add(row.placa))
       if (isNew) {
         setNewPlacas((prev) => { const s = new Set(prev); s.delete(row.placa); return s })
@@ -298,6 +333,7 @@ export function FrotaEditorPage() {
     const blank = emptyRow()
     setRows((prev) => [blank, ...prev])
     setNewPlacas((prev) => new Set(prev).add(blank.placa))
+    originalPlacaByIdRef.current.set(blank.id, blank.placa)
   }, [])
 
   // ── update placa of new row ──────────────────────────────────────────────
@@ -343,11 +379,11 @@ export function FrotaEditorPage() {
       setNewPlacas((prev) => { const s = new Set(prev); s.delete(row.placa); return s })
       return
     }
-    const orig = originalRef.current.get(row.placa)
+    const orig = getOriginal(row)
     if (!orig) return
-    setRows((prev) => prev.map((r) => (r.placa === row.placa ? { ...orig } : r)))
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...orig } : r)))
     setErrors((prev) => { const e = { ...prev }; delete e[row.placa]; return e })
-  }, [])
+  }, [getOriginal])
 
   // ── filtered rows ────────────────────────────────────────────────────────
 
@@ -476,7 +512,7 @@ export function FrotaEditorPage() {
             <tbody>
               {filtered.map((row) => (
                 <TableRow
-                  key={row.placa}
+                  key={row.id}
                   row={row}
                   dirty={isDirty(row)}
                   saving={saving.has(row.placa)}
@@ -624,7 +660,7 @@ const CELL_READONLY =
   'cursor-default select-all font-black text-slate-900 dark:text-white'
 
 function Cell({ col, value, isNew, onChange }: CellProps) {
-  // placa: readonly for existing rows, editable text for new rows
+  // placa: new row gets autoFocus input; existing row gets regular editable input
   if (col.key === 'placa') {
     if (isNew) {
       return (
@@ -640,9 +676,13 @@ function Cell({ col, value, isNew, onChange }: CellProps) {
       )
     }
     return (
-      <span className={`block px-1.5 py-1 ${CELL_READONLY} font-mono text-[11px]`}>
-        {value}
-      </span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value.toUpperCase())}
+        maxLength={8}
+        className={`${CELL_BASE} ${CELL_FOCUS} font-black font-mono text-[11px] uppercase`}
+        spellCheck={false}
+      />
     )
   }
 
