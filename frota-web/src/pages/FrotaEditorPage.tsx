@@ -280,18 +280,24 @@ export function FrotaEditorPage() {
 
     let dbError: { message: string } | null = null
 
-    if (plateChanged && origPlaca) {
-      // placa mudou em linha existente — UPDATE pelo id para não criar duplicata
+    if (!isNew) {
+      // Linhas existentes: sempre UPDATE por id — evita conflito de chave única
+      // mesmo em veículos desmobilizados (deleted_at != null).
       const { error } = await supabase.from('vehicles').update(payload).eq('id', row.id)
       dbError = error
       if (!error) {
-        originalRef.current.delete(origPlaca)
-        originalRef.current.set(row.placa, { ...row })
-        originalPlacaByIdRef.current.set(row.id, row.placa)
-        if (_sessionCache) {
-          const idx = _sessionCache.findIndex((r) => r.placa === origPlaca)
+        if (origPlaca && origPlaca !== row.placa) {
+          originalRef.current.delete(origPlaca)
+          originalPlacaByIdRef.current.set(row.id, row.placa)
+          if (_sessionCache) {
+            const idx = _sessionCache.findIndex((r) => r.placa === origPlaca)
+            if (idx >= 0) _sessionCache[idx] = { ...row }
+          }
+        } else if (_sessionCache) {
+          const idx = _sessionCache.findIndex((r) => r.placa === row.placa)
           if (idx >= 0) _sessionCache[idx] = { ...row }
         }
+        originalRef.current.set(row.placa, { ...row })
       }
     } else {
       const { error } = await supabase.from('vehicles').upsert(payload, { onConflict: 'placa' })
