@@ -241,7 +241,6 @@ export function FrotaEditorPage() {
   const saveRow = useCallback(async (row: VehicleRow) => {
     const isNew = isNewRow(row.placa)
     const origPlaca = originalPlacaByIdRef.current.get(row.id)
-    const plateChanged = !isNew && origPlaca !== undefined && origPlaca !== row.placa
 
     // validate placa
     if (isNew && !row.placa.replace(NEW_PREFIX, '').trim()) {
@@ -662,8 +661,6 @@ const CELL_BASE =
   'w-full rounded px-1.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-none transition bg-transparent'
 const CELL_FOCUS =
   'focus:bg-brand-50 focus:ring-1 focus:ring-brand-400 dark:focus:bg-brand-950/30 dark:focus:ring-brand-500'
-const CELL_READONLY =
-  'cursor-default select-all font-black text-slate-900 dark:text-white'
 
 function Cell({ col, value, isNew, onChange }: CellProps) {
   // placa: new row gets autoFocus input; existing row gets regular editable input
